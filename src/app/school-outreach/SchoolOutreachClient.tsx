@@ -690,7 +690,7 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                   const enrollment = getEnrollment(school.id)
                   const badge = getCadenceBadge(enrollment, todayStr)
                   const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
-                  const canEnroll = !enrollment || enrollment.status === 'removed' || enrollment.status === 'replied'
+                  const canEnroll = !enrollment || enrollment.status === 'removed' || enrollment.status === 'replied' || enrollment.status === 'completed'
 
                   return (
                     <tr key={school.id} className="hover:bg-[var(--canvas)] transition-colors">

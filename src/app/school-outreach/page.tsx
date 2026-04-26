@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/layout/AppShell'
 import SchoolOutreachClient from './SchoolOutreachClient'
+import { checkGmailReplies } from '@/app/actions/cadence'
 import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/database'
 
 export default async function SchoolOutreachPage() {
@@ -24,6 +25,7 @@ export default async function SchoolOutreachPage() {
       .select('*')
       .eq('user_id', user.id)
       .maybeSingle(),
+    checkGmailReplies().catch(() => null),
   ])
 
   return (

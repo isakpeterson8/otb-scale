@@ -43,6 +43,14 @@ async function getValidAccessToken(supabase: Awaited<ReturnType<typeof createCli
 }
 
 function buildRfc2822(to: string, from: string, subject: string, body: string): string {
+  // Split on blank lines to get paragraphs, collapse single newlines within
+  // each paragraph to a space, then rejoin with CRLF paragraph breaks.
+  const normalizedBody = body
+    .split(/\n\n+/)
+    .map(para => para.replace(/\n/g, ' ').trim())
+    .filter(Boolean)
+    .join('\r\n\r\n')
+
   const message = [
     `To: ${to}`,
     `From: ${from}`,
@@ -50,7 +58,7 @@ function buildRfc2822(to: string, from: string, subject: string, body: string): 
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
     '',
-    body,
+    normalizedBody,
   ].join('\r\n')
 
   return Buffer.from(message)
@@ -126,10 +134,10 @@ export async function enrollInCadence(schoolId: string, openingTemplate: string)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
-  // Remove any previous enrollment for this school before re-enrolling
+  // Complete any active enrollment before creating a new one
   await supabase
     .from('cadence_enrollments')
-    .update({ status: 'removed', removal_reason: 'manual', removed_at: new Date().toISOString() })
+    .update({ status: 'completed' })
     .eq('school_id', schoolId)
     .eq('user_id', user.id)
     .eq('status', 'active')
@@ -226,19 +234,38 @@ export async function checkGmailReplies(): Promise<number> {
 
   const { data: enrollments } = await supabase
     .from('cadence_enrollments')
-    .select('id, gmail_thread_id')
+    .select('id, gmail_thread_id, school_id')
     .eq('user_id', user.id)
     .eq('status', 'active')
     .not('gmail_thread_id', 'is', null)
 
   if (!enrollments?.length) return 0
 
-  // Gmail OAuth integration needed — replies would be detected here
-  // const token = await getGmailOAuthToken(user.id)
-  // for (const e of enrollments) {
-  //   const replied = await checkThreadForReply(token, e.gmail_thread_id)
-  //   if (replied) { await removeFromCadence(e.id, 'reply_detected'); detected++ }
-  // }
+  const accessToken = await getValidAccessToken(supabase, user.id)
+  if (!accessToken) return 0
 
-  return 0
+  let detected = 0
+  for (const e of enrollments as { id: string; gmail_thread_id: string; school_id: string }[]) {
+    try {
+      const res = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/threads/${e.gmail_thread_id}?format=minimal`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
+      if (!res.ok) continue
+      const thread = await res.json() as { messages?: unknown[] }
+      if ((thread.messages?.length ?? 0) > 1) {
+        await removeFromCadence(e.id, 'reply_detected')
+        await supabase
+          .from('school_outreach')
+          .update({ stage: 'replied' })
+          .eq('id', e.school_id)
+        detected++
+      }
+    } catch {
+      // ignore per-thread errors
+    }
+  }
+
+  if (detected > 0) revalidatePath('/school-outreach')
+  return detected
 }
