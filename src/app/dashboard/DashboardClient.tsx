@@ -25,7 +25,9 @@ function fmtMonthYear(d: string) {
 }
 
 function fmtDate(d: string) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const parsed = new Date(d + 'T12:00:00')
+  if (isNaN(parsed.getTime())) return 'Due soon'
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function Card({ children, href, className = '' }: { children: React.ReactNode; href?: string; className?: string }) {

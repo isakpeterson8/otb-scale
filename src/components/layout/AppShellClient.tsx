@@ -28,7 +28,7 @@ export default function AppShellClient({ children, displayName, isAdmin, viewOnl
             <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
-        <img src="/otb-logo.png" alt="Outside The Bachs" width={90} style={{ objectFit: 'contain' }} />
+        <img src="/otb-logo.png" alt="Outside The Bachs" width={60} height={60} style={{ objectFit: 'contain' }} />
         {/* Right spacer keeps logo centred */}
         <div className="w-10" />
       </header>

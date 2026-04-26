@@ -119,9 +119,9 @@ export default function Sidebar({ displayName, isAdmin, viewOnly, isOpen = false
             <img
               src="/otb-logo.png"
               alt="Outside The Bachs"
-              width={80}
-              height={80}
-              className="md:w-[120px] md:h-auto"
+              width={60}
+              height={60}
+              className="md:w-[100px] md:h-auto"
               style={{ objectFit: 'contain' }}
             />
             {viewOnly && (
