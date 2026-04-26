@@ -342,6 +342,12 @@ function TemplateViewerModal({
 
   if (!resolved) return null
 
+  const unfilledVars = [...new Set([
+    ...(subject.match(/\$[A-Za-z]+/g) ?? []),
+    ...(body.match(/\$[A-Za-z]+/g) ?? []),
+  ])]
+  const hasUnfilled = unfilledVars.length > 0
+
   function copySubject() {
     navigator.clipboard.writeText(subject)
     setCopiedSubject(true)
@@ -439,8 +445,26 @@ function TemplateViewerModal({
             style={{ resize: 'vertical', minHeight: '200px' }}
             className="w-full px-3 py-2.5 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] leading-relaxed focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
           />
-          <p className="text-xs text-[var(--ink-3)] mt-1">Edit this template before sending</p>
+          {hasUnfilled ? (
+            <p className="text-xs mt-1" style={{ color: '#b45309' }}>
+              ⚠️ Unfilled variables in body/subject: {unfilledVars.join(', ')}
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--ink-3)] mt-1">Edit this template before sending</p>
+          )}
         </div>
+
+        {hasUnfilled && (
+          <div
+            className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-xs mt-3"
+            style={{ background: 'rgba(180,83,9,0.1)', color: '#b45309' }}
+          >
+            <span className="shrink-0 mt-px">⚠️</span>
+            <span>
+              This email still contains unfilled variables: {unfilledVars.join(', ')}. Edit the template above before sending.
+            </span>
+          </div>
+        )}
 
         {sendError && (
           <p className="text-xs mt-3 px-3 py-2 rounded-lg" style={{ background: 'rgba(220,38,38,0.1)', color: '#b91c1c' }}>
