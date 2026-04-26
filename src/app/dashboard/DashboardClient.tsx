@@ -176,7 +176,9 @@ export default function DashboardClient({ latestSnapshot, schools, enrollments, 
                       >
                         <span className="font-medium text-[#111827] truncate max-w-[55%]">{name}</span>
                         <span className={`text-xs shrink-0 ml-2 ${isOverdue ? 'text-red-500 font-semibold' : 'text-[#6b7280]'}`}>
-                          {label} {date ? (isOverdue ? `overdue ${fmtDate(date)}` : `due ${fmtDate(date)}`) : 'ready'}
+                          {date === null
+                            ? `${label} ready`
+                            : `${label} — ${isOverdue ? `overdue ${fmtDate(date)}` : fmtDate(date)}`}
                         </span>
                       </Link>
                     )
