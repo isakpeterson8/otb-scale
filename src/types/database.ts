@@ -93,7 +93,6 @@ export interface StudioSnapshot {
   poss_reg: number | null
   new_enrollments: number | null
   disenrollments: number | null
-  est_revenue: number | null
   collected_revenue: number | null
   expenses: number | null
   created_at: string

@@ -26,26 +26,38 @@ function fmtPct(num: number | null, den: number | null): string {
   return ((num / den) * 100).toFixed(1) + '%'
 }
 
-function fmtDate(d: string): string {
+function fmtMonthYear(d: string): string {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: 'long', year: 'numeric',
   })
 }
 
-function fmtChartDate(d: string): string {
+function fmtChartMonth(d: string): string {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric',
+    month: 'short', year: '2-digit',
   })
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+const YEARS = [2023, 2024, 2025, 2026, 2027]
+
+function prevMonthDefaults(): { month: string; year: string } {
+  const now = new Date()
+  const m = now.getMonth() // 0-indexed; 0 = Jan
+  if (m === 0) {
+    return { month: '12', year: String(now.getFullYear() - 1) }
+  }
+  return { month: String(m), year: String(now.getFullYear()) }
 }
 
 // ─── form types ───────────────────────────────────────────────────────────────
 
 type FormState = {
-  snapshot_date: string
+  month: string
+  year: string
   enrollment: string
   booked_hrs: string
   goal_hrs: string
@@ -55,38 +67,40 @@ type FormState = {
   poss_reg: string
   new_enrollments: string
   disenrollments: string
-  est_revenue: string
   collected_revenue: string
   expenses: string
 }
 
 function blankForm(): FormState {
+  const { month, year } = prevMonthDefaults()
   return {
-    snapshot_date: today(),
+    month, year,
     enrollment: '', booked_hrs: '', goal_hrs: '', avail_hrs: '',
     leads: '', consults: '', poss_reg: '', new_enrollments: '', disenrollments: '',
-    est_revenue: '', collected_revenue: '', expenses: '',
+    collected_revenue: '', expenses: '',
   }
 }
 
 function snapshotToForm(s: StudioSnapshot): FormState {
   const n = (v: number | null) => v != null ? String(v) : ''
+  const month = String(parseInt(s.snapshot_date.slice(5, 7), 10))
+  const year = s.snapshot_date.slice(0, 4)
   return {
-    snapshot_date: s.snapshot_date,
+    month, year,
     enrollment: n(s.enrollment), booked_hrs: n(s.booked_hrs),
     goal_hrs: n(s.goal_hrs), avail_hrs: n(s.avail_hrs),
     leads: n(s.leads), consults: n(s.consults), poss_reg: n(s.poss_reg),
     new_enrollments: n(s.new_enrollments), disenrollments: n(s.disenrollments),
-    est_revenue: n(s.est_revenue), collected_revenue: n(s.collected_revenue),
-    expenses: n(s.expenses),
+    collected_revenue: n(s.collected_revenue), expenses: n(s.expenses),
   }
 }
 
 function parseForm(f: FormState): Omit<StudioSnapshot, 'id' | 'studio_id' | 'created_at'> {
   const ni = (s: string) => s.trim() === '' ? null : parseInt(s, 10)
   const nf = (s: string) => s.trim() === '' ? null : parseFloat(s)
+  const snapshot_date = `${f.year}-${f.month.padStart(2, '0')}-01`
   return {
-    snapshot_date: f.snapshot_date,
+    snapshot_date,
     enrollment: ni(f.enrollment),
     booked_hrs: nf(f.booked_hrs),
     goal_hrs: nf(f.goal_hrs),
@@ -96,7 +110,6 @@ function parseForm(f: FormState): Omit<StudioSnapshot, 'id' | 'studio_id' | 'cre
     poss_reg: ni(f.poss_reg),
     new_enrollments: ni(f.new_enrollments),
     disenrollments: ni(f.disenrollments),
-    est_revenue: nf(f.est_revenue),
     collected_revenue: nf(f.collected_revenue),
     expenses: nf(f.expenses),
   }
@@ -144,18 +157,19 @@ function SnapshotModal({
   }
 
   const inputCls = 'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
+  const selectCls = inputCls
   const labelCls = 'block text-xs text-[var(--ink-3)] mb-1'
 
-  function Field({ label, field, type = 'number', placeholder = '' }: {
-    label: string; field: keyof FormState; type?: string; placeholder?: string
+  function Field({ label, field, placeholder = '' }: {
+    label: string; field: keyof FormState; placeholder?: string
   }) {
     return (
       <div>
         <label className={labelCls}>{label}</label>
         <input
-          type={type}
-          step={type === 'number' ? 'any' : undefined}
-          min={type === 'number' ? '0' : undefined}
+          type="number"
+          step="any"
+          min="0"
           value={form[field]}
           onChange={e => set(field, e.target.value)}
           placeholder={placeholder}
@@ -170,7 +184,7 @@ function SnapshotModal({
       <div className="w-full max-w-lg bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 p-6 my-auto">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-medium text-[var(--ink)]">
-            {snapshot ? 'Edit Snapshot' : 'Log Snapshot'}
+            {snapshot ? 'Edit Monthly Recap' : 'Monthly Recap'}
           </h3>
           <button onClick={onClose} className="text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -180,15 +194,34 @@ function SnapshotModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
-          <div>
-            <label className={labelCls}>Snapshot Date *</label>
-            <input
-              type="date"
-              required
-              value={form.snapshot_date}
-              onChange={e => set('snapshot_date', e.target.value)}
-              className={inputCls}
-            />
+          {/* Month + Year */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Month *</label>
+              <select
+                required
+                value={form.month}
+                onChange={e => set('month', e.target.value)}
+                className={selectCls}
+              >
+                {MONTH_NAMES.map((name, i) => (
+                  <option key={name} value={String(i + 1)}>{name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Year *</label>
+              <select
+                required
+                value={form.year}
+                onChange={e => set('year', e.target.value)}
+                className={selectCls}
+              >
+                {YEARS.map(y => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -196,10 +229,10 @@ function SnapshotModal({
               Enrollment
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Enrollment" field="enrollment" placeholder="32" />
-              <Field label="Booked Hrs" field="booked_hrs" placeholder="64" />
-              <Field label="Goal Hrs" field="goal_hrs" placeholder="80" />
-              <Field label="Avail Hrs" field="avail_hrs" placeholder="90" />
+              <Field label="Current Enrollment (number of students)" field="enrollment" placeholder="32" />
+              <Field label="Booked Hours" field="booked_hrs" placeholder="64" />
+              <Field label="Goal Hours" field="goal_hrs" placeholder="80" />
+              <Field label="Available Hours" field="avail_hrs" placeholder="90" />
             </div>
           </div>
 
@@ -210,9 +243,9 @@ function SnapshotModal({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Leads" field="leads" placeholder="12" />
               <Field label="Consults" field="consults" placeholder="5" />
-              <Field label="Poss. Reg." field="poss_reg" placeholder="3" />
+              <Field label="Possible Registrations" field="poss_reg" placeholder="3" />
               <Field label="New Enrollments" field="new_enrollments" placeholder="2" />
-              <Field label="Disenrollments" field="disenrollments" placeholder="1" />
+              <Field label="Disenrollments (number of students)" field="disenrollments" placeholder="1" />
             </div>
           </div>
 
@@ -221,7 +254,6 @@ function SnapshotModal({
               Revenue
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Est. Revenue ($)" field="est_revenue" placeholder="4500" />
               <Field label="Collected Revenue ($)" field="collected_revenue" placeholder="4200" />
               <Field label="Expenses ($)" field="expenses" placeholder="800" />
             </div>
@@ -240,7 +272,7 @@ function SnapshotModal({
               disabled={isPending}
               className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:opacity-90 disabled:opacity-60 transition-opacity"
             >
-              {isPending ? 'Saving…' : snapshot ? 'Save changes' : 'Log snapshot'}
+              {isPending ? 'Saving…' : snapshot ? 'Save changes' : 'Save recap'}
             </button>
           </div>
         </form>
@@ -278,7 +310,7 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
   const recent = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null
 
   const chartData = snapshots.map(s => ({
-    date: fmtChartDate(s.snapshot_date),
+    date: fmtChartMonth(s.snapshot_date),
     enrollment: s.enrollment,
     collected_revenue: s.collected_revenue,
     expenses: s.expenses,
@@ -306,7 +338,7 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
   }
 
   function handleDelete(id: string) {
-    if (!confirm('Delete this snapshot? This cannot be undone.')) return
+    if (!confirm('Delete this recap? This cannot be undone.')) return
     setSnapshots(prev => prev.filter(x => x.id !== id))
     startDeleteTransition(async () => {
       await deleteSnapshot(id)
@@ -347,7 +379,7 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
             <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          Log Snapshot
+          Add Monthly Recap
         </button>
       </div>
 
@@ -360,9 +392,9 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
             </svg>
           </div>
           <div>
-            <p className="text-base font-medium text-[var(--ink)]">No snapshots yet</p>
+            <p className="text-base font-medium text-[var(--ink)]">No recaps yet</p>
             <p className="text-sm text-[var(--ink-3)] mt-1 max-w-xs">
-              Log your first snapshot to start tracking your studio's growth.
+              No recaps yet. Add your first monthly recap to start tracking your studio's growth.
             </p>
           </div>
           <button
@@ -370,7 +402,7 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
             className="mt-2 px-5 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 transition-opacity"
             style={{ background: '#04ADEF' }}
           >
-            Log First Snapshot
+            Add First Monthly Recap
           </button>
         </div>
       ) : (
@@ -390,7 +422,6 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
           {/* Charts — only show with 2+ points */}
           {chartData.length >= 2 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {/* Enrollment over time */}
               <ChartCard title="Enrollment Over Time">
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
@@ -406,7 +437,6 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* Revenue vs Expenses */}
               <ChartCard title="Revenue vs Expenses">
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
@@ -425,7 +455,6 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* Pipeline */}
               <ChartCard title="Pipeline">
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
@@ -446,17 +475,17 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
             </div>
           ) : (
             <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 px-5 py-6 text-center text-sm text-[var(--ink-3)]">
-              Add at least 2 snapshots to see charts.
+              Add at least 2 monthly recaps to see charts.
             </div>
           )}
 
-          {/* Snapshots table */}
+          {/* Recaps table */}
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--ink)]/8">
-                    {['Date', 'Enrollment', 'Collected Revenue', 'Expenses', 'Profit', 'Util %', '', ''].map((h, i) => (
+                    {['Month', 'Enrollment', 'Collected Revenue', 'Expenses', 'Profit', 'Util %', '', ''].map((h, i) => (
                       <th
                         key={i}
                         className={`py-3 text-xs font-medium uppercase tracking-wide text-[var(--ink-3)] whitespace-nowrap ${i === 0 ? 'px-4 text-left' : i >= 6 ? 'px-2 text-right w-8' : 'px-4 text-right'}`}
@@ -472,7 +501,7 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
                     const hasFinancials = s.collected_revenue != null || s.expenses != null
                     return (
                       <tr key={s.id} className="hover:bg-[var(--canvas)] transition-colors">
-                        <td className="px-4 py-3 text-sm font-medium text-[var(--ink)] whitespace-nowrap">{fmtDate(s.snapshot_date)}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-[var(--ink)] whitespace-nowrap">{fmtMonthYear(s.snapshot_date)}</td>
                         <td className="px-4 py-3 text-sm text-right text-[var(--ink-2)]">{fmtInt(s.enrollment)}</td>
                         <td className="px-4 py-3 text-sm text-right text-[var(--ink-2)]">{fmtCur(s.collected_revenue)}</td>
                         <td className="px-4 py-3 text-sm text-right text-[var(--ink-2)]">{fmtCur(s.expenses)}</td>
