@@ -319,6 +319,7 @@ function TemplateViewerModal({
     s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 
   const fills: Record<string, string> = {
+    Name: school.contact_name || '$Name',
     MyName: settings?.display_name ? capitalize(settings.display_name) : '',
     StudioName: settings?.studio_name ? capitalize(settings.studio_name) : '',
     Location: settings?.location ?? '',
@@ -674,10 +675,10 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1100px]">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="border-b border-[var(--ink)]/8">
-                  {['School', 'Contact', 'Email / Phone', 'Stage', 'Cadence', 'Probability', 'Last Contact', 'Next Step', 'Due', ''].map((h) => (
+                  {['School', 'Contact', 'Phone', 'Stage', 'Cadence', ''].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>
@@ -689,22 +690,21 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                   const enrollment = getEnrollment(school.id)
                   const badge = getCadenceBadge(enrollment, todayStr)
                   const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
-                  const isOverdue = school.next_step_due_date && school.next_step_due_date < todayStr
                   const canEnroll = !enrollment || enrollment.status === 'removed' || enrollment.status === 'replied'
 
                   return (
-                    <tr key={school.id} className="hover:bg-[var(--canvas)] transition-colors group">
+                    <tr key={school.id} className="hover:bg-[var(--canvas)] transition-colors">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-[var(--ink)] truncate max-w-[140px]">{school.school_name}</p>
-                      </td>
-                      <td className="px-4 py-3 text-[var(--ink-2)] whitespace-nowrap">
-                        {school.contact_name ?? '—'}
+                        <p className="font-medium text-[var(--ink)] truncate max-w-[180px]">{school.school_name}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-[var(--ink-2)] text-xs space-y-0.5">
-                          <div>{school.email ?? '—'}</div>
-                          <div className="text-[var(--ink-3)]">{school.phone ?? ''}</div>
+                        <div className="space-y-0.5">
+                          <p className="text-[var(--ink-2)] whitespace-nowrap">{school.contact_name ?? '—'}</p>
+                          <p className="text-xs text-[var(--ink-3)]">{school.email ?? ''}</p>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--ink-3)] text-xs whitespace-nowrap">
+                        {school.phone ?? '—'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <StageBadge stage={school.stage} />
@@ -717,7 +717,7 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                           >
                             {badge.label}
                           </span>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-wrap">
                             {canEnroll && (
                               <button
                                 onClick={() => setEnrollModal(school)}
@@ -757,51 +757,17 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {school.probability != null ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[var(--ink-2)] text-xs w-8 tabular-nums">{school.probability}%</span>
-                            <div className="w-14 h-1.5 bg-[var(--canvas)] rounded-full overflow-hidden border border-[var(--ink)]/8">
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${school.probability}%`,
-                                  background: school.probability >= 70 ? 'var(--green)' : school.probability >= 40 ? 'var(--amber)' : 'var(--red)',
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--ink-3)] text-xs whitespace-nowrap">
-                        {formatDate(school.last_interacted_date)}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--ink-2)] max-w-[140px]">
-                        <span className="line-clamp-1 text-xs" title={school.next_step ?? ''}>
-                          {school.next_step ?? '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {school.next_step_due_date ? (
-                          <span className={`text-xs font-medium ${isOverdue ? 'text-[var(--red)]' : 'text-[var(--ink-2)]'}`}>
-                            {isOverdue && '⚠ '}{formatDate(school.next_step_due_date)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-[var(--ink-3)]">—</span>
-                        )}
-                      </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => setEditSchool(school)}
-                            className="p-1.5 rounded-lg text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--ink)]/5 transition-colors"
-                            title="Edit"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                              <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                            </svg>
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setEditSchool(school)}
+                          className="p-1.5 rounded-lg transition-colors"
+                          style={{ color: '#04ADEF' }}
+                          title="Edit"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                            <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                          </svg>
+                        </button>
                       </td>
                     </tr>
                   )
