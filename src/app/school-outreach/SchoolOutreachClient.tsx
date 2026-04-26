@@ -54,7 +54,10 @@ function getCadenceBadge(e: CadenceEnrollment | null, todayStr: string) {
     if (e.removal_reason === 'reply_detected') return { label: 'Removed — replied', bg: 'rgba(4,173,239,0.1)', text: 'var(--accent-text)' }
     return { label: 'Removed', bg: 'rgba(0,0,0,0.04)', text: 'rgba(0,0,0,0.35)' }
   }
-  const num = e.current_email_number ?? 1
+  const num = e.current_email_number ?? 0
+  if (num === 0) {
+    return { label: 'Email 1 ready', bg: 'rgba(4,173,239,0.1)', text: 'var(--accent-text)' }
+  }
   if (num === 1) {
     if (e.email_2_due_at && e.email_2_due_at.slice(0, 10) <= todayStr) {
       return { label: `Email 2 due ${fmtShort(e.email_2_due_at)}`, bg: 'rgba(180,83,9,0.1)', text: 'var(--amber)' }
@@ -74,7 +77,7 @@ function getCadenceBadge(e: CadenceEnrollment | null, todayStr: string) {
 
 function getNextEmailNumber(e: CadenceEnrollment): number | null {
   if (e.status !== 'active') return null
-  const num = e.current_email_number ?? 1
+  const num = e.current_email_number ?? 0
   if (num >= 4) return null
   return num + 1
 }
@@ -82,11 +85,15 @@ function getNextEmailNumber(e: CadenceEnrollment): number | null {
 function getNextEmailContent(e: CadenceEnrollment) {
   const nextNum = getNextEmailNumber(e)
   if (!nextNum) return null
-  const openingSubject = OPENING_TEMPLATES[e.opening_template]?.subject ?? 'Guest Instructor'
+  const openingTpl = OPENING_TEMPLATES[e.opening_template as OpeningTemplateKey]
+  const openingSubject = openingTpl?.subject ?? 'Guest Instructor'
+  if (nextNum === 1) {
+    if (!openingTpl) return null
+    return { emailNumber: 1, subject: openingTpl.subject, body: openingTpl.body }
+  }
   if (nextNum === 2 || nextNum === 3 || nextNum === 4) {
     const tpl = FOLLOWUP_EMAILS[nextNum as 2 | 3 | 4]
-    const subject = `Re: ${openingSubject}`
-    return { emailNumber: nextNum, subject, body: tpl.body }
+    return { emailNumber: nextNum, subject: `Re: ${openingSubject}`, body: tpl.body }
   }
   return null
 }
@@ -382,6 +389,15 @@ function TemplateViewerModal({
             </svg>
           </button>
         </div>
+
+        {content.emailNumber > 1 && (
+          <div
+            className="rounded-lg text-xs leading-relaxed mb-4"
+            style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626', padding: '10px 14px' }}
+          >
+            ⚠️ Note: This email will be sent as a new thread, not as a reply to your previous email. To send as a true reply, copy the body and reply manually from your email client.
+          </div>
+        )}
 
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">

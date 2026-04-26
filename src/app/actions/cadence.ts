@@ -142,16 +142,11 @@ export async function enrollInCadence(schoolId: string, openingTemplate: string)
     .eq('user_id', user.id)
     .eq('status', 'active')
 
-  const now = new Date()
-  const email2Due = new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000)
-
   const { error } = await supabase.from('cadence_enrollments').insert({
     school_id: schoolId,
     user_id: user.id,
     opening_template: openingTemplate,
-    current_email_number: 1,
-    email_1_sent_at: now.toISOString(),
-    email_2_due_at: email2Due.toISOString(),
+    current_email_number: 0,
     status: 'active',
   })
 
