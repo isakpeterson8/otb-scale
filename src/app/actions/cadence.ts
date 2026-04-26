@@ -48,23 +48,56 @@ async function getValidAccessToken(supabase: Awaited<ReturnType<typeof createCli
   return tokens.access_token
 }
 
+function bodyToHtml(body: string): string {
+  const paragraphs = body.split(/\n\n+/)
+  const htmlParts: string[] = []
+
+  for (const para of paragraphs) {
+    const trimmed = para.trim()
+    if (!trimmed) continue
+
+    const lines = trimmed.split('\n')
+    const isBulletBlock = lines.every(l => l.trimStart().startsWith('- '))
+
+    if (isBulletBlock) {
+      const items = lines.map(l => `<li>${l.trimStart().slice(2).trim()}</li>`).join('\n')
+      htmlParts.push(`<ul style="margin: 0 0 12px; padding-left: 20px;">\n${items}\n</ul>`)
+    } else {
+      const html = lines.map(l => l.trimStart().startsWith('- ')
+        ? `• ${l.trimStart().slice(2).trim()}`
+        : l
+      ).join('<br>')
+      htmlParts.push(`<p style="margin: 0 0 12px;">${html}</p>`)
+    }
+  }
+
+  return `<div style="font-family: Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #000000; max-width: 600px;">\n${htmlParts.join('\n')}\n</div>`
+}
+
 function buildRfc2822(to: string, from: string, subject: string, body: string): string {
-  // Split on blank lines to get paragraphs, collapse single newlines within
-  // each paragraph to a space, then rejoin with CRLF paragraph breaks.
-  const normalizedBody = body
-    .split(/\n\n+/)
-    .map(para => para.replace(/\n/g, ' ').trim())
-    .filter(Boolean)
-    .join('\r\n\r\n')
+  const boundary = 'boundary_otb_' + Date.now()
+
+  const plainText = body.trim()
+  const htmlBody = bodyToHtml(body)
 
   const message = [
     `To: ${to}`,
     `From: ${from}`,
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
     'Content-Type: text/plain; charset=UTF-8',
     '',
-    normalizedBody,
+    plainText,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=UTF-8',
+    '',
+    htmlBody,
+    '',
+    `--${boundary}--`,
   ].join('\r\n')
 
   return Buffer.from(message)
