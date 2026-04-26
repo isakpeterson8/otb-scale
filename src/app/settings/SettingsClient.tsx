@@ -174,7 +174,7 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
             <input
               name="display_name"
               type="text"
-              defaultValue={settings?.display_name ?? profile?.display_name ?? ''}
+              defaultValue={settings?.display_name ?? ''}
               placeholder="Your name"
               className={inputClass}
             />
