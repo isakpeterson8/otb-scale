@@ -89,7 +89,7 @@ export default function Sidebar({ displayName, isAdmin, viewOnly, isOpen = false
   }
 
   const navLinkClass = (active: boolean) => [
-    'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
+    'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs md:text-sm transition-colors min-h-[44px]',
     active
       ? 'bg-white/10 text-[var(--ink)]'
       : 'text-[var(--ink)]/50 hover:text-[var(--ink)]/80 hover:bg-white/6',
@@ -109,7 +109,7 @@ export default function Sidebar({ displayName, isAdmin, viewOnly, isOpen = false
       {/* Sidebar panel */}
       <aside
         className={[
-          'fixed inset-y-0 left-0 z-40 w-56 shrink-0 flex flex-col bg-[var(--sidebar)] transition-transform duration-200',
+          'fixed inset-y-0 left-0 z-40 w-[200px] md:w-[240px] shrink-0 flex flex-col bg-[var(--sidebar)] transition-transform duration-200',
           'md:sticky md:top-0 md:h-screen md:translate-x-0 md:z-auto',
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
@@ -119,7 +119,9 @@ export default function Sidebar({ displayName, isAdmin, viewOnly, isOpen = false
             <img
               src="/otb-logo.png"
               alt="Outside The Bachs"
-              className="w-20 md:w-[120px]"
+              width={80}
+              height={80}
+              className="md:w-[120px] md:h-auto"
               style={{ objectFit: 'contain' }}
             />
             {viewOnly && (
