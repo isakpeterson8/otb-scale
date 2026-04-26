@@ -11,17 +11,21 @@ export default async function AppShell({ children }: { children: React.ReactNode
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, display_name, role, email')
+    .select('id, studio_id, role, email, status')
     .eq('id', user.id)
     .single<Profile>()
 
+  const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
+
+  if (!isAdmin) {
+    if (profile?.status === 'rejected') redirect('/rejected')
+    if (profile?.status !== 'approved') redirect('/pending')
+  }
+
   const displayName =
-    profile?.display_name ??
     user.user_metadata?.full_name ??
     user.email?.split('@')[0] ??
     'User'
-
-  const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
 
   return (
     <div className="flex min-h-screen bg-[var(--canvas)]">
