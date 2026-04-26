@@ -27,7 +27,7 @@ export default async function FinancialsPage() {
 
   return (
     <AppShell>
-      <main className="px-8 py-7 pb-16">
+      <main className="px-4 md:px-8 py-5 md:py-7 pb-16">
         <FinancialsClient initialSnapshots={snapshots} />
       </main>
     </AppShell>

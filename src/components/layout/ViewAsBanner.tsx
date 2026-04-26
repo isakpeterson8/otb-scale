@@ -15,10 +15,10 @@ export function ViewAsBanner({ email }: { email: string }) {
 
   return (
     <div
-      className="flex items-center justify-between px-5 py-2.5 text-sm font-medium"
+      className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm font-medium"
       style={{ background: 'rgba(220,38,38,0.12)', color: '#b91c1c', borderBottom: '1px solid rgba(220,38,38,0.2)' }}
     >
-      <span>👁 Viewing as {email} — Read only mode</span>
+      <span className="truncate mr-3 min-w-0">👁 Viewing as {email} — Read only mode</span>
       <button
         onClick={handleExit}
         disabled={isPending}

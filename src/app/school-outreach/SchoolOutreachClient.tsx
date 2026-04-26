@@ -149,7 +149,7 @@ function SchoolForm({ school, onClose }: { school?: SchoolOutreach; onClose: () 
   )
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-h-[72vh] overflow-y-auto pr-1">
+    <form onSubmit={handleSubmit} className="space-y-3 pr-1">
       {textField('School Name', 'school_name', 'text', 'Lincoln Elementary', true)}
       <div className="grid grid-cols-2 gap-3">
         {textField('Contact Name', 'contact_name', 'text', 'Ms. Johnson')}
@@ -237,8 +237,8 @@ function EnrollModal({
   const [preview, setPreview] = useState<OpeningTemplateKey | null>(null)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-2xl bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 p-6 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[var(--surface)] p-6 sm:flex-none sm:rounded-2xl sm:border sm:border-[var(--ink)]/8 sm:max-h-[90vh] sm:max-w-2xl w-full">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-medium text-[var(--ink)]">Enroll in Cadence</h3>
@@ -251,7 +251,7 @@ function EnrollModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0">
           {OPENING_TEMPLATE_KEYS.map((key) => {
             const tpl = OPENING_TEMPLATES[key]
             const isSelected = selected === key
@@ -384,8 +384,8 @@ function TemplateViewerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-xl bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 p-6 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[var(--surface)] p-6 sm:flex-none sm:rounded-2xl sm:border sm:border-[var(--ink)]/8 sm:max-h-[90vh] sm:max-w-xl w-full">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-medium text-[var(--ink)]">Email {resolved.emailNumber} — {school.school_name}</h3>
@@ -561,14 +561,14 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
         </p>
       </div>
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
             School Outreach
           </h2>
           <p className="text-sm text-[var(--ink-3)] mt-0.5">Classroom visit pipeline</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <a
             href="/email-templates"
             className="flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors hover:opacity-80"
@@ -686,8 +686,8 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
 
       {/* Modals */}
       {(showForm || editSchool) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-lg bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 p-6">
+        <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
+          <div className="flex-1 overflow-y-auto bg-[var(--surface)] p-6 sm:flex-none sm:rounded-2xl sm:border sm:border-[var(--ink)]/8 sm:max-h-[90vh] sm:overflow-y-auto sm:max-w-lg w-full">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-medium text-[var(--ink)]">
                 {editSchool ? 'Edit school' : 'Add school'}
@@ -727,114 +727,196 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
         />
       )}
 
-      {/* Table */}
+      {/* School list */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <p className="text-sm text-[var(--ink-3)]">No schools yet. Add your first school outreach record.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="border-b border-[var(--ink)]/8">
-                  {['School', 'Contact', 'Phone', 'Stage', 'Cadence', ''].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ink)]/6">
-                {filtered.map((school) => {
-                  const enrollment = getEnrollment(school.id)
-                  const badge = getCadenceBadge(enrollment, todayStr)
-                  const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
-                  const canEnroll = !enrollment || enrollment.status === 'removed' || enrollment.status === 'replied' || enrollment.status === 'completed'
-
-                  return (
-                    <tr key={school.id} className="hover:bg-[var(--canvas)] transition-colors">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-[var(--ink)] truncate max-w-[180px]">{school.school_name}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-0.5">
-                          <p className="text-[var(--ink-2)] whitespace-nowrap">{school.contact_name ?? '—'}</p>
-                          <p className="text-xs text-[var(--ink-3)]">{school.email ?? ''}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-[var(--ink-3)] text-xs whitespace-nowrap">
-                        {school.phone ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <StageBadge stage={school.stage} />
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex flex-col gap-1.5">
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap w-fit"
-                            style={{ background: badge.bg, color: badge.text }}
+          <>
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-[var(--ink)]/6">
+              {filtered.map((school) => {
+                const enrollment = getEnrollment(school.id)
+                const badge = getCadenceBadge(enrollment, todayStr)
+                const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
+                const canEnroll = !enrollment || enrollment.status === 'removed' || enrollment.status === 'replied' || enrollment.status === 'completed'
+                return (
+                  <div key={school.id} className="px-4 py-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-[var(--ink)] truncate">{school.school_name}</p>
+                        <p className="text-xs text-[var(--ink-3)] mt-0.5 truncate">
+                          {school.contact_name ?? '—'}{school.email ? ` · ${school.email}` : ''}
+                        </p>
+                        {school.phone && <p className="text-xs text-[var(--ink-3)]">{school.phone}</p>}
+                      </div>
+                      <button
+                        onClick={() => setEditSchool(school)}
+                        className="p-1.5 rounded-lg shrink-0 transition-colors"
+                        style={{ color: '#04ADEF' }}
+                        title="Edit"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                          <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <StageBadge stage={school.stage} />
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{ background: badge.bg, color: badge.text }}
+                      >
+                        {badge.label}
+                      </span>
+                    </div>
+                    {(canEnroll || (enrollment && enrollment.status === 'active' && nextNum)) && (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {canEnroll && (
+                          <button
+                            onClick={() => setEnrollModal(school)}
+                            disabled={isPending}
+                            className="text-xs text-[var(--accent-text)] hover:underline disabled:opacity-50 min-h-[40px] px-2"
                           >
-                            {badge.label}
-                          </span>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {canEnroll && (
-                              <button
-                                onClick={() => setEnrollModal(school)}
-                                disabled={isPending}
-                                className="text-xs text-[var(--accent-text)] hover:underline disabled:opacity-50"
-                              >
-                                {enrollment ? 'Re-enroll' : 'Enroll'}
-                              </button>
-                            )}
-                            {enrollment && enrollment.status === 'active' && nextNum && (
-                              <>
-                                {!canEnroll && <span className="text-[var(--ink-3)] text-xs">·</span>}
-                                <button
-                                  onClick={() => setTemplateViewer({ school, enrollment })}
-                                  className="text-xs text-[var(--ink-3)] hover:text-[var(--ink)] hover:underline"
-                                >
-                                  View #{nextNum}
-                                </button>
-                                <span className="text-[var(--ink-3)] text-xs">·</span>
-                                <button
-                                  onClick={() => handleMarkSent(enrollment)}
-                                  disabled={isPending}
-                                  className="text-xs text-[var(--green)] hover:underline disabled:opacity-50"
-                                >
-                                  Mark sent
-                                </button>
-                                <span className="text-[var(--ink-3)] text-xs">·</span>
-                                <button
-                                  onClick={() => handleRemove(enrollment)}
-                                  disabled={isPending}
-                                  className="text-xs text-[var(--ink-3)] hover:text-[var(--red)] disabled:opacity-50"
-                                >
-                                  Remove
-                                </button>
-                              </>
-                            )}
+                            {enrollment ? 'Re-enroll' : 'Enroll'}
+                          </button>
+                        )}
+                        {enrollment && enrollment.status === 'active' && nextNum && (
+                          <>
+                            <button
+                              onClick={() => setTemplateViewer({ school, enrollment })}
+                              className="text-xs text-[var(--ink-3)] hover:text-[var(--ink)] hover:underline min-h-[40px] px-2"
+                            >
+                              View #{nextNum}
+                            </button>
+                            <button
+                              onClick={() => handleMarkSent(enrollment)}
+                              disabled={isPending}
+                              className="text-xs text-[var(--green)] hover:underline disabled:opacity-50 min-h-[40px] px-2"
+                            >
+                              Mark sent
+                            </button>
+                            <button
+                              onClick={() => handleRemove(enrollment)}
+                              disabled={isPending}
+                              className="text-xs text-[var(--ink-3)] hover:text-[var(--red)] disabled:opacity-50 min-h-[40px] px-2"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm min-w-[720px]">
+                <thead>
+                  <tr className="border-b border-[var(--ink)]/8">
+                    {['School', 'Contact', 'Phone', 'Stage', 'Cadence', ''].map((h) => (
+                      <th key={h} className="text-left px-4 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--ink)]/6">
+                  {filtered.map((school) => {
+                    const enrollment = getEnrollment(school.id)
+                    const badge = getCadenceBadge(enrollment, todayStr)
+                    const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
+                    const canEnroll = !enrollment || enrollment.status === 'removed' || enrollment.status === 'replied' || enrollment.status === 'completed'
+
+                    return (
+                      <tr key={school.id} className="hover:bg-[var(--canvas)] transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-[var(--ink)] truncate max-w-[180px]">{school.school_name}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="space-y-0.5">
+                            <p className="text-[var(--ink-2)] whitespace-nowrap">{school.contact_name ?? '—'}</p>
+                            <p className="text-xs text-[var(--ink-3)]">{school.email ?? ''}</p>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => setEditSchool(school)}
-                          className="p-1.5 rounded-lg transition-colors"
-                          style={{ color: '#04ADEF' }}
-                          title="Edit"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                            <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="px-4 py-3 text-[var(--ink-3)] text-xs whitespace-nowrap">
+                          {school.phone ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <StageBadge stage={school.stage} />
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex flex-col gap-1.5">
+                            <span
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap w-fit"
+                              style={{ background: badge.bg, color: badge.text }}
+                            >
+                              {badge.label}
+                            </span>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {canEnroll && (
+                                <button
+                                  onClick={() => setEnrollModal(school)}
+                                  disabled={isPending}
+                                  className="text-xs text-[var(--accent-text)] hover:underline disabled:opacity-50"
+                                >
+                                  {enrollment ? 'Re-enroll' : 'Enroll'}
+                                </button>
+                              )}
+                              {enrollment && enrollment.status === 'active' && nextNum && (
+                                <>
+                                  {!canEnroll && <span className="text-[var(--ink-3)] text-xs">·</span>}
+                                  <button
+                                    onClick={() => setTemplateViewer({ school, enrollment })}
+                                    className="text-xs text-[var(--ink-3)] hover:text-[var(--ink)] hover:underline"
+                                  >
+                                    View #{nextNum}
+                                  </button>
+                                  <span className="text-[var(--ink-3)] text-xs">·</span>
+                                  <button
+                                    onClick={() => handleMarkSent(enrollment)}
+                                    disabled={isPending}
+                                    className="text-xs text-[var(--green)] hover:underline disabled:opacity-50"
+                                  >
+                                    Mark sent
+                                  </button>
+                                  <span className="text-[var(--ink-3)] text-xs">·</span>
+                                  <button
+                                    onClick={() => handleRemove(enrollment)}
+                                    disabled={isPending}
+                                    className="text-xs text-[var(--ink-3)] hover:text-[var(--red)] disabled:opacity-50"
+                                  >
+                                    Remove
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => setEditSchool(school)}
+                            className="p-1.5 rounded-lg transition-colors"
+                            style={{ color: '#04ADEF' }}
+                            title="Edit"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                              <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

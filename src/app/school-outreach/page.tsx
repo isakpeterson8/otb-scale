@@ -30,7 +30,7 @@ export default async function SchoolOutreachPage() {
 
   return (
     <AppShell>
-      <main className="flex-1 px-8 py-7">
+      <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <SchoolOutreachClient
           schools={(schools ?? []) as SchoolOutreach[]}
           enrollments={(enrollments ?? []) as CadenceEnrollment[]}

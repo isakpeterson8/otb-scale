@@ -120,7 +120,7 @@ export default function DashboardClient({ latestSnapshot, schools, enrollments, 
       {/* Row 1 — Studio Snapshot */}
       <section className="space-y-3">
         <SectionHeading>Studio Snapshot</SectionHeading>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card href="/financials">
             <CardTitle>Current Enrollment</CardTitle>
             {latestSnapshot?.enrollment != null
@@ -146,7 +146,7 @@ export default function DashboardClient({ latestSnapshot, schools, enrollments, 
       {/* Row 2 — School Outreach */}
       <section className="space-y-3">
         <SectionHeading>School Outreach</SectionHeading>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
           {/* Card 1: Active Schools */}
           <Card href="/school-outreach">
@@ -210,7 +210,7 @@ export default function DashboardClient({ latestSnapshot, schools, enrollments, 
       {/* Row 3 — Facebook Groups */}
       <section className="space-y-3">
         <SectionHeading>Facebook Groups</SectionHeading>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
           {/* Card 1: Active Groups */}
           <Card href="/facebook-groups">

@@ -74,9 +74,11 @@ interface SidebarProps {
   displayName: string
   isAdmin: boolean
   viewOnly?: boolean
+  isOpen?: boolean
+  onClose?: () => void
 }
 
-export default function Sidebar({ displayName, isAdmin, viewOnly }: SidebarProps) {
+export default function Sidebar({ displayName, isAdmin, viewOnly, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -86,84 +88,113 @@ export default function Sidebar({ displayName, isAdmin, viewOnly }: SidebarProps
     router.push('/auth/login')
   }
 
+  const navLinkClass = (active: boolean) => [
+    'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
+    active
+      ? 'bg-white/10 text-[var(--ink)]'
+      : 'text-[var(--ink)]/50 hover:text-[var(--ink)]/80 hover:bg-white/6',
+  ].join(' ')
+
   return (
-    <aside className="w-56 shrink-0 flex flex-col h-screen sticky top-0 bg-[var(--sidebar)]">
-      <div className="flex items-center gap-2 px-5 py-6">
-        <img
-          src="/otb-logo.png"
-          alt="Outside The Bachs"
-          width={120}
-          style={{ objectFit: 'contain' }}
+    <>
+      {/* Backdrop — mobile only */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={onClose}
+          aria-hidden
         />
-        {viewOnly && (
-          <span
-            className="text-xs px-1.5 py-0.5 rounded font-semibold shrink-0"
-            style={{ background: 'rgba(220,38,38,0.15)', color: '#b91c1c' }}
-          >
-            View Only
-          </span>
-        )}
-      </div>
+      )}
 
-      <nav className="flex-1 px-3 py-2 space-y-0.5">
-        {NAV.map(({ label, href, icon }) => {
-          const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={[
-                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
-                active
-                  ? 'bg-white/10 text-[var(--ink)]'
-                  : 'text-[var(--ink)]/50 hover:text-[var(--ink)]/80 hover:bg-white/6',
-              ].join(' ')}
-            >
-              <span className={active ? 'text-[var(--ink)]' : 'text-[var(--ink)]/40'}>{icon}</span>
-              {label}
-            </Link>
-          )
-        })}
-
-        {isAdmin && (
-          <Link
-            href="/admin"
-            className={[
-              'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
-              pathname.startsWith('/admin')
-                ? 'bg-white/10 text-[var(--ink)]'
-                : 'text-[var(--ink)]/50 hover:text-[var(--ink)]/80 hover:bg-white/6',
-            ].join(' ')}
-          >
-            <span className={pathname.startsWith('/admin') ? 'text-[var(--ink)]' : 'text-[var(--ink)]/40'}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                <path d="M8 1l2 4h4l-3 3 1 4-4-2.5L4 12l1-4L2 5h4L8 1z" fill="currentColor" />
-              </svg>
-            </span>
-            Admin
-          </Link>
-        )}
-      </nav>
-
-      <div className="px-3 pt-3 pb-4 border-t border-white/8">
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">
-            <span className="text-[var(--ink)] text-xs font-semibold leading-none">
-              {initials(displayName)}
-            </span>
+      {/* Sidebar panel */}
+      <aside
+        className={[
+          'fixed inset-y-0 left-0 z-40 w-56 shrink-0 flex flex-col bg-[var(--sidebar)] transition-transform duration-200',
+          'md:sticky md:top-0 md:h-screen md:translate-x-0 md:z-auto',
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        ].join(' ')}
+      >
+        <div className="flex items-center justify-between gap-2 px-5 py-6">
+          <div className="flex items-center gap-2">
+            <img
+              src="/otb-logo.png"
+              alt="Outside The Bachs"
+              width={120}
+              style={{ objectFit: 'contain' }}
+            />
+            {viewOnly && (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded font-semibold shrink-0"
+                style={{ background: 'rgba(220,38,38,0.15)', color: '#b91c1c' }}
+              >
+                View Only
+              </span>
+            )}
           </div>
-          <span className="text-sm text-[var(--ink)]/60 truncate">{displayName}</span>
+          {/* Mobile close button */}
+          <button
+            onClick={onClose}
+            className="md:hidden flex items-center justify-center w-8 h-8 text-[var(--ink)]/40 hover:text-[var(--ink)] transition-colors"
+            aria-label="Close menu"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-[var(--ink)]/30 hover:text-[var(--ink)]/55 hover:bg-white/6 transition-colors"
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
-            <path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h3M9 9.5l3-3-3-3M12 6.5H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Sign out
-        </button>
-      </div>
-    </aside>
+
+        <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+          {NAV.map(({ label, href, icon }) => {
+            const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onClose}
+                className={navLinkClass(active)}
+              >
+                <span className={active ? 'text-[var(--ink)]' : 'text-[var(--ink)]/40'}>{icon}</span>
+                {label}
+              </Link>
+            )
+          })}
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              onClick={onClose}
+              className={navLinkClass(pathname.startsWith('/admin'))}
+            >
+              <span className={pathname.startsWith('/admin') ? 'text-[var(--ink)]' : 'text-[var(--ink)]/40'}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path d="M8 1l2 4h4l-3 3 1 4-4-2.5L4 12l1-4L2 5h4L8 1z" fill="currentColor" />
+                </svg>
+              </span>
+              Admin
+            </Link>
+          )}
+        </nav>
+
+        <div className="px-3 pt-3 pb-4 border-t border-white/8">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">
+              <span className="text-[var(--ink)] text-xs font-semibold leading-none">
+                {initials(displayName)}
+              </span>
+            </div>
+            <span className="text-sm text-[var(--ink)]/60 truncate">{displayName}</span>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-[var(--ink)]/30 hover:text-[var(--ink)]/55 hover:bg-white/6 transition-colors min-h-[44px]"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
+              <path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h3M9 9.5l3-3-3-3M12 6.5H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Sign out
+          </button>
+        </div>
+      </aside>
+    </>
   )
 }

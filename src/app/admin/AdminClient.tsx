@@ -177,30 +177,47 @@ export default function AdminClient({
       {/* Pending Approval tab */}
       {tab === 'pending' && (
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ink)]/8">
-                  <Th>Email</Th>
-                  <Th>Joined</Th>
-                  <Th>Actions</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ink)]/6">
-                {pendingProfiles.length === 0
-                  ? <EmptyRow cols={3} msg="No pending users." />
-                  : pendingProfiles.map(p => (
-                    <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
-                      <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
-                      <Td muted nowrap>{formatDate(p.created_at)}</Td>
-                      <td className="px-4 py-3">
-                        <ApprovalButtons userId={p.id} />
-                      </td>
+          {pendingProfiles.length === 0 ? (
+            <p className="px-4 py-12 text-center text-sm text-[var(--ink-3)]">No pending users.</p>
+          ) : (
+            <>
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-[var(--ink)]/6">
+                {pendingProfiles.map(p => (
+                  <div key={p.id} className="px-4 py-4 space-y-3">
+                    <div>
+                      <p className="font-medium text-[var(--ink)] text-sm">{p.email ?? '—'}</p>
+                      <p className="text-xs text-[var(--ink-3)] mt-0.5">Joined {formatDate(p.created_at)}</p>
+                    </div>
+                    <ApprovalButtons userId={p.id} />
+                  </div>
+                ))}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--ink)]/8">
+                      <Th>Email</Th>
+                      <Th>Joined</Th>
+                      <Th>Actions</Th>
                     </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ink)]/6">
+                    {pendingProfiles.map(p => (
+                      <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
+                        <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
+                        <Td muted nowrap>{formatDate(p.created_at)}</Td>
+                        <td className="px-4 py-3">
+                          <ApprovalButtons userId={p.id} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -217,45 +234,74 @@ export default function AdminClient({
           />
 
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--ink)]/8">
-                    <Th>Email</Th>
-                    <Th>Role</Th>
-                    <Th>Status</Th>
-                    <Th>Name</Th>
-                    <Th>Joined</Th>
-                    <Th></Th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ink)]/6">
-                  {filteredProfiles.length === 0
-                    ? <EmptyRow cols={6} msg={search ? 'No users match that search.' : 'No users found.'} />
-                    : filteredProfiles.map(p => {
-                      const statusBadge = p.status ? USER_STATUS_BADGE[p.status] : null
-                      return (
-                        <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
-                          <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
-                          <td className="px-4 py-3">
-                            <RoleCell profile={p} canEdit={isSuperAdmin} />
-                          </td>
-                          <td className="px-4 py-3">
-                            {statusBadge
-                              ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
-                              : <span className="text-[var(--ink-3)] text-xs">—</span>}
-                          </td>
-                          <Td muted>{p.display_name ?? '—'}</Td>
-                          <Td muted nowrap>{formatDate(p.created_at)}</Td>
-                          <td className="px-4 py-3 text-right">
-                            <ViewAsButton profile={p} />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                </tbody>
-              </table>
-            </div>
+            {filteredProfiles.length === 0 ? (
+              <p className="px-4 py-12 text-center text-sm text-[var(--ink-3)]">{search ? 'No users match that search.' : 'No users found.'}</p>
+            ) : (
+              <>
+                {/* Mobile cards */}
+                <div className="md:hidden divide-y divide-[var(--ink)]/6">
+                  {filteredProfiles.map(p => {
+                    const statusBadge = p.status ? USER_STATUS_BADGE[p.status] : null
+                    return (
+                      <div key={p.id} className="px-4 py-4 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-medium text-[var(--ink)] text-sm truncate">{p.email ?? '—'}</p>
+                            {p.display_name && <p className="text-xs text-[var(--ink-3)] mt-0.5">{p.display_name}</p>}
+                            <p className="text-xs text-[var(--ink-3)]">Joined {formatDate(p.created_at)}</p>
+                          </div>
+                          <ViewAsButton profile={p} />
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <RoleCell profile={p} canEdit={isSuperAdmin} />
+                          {statusBadge
+                            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
+                            : null}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--ink)]/8">
+                        <Th>Email</Th>
+                        <Th>Role</Th>
+                        <Th>Status</Th>
+                        <Th>Name</Th>
+                        <Th>Joined</Th>
+                        <Th></Th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--ink)]/6">
+                      {filteredProfiles.map(p => {
+                        const statusBadge = p.status ? USER_STATUS_BADGE[p.status] : null
+                        return (
+                          <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
+                            <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
+                            <td className="px-4 py-3">
+                              <RoleCell profile={p} canEdit={isSuperAdmin} />
+                            </td>
+                            <td className="px-4 py-3">
+                              {statusBadge
+                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
+                                : <span className="text-[var(--ink-3)] text-xs">—</span>}
+                            </td>
+                            <Td muted>{p.display_name ?? '—'}</Td>
+                            <Td muted nowrap>{formatDate(p.created_at)}</Td>
+                            <td className="px-4 py-3 text-right">
+                              <ViewAsButton profile={p} />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

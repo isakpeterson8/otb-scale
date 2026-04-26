@@ -296,11 +296,11 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--ink)]/8">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--ink)]/8">
                   <p className="text-xs text-[var(--ink-2)]">Connect your Gmail account to send emails directly from the app.</p>
                   <a
                     href="/api/auth/google"
-                    className="ml-4 shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--ink)] text-xs font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--ink)] text-xs font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors self-start sm:self-auto"
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
                       <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

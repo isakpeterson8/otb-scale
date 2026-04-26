@@ -47,7 +47,7 @@ export default async function EmailTemplatesPage() {
 
   return (
     <AppShell>
-      <main className="flex-1 px-8 py-7">
+      <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <EmailTemplatesClient fills={fills} initialCustomTemplates={initialCustomTemplates} />
       </main>
     </AppShell>

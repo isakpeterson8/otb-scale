@@ -180,8 +180,8 @@ function SnapshotModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8 overflow-y-auto">
-      <div className="w-full max-w-lg bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 p-6 my-auto">
+    <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
+      <div className="flex-1 overflow-y-auto bg-[var(--surface)] p-6 sm:flex-none sm:rounded-2xl sm:border sm:border-[var(--ink)]/8 sm:max-h-[90vh] sm:overflow-y-auto sm:max-w-lg w-full">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-medium text-[var(--ink)]">
             {snapshot ? 'Edit Monthly Recap' : 'Monthly Recap'}
@@ -193,7 +193,7 @@ function SnapshotModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="space-y-5 pr-1">
           {/* Month + Year */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -368,7 +368,7 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
             Studio Financials
@@ -483,9 +483,61 @@ export default function FinancialsClient({ initialSnapshots }: { initialSnapshot
             </div>
           )}
 
-          {/* Recaps table */}
+          {/* Recaps list */}
           <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-[var(--ink)]/6">
+              {[...snapshots].reverse().map(s => {
+                const profit = (s.collected_revenue ?? 0) - (s.expenses ?? 0)
+                const hasFinancials = s.collected_revenue != null || s.expenses != null
+                return (
+                  <div key={s.id} className="px-4 py-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="font-medium text-[var(--ink)]">{fmtMonthYear(s.snapshot_date)}</p>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => openEdit(s)} title="Edit" className="p-1.5 rounded-lg" style={{ color: '#04ADEF' }}>
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                            <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button onClick={() => handleDelete(s.id)} disabled={deleting} title="Delete" className="p-1.5 rounded-lg text-[var(--ink-3)] hover:text-[var(--red)] transition-colors disabled:opacity-40">
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                            <path d="M2 3.5h10M5 3.5V2h4v1.5M5.5 6v4.5M8.5 6v4.5M3 3.5l.8 8h6.4l.8-8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <div>
+                        <span className="text-xs text-[var(--ink-3)]">Enrollment </span>
+                        <span className="text-[var(--ink-2)]">{fmtInt(s.enrollment)}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-[var(--ink-3)]">Revenue </span>
+                        <span className="text-[var(--ink-2)]">{fmtCur(s.collected_revenue)}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-[var(--ink-3)]">Expenses </span>
+                        <span className="text-[var(--ink-2)]">{fmtCur(s.expenses)}</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-[var(--ink-3)]">Profit </span>
+                        <span style={{ color: hasFinancials ? (profit >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--ink-3)' }}>
+                          {hasFinancials ? fmtCur(profit) : '—'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-[var(--ink-3)]">Util </span>
+                        <span className="text-[var(--ink-2)]">{fmtPct(s.booked_hrs, s.avail_hrs)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--ink)]/8">

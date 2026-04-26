@@ -70,7 +70,7 @@ function GroupForm({
   )
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+    <form onSubmit={handleSubmit} className="space-y-3 pr-1">
       {field('Group Name *', 'group_name', 'text', 'Piano Moms of Austin')}
       {field('Group URL', 'group_url', 'url', 'https://facebook.com/groups/...')}
       <div className="grid grid-cols-2 gap-3">
@@ -102,7 +102,7 @@ function GroupForm({
           className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
         />
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {field('Application Date', 'application_date', 'date')}
         {field('Acceptance Date', 'acceptance_date', 'date')}
         {field('Last Post Date', 'most_recent_post_date', 'date')}
@@ -168,7 +168,7 @@ export default function FacebookGroupsClient({ groups }: Props) {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
             Facebook Groups
@@ -204,7 +204,7 @@ export default function FacebookGroupsClient({ groups }: Props) {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 border-b border-[var(--ink)]/8">
+      <div className="flex items-center gap-1 border-b border-[var(--ink)]/8 overflow-x-auto">
         {tabs.map(({ key, label }) => (
           <button
             key={key}
@@ -223,15 +223,15 @@ export default function FacebookGroupsClient({ groups }: Props) {
 
       {/* Modal */}
       {(showForm || editGroup) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-lg bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 p-6">
+        <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
+          <div className="flex-1 overflow-y-auto bg-[var(--surface)] sm:flex-none sm:rounded-2xl sm:border sm:border-[var(--ink)]/8 sm:max-h-[90vh] sm:w-full sm:max-w-lg p-6 flex flex-col">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-medium text-[var(--ink)]">
                 {editGroup ? 'Edit group' : 'Add Facebook group'}
               </h3>
               <button
                 onClick={() => { setShowForm(false); setEditGroup(null) }}
-                className="text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
+                className="p-2 text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
               >
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
                   <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -248,100 +248,100 @@ export default function FacebookGroupsClient({ groups }: Props) {
 
       {/* Group list */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-        {/* Column headers */}
-        <div className="grid items-center gap-3 px-5 py-2.5 border-b border-[var(--ink)]/8"
-          style={{ gridTemplateColumns: '1fr 140px 120px 140px 170px' }}>
-          <span className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Group Name</span>
-          <span className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Shared With</span>
-          <span className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Post Type</span>
-          <span className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Last Posted</span>
-          <span />
-        </div>
-
         {filtered.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <p className="text-sm text-[var(--ink-3)]">No groups yet. Add your first Facebook group.</p>
           </div>
         ) : (
-          <div className="divide-y divide-[var(--ink)]/6">
-            {filtered.map((group) => {
-              const postBadge = group.post_type ? POST_TYPE_BADGE[group.post_type] : null
-              const dateStyle = lastPostedStyle(group.most_recent_post_date)
-              return (
-                <div
-                  key={group.id}
-                  className={`grid items-center gap-3 px-5 py-3.5 hover:bg-[var(--canvas)] transition-colors${!group.is_active ? ' opacity-50' : ''}`}
-                  style={{ gridTemplateColumns: '1fr 140px 120px 140px 170px' }}
-                >
-                  {/* Group name */}
-                  <span className="font-medium text-[var(--ink)] truncate">
-                    {group.group_url ? (
-                      <a
-                        href={group.group_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-[var(--accent-text)] transition-colors"
-                      >
-                        {group.group_name}
-                      </a>
-                    ) : group.group_name}
-                  </span>
-
-                  {/* Shared with */}
-                  <span className="text-sm text-[var(--ink-2)] truncate">
-                    {group.shared_with ?? '—'}
-                  </span>
-
-                  {/* Post type badge */}
-                  <span>
-                    {postBadge ? (
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                        style={{ background: postBadge.bg, color: postBadge.color }}
-                      >
-                        {postBadge.label}
-                      </span>
-                    ) : <span className="text-[var(--ink-3)] text-xs">—</span>}
-                  </span>
-
-                  {/* Last posted */}
-                  <span>
-                    <span
-                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                      style={{ background: dateStyle.bg, color: dateStyle.color }}
-                    >
+          <>
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-[var(--ink)]/6">
+              {filtered.map((group) => {
+                const postBadge = group.post_type ? POST_TYPE_BADGE[group.post_type] : null
+                const dateStyle = lastPostedStyle(group.most_recent_post_date)
+                return (
+                  <div key={group.id} className={`p-4 space-y-3${!group.is_active ? ' opacity-50' : ''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-[var(--ink)] text-sm">
+                          {group.group_url
+                            ? <a href={group.group_url} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--accent-text)] transition-colors">{group.group_name}</a>
+                            : group.group_name}
+                        </p>
+                        {group.shared_with && (
+                          <p className="text-xs text-[var(--ink-3)] mt-0.5">Shared with {group.shared_with}</p>
+                        )}
+                      </div>
+                      {postBadge && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0" style={{ background: postBadge.bg, color: postBadge.color }}>
+                          {postBadge.label}
+                        </span>
+                      )}
+                    </div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: dateStyle.bg, color: dateStyle.color }}>
                       {formatDate(group.most_recent_post_date)}
                     </span>
-                  </span>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleLogPost(group.id)}
-                      disabled={isPending}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
-                      style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d' }}
-                    >
-                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
-                        <path d="M2 6.5l2.5 2.5 5.5-5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      Posted Today
-                    </button>
-                    <button
-                      onClick={() => setEditGroup(group)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors whitespace-nowrap"
-                      style={{ background: 'rgba(0,0,0,0.05)' }}
-                    >
-                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
-                        <path d="M8.5 1.5l2 2-6 6H2.5v-2l6-6z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                      </svg>
-                      Edit
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleLogPost(group.id)} disabled={isPending} className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-50 min-h-[40px]" style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d' }}>
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                          <path d="M2 6.5l2.5 2.5 5.5-5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Posted Today
+                      </button>
+                      <button onClick={() => setEditGroup(group)} className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-[var(--ink-2)] min-h-[40px]" style={{ background: 'rgba(0,0,0,0.05)' }}>
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                          <path d="M8.5 1.5l2 2-6 6H2.5v-2l6-6z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                        </svg>
+                        Edit
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop grid */}
+            <div className="hidden md:block">
+              <div className="grid items-center gap-3 px-5 py-2.5 border-b border-[var(--ink)]/8"
+                style={{ gridTemplateColumns: '1fr 140px 120px 140px 170px' }}>
+                <span className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Group Name</span>
+                <span className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Shared With</span>
+                <span className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Post Type</span>
+                <span className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Last Posted</span>
+                <span />
+              </div>
+              <div className="divide-y divide-[var(--ink)]/6">
+                {filtered.map((group) => {
+                  const postBadge = group.post_type ? POST_TYPE_BADGE[group.post_type] : null
+                  const dateStyle = lastPostedStyle(group.most_recent_post_date)
+                  return (
+                    <div key={group.id} className={`grid items-center gap-3 px-5 py-3.5 hover:bg-[var(--canvas)] transition-colors${!group.is_active ? ' opacity-50' : ''}`} style={{ gridTemplateColumns: '1fr 140px 120px 140px 170px' }}>
+                      <span className="font-medium text-[var(--ink)] truncate">
+                        {group.group_url ? <a href={group.group_url} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--accent-text)] transition-colors">{group.group_name}</a> : group.group_name}
+                      </span>
+                      <span className="text-sm text-[var(--ink-2)] truncate">{group.shared_with ?? '—'}</span>
+                      <span>
+                        {postBadge ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: postBadge.bg, color: postBadge.color }}>{postBadge.label}</span> : <span className="text-[var(--ink-3)] text-xs">—</span>}
+                      </span>
+                      <span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: dateStyle.bg, color: dateStyle.color }}>{formatDate(group.most_recent_post_date)}</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => handleLogPost(group.id)} disabled={isPending} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50 whitespace-nowrap" style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d' }}>
+                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden><path d="M2 6.5l2.5 2.5 5.5-5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          Posted Today
+                        </button>
+                        <button onClick={() => setEditGroup(group)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--ink-2)] whitespace-nowrap" style={{ background: 'rgba(0,0,0,0.05)' }}>
+                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden><path d="M8.5 1.5l2 2-6 6H2.5v-2l6-6z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>
