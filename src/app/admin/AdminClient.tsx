@@ -138,7 +138,10 @@ export default function AdminClient({
   ]
 
   const filteredProfiles = search.trim()
-    ? profiles.filter(p => p.email?.toLowerCase().includes(search.toLowerCase()))
+    ? profiles.filter(p =>
+        (p.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (p.display_name ?? '').toLowerCase().includes(search.toLowerCase())
+      )
     : profiles
 
   return (
@@ -207,7 +210,7 @@ export default function AdminClient({
           {/* Search */}
           <input
             type="text"
-            placeholder="Search by email…"
+            placeholder="Search by name or email…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full max-w-sm px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
@@ -221,7 +224,7 @@ export default function AdminClient({
                     <Th>Email</Th>
                     <Th>Role</Th>
                     <Th>Status</Th>
-                    <Th>Studio</Th>
+                    <Th>Name</Th>
                     <Th>Joined</Th>
                     <Th></Th>
                   </tr>
@@ -242,7 +245,7 @@ export default function AdminClient({
                               ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
                               : <span className="text-[var(--ink-3)] text-xs">—</span>}
                           </td>
-                          <Td muted>{p.studio_name ?? '—'}</Td>
+                          <Td muted>{p.display_name ?? '—'}</Td>
                           <Td muted nowrap>{formatDate(p.created_at)}</Td>
                           <td className="px-4 py-3 text-right">
                             <ViewAsButton profile={p} />

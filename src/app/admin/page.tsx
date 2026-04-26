@@ -10,7 +10,7 @@ export interface AdminProfile {
   studio_id: string | null
   email: string | null
   role: UserRole
-  studio_name: string | null
+  display_name: string | null
   status: 'pending' | 'approved' | 'rejected' | null
   created_at: string
 }
@@ -28,22 +28,22 @@ export default async function AdminPage() {
 
   const callerRole = (callerProfile?.role ?? 'studio_owner') as UserRole
 
-  const [studiosRes, profilesRes] = await Promise.all([
-    adminClient.from('studios').select('id, name').order('created_at', { ascending: false }),
+  const [profilesRes, settingsRes] = await Promise.all([
     adminClient.from('profiles').select('id, studio_id, role, email, status, created_at').order('created_at', { ascending: false }),
+    adminClient.from('settings').select('user_id, display_name'),
   ])
 
-  const rawStudios  = (studiosRes.data  ?? []) as { id: string; name: string }[]
   const rawProfiles = (profilesRes.data ?? []) as { id: string; studio_id: string | null; role: UserRole; email: string | null; status: string | null; created_at: string }[]
+  const rawSettings = (settingsRes.data ?? []) as { user_id: string; display_name: string | null }[]
 
-  const studioById = new Map(rawStudios.map(s => [s.id, s]))
+  const displayNameById = new Map(rawSettings.map(s => [s.user_id, s.display_name]))
 
   const adminProfiles: AdminProfile[] = rawProfiles.map(p => ({
     id: p.id,
     studio_id: p.studio_id,
     email: p.email,
     role: p.role,
-    studio_name: p.studio_id ? (studioById.get(p.studio_id)?.name ?? null) : null,
+    display_name: displayNameById.get(p.id) ?? null,
     status: (p.status ?? null) as AdminProfile['status'],
     created_at: p.created_at,
   }))
