@@ -1,4 +1,4 @@
-export type UserRole = 'studio_owner' | 'otb_admin'
+export type UserRole = 'studio_owner' | 'otb_admin' | 'otb_staff'
 
 export interface Studio {
   id: string

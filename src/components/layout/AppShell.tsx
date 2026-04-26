@@ -21,7 +21,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
     user.email?.split('@')[0] ??
     'User'
 
-  const isAdmin = profile?.role === 'otb_admin'
+  const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
 
   return (
     <div className="flex min-h-screen bg-[var(--canvas)]">

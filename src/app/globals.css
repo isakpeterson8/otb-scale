@@ -1,6 +1,14 @@
 @font-face {
-  font-family: 'Myfont';
-  src: url('/fonts/Myfont-Regular.ttf') format('truetype');
+  font-family: 'Goldplay';
+  src: url('/fonts/Goldplay-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Haboro';
+  src: url('/fonts/haborocontrastnormregular.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -36,8 +44,8 @@
   --border: rgba(0, 0, 0, 0.08);
   --border-s: rgba(0, 0, 0, 0.15);
 
-  --font-heading: 'Myfont', serif;
-  --font-sans: 'Myfont', system-ui, sans-serif;
+  --font-heading: 'Goldplay', serif;
+  --font-sans: 'Haboro', system-ui, sans-serif;
 }
 
 @theme inline {

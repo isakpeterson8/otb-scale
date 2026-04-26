@@ -1,163 +1,193 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminSupabase } from '@/lib/supabase/admin'
 import AppShell from '@/components/layout/AppShell'
-import { formatDate } from '@/lib/utils'
-import type { Studio, Profile } from '@/types/database'
+import AdminClient from './AdminClient'
+import type {
+  UserRole,
+  SchoolOutreachStage,
+  CadenceStatus,
+} from '@/types/database'
+
+export interface AdminProfile {
+  id: string
+  display_name: string | null
+  email: string | null
+  role: UserRole
+  studio_name: string | null
+  created_at: string
+}
+
+export interface AdminStudio {
+  id: string
+  name: string
+  owner_name: string | null
+  owner_email: string | null
+  contact_count: number
+  school_count: number
+  fb_group_count: number
+  created_at: string
+}
+
+export interface AdminSchoolRecord {
+  id: string
+  studio_name: string
+  school_name: string
+  contact_name: string | null
+  email: string | null
+  stage: SchoolOutreachStage
+  cadence_status: CadenceStatus | null
+  last_interacted_date: string | null
+}
+
+export interface AdminContact {
+  id: string
+  studio_name: string
+  name: string
+  email: string | null
+  phone: string | null
+  status: string | null
+  created_at: string
+}
+
+export interface AdminFinancial {
+  id: string
+  studio_name: string
+  month: string
+  revenue: number | null
+  expenses: number | null
+  notes: string | null
+}
 
 export default async function AdminPage() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/auth/login')
 
-  const [studiosResult, profilesResult, contactsResult, pipelineResult] = await Promise.all([
-    supabase.from('studios').select('*').order('created_at', { ascending: false }),
-    supabase.from('profiles').select('id, studio_id, role, display_name, email, created_at'),
-    supabase.from('contacts').select('id, studio_id, created_at'),
-    supabase.from('pipeline_events').select('id, studio_id, stage'),
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const callerRole = (callerProfile?.role ?? 'studio_owner') as UserRole
+
+  const admin = createAdminSupabase()
+
+  const [
+    studiosRes,
+    profilesRes,
+    contactsRes,
+    schoolRes,
+    fbRes,
+    financialsRes,
+    cadenceRes,
+  ] = await Promise.all([
+    admin.from('studios').select('id, name, owner_user_id, created_at').order('created_at', { ascending: false }),
+    admin.from('profiles').select('id, studio_id, role, display_name, email, created_at').order('created_at', { ascending: false }),
+    admin.from('contacts').select('id, studio_id, name, email, phone, status, created_at').order('created_at', { ascending: false }),
+    admin.from('school_outreach').select('id, studio_id, school_name, contact_name, email, stage, last_interacted_date').order('created_at', { ascending: false }),
+    admin.from('facebook_groups').select('id, studio_id'),
+    admin.from('financial_months').select('id, studio_id, month, revenue, expenses, notes').order('month', { ascending: false }),
+    admin.from('cadence_enrollments').select('id, school_id, status').order('created_at', { ascending: false }),
   ])
 
-  const studios = (studiosResult.data ?? []) as Studio[]
-  const profiles = (profilesResult.data ?? []) as Profile[]
-  const contacts = contactsResult.data ?? []
-  const pipeline = pipelineResult.data ?? []
+  const rawStudios  = (studiosRes.data   ?? []) as { id: string; name: string; owner_user_id: string; created_at: string }[]
+  const rawProfiles = (profilesRes.data  ?? []) as { id: string; studio_id: string | null; role: UserRole; display_name: string | null; email: string | null; created_at: string }[]
+  const rawContacts = (contactsRes.data  ?? []) as { id: string; studio_id: string; name: string; email: string | null; phone: string | null; status: string | null; created_at: string }[]
+  const rawSchools  = (schoolRes.data    ?? []) as { id: string; studio_id: string; school_name: string; contact_name: string | null; email: string | null; stage: SchoolOutreachStage; last_interacted_date: string | null }[]
+  const rawFb       = (fbRes.data        ?? []) as { id: string; studio_id: string }[]
+  const rawFin      = (financialsRes.data ?? []) as { id: string; studio_id: string; month: string; revenue: number | null; expenses: number | null; notes: string | null }[]
+  const rawCadence  = (cadenceRes.data   ?? []) as { id: string; school_id: string; status: string }[]
 
-  const contactsByStudio = contacts.reduce<Record<string, number>>((acc, c) => {
-    acc[c.studio_id] = (acc[c.studio_id] ?? 0) + 1
-    return acc
+  // Build lookup maps
+  const studioById = new Map(rawStudios.map(s => [s.id, s]))
+  const profileById = new Map(rawProfiles.map(p => [p.id, p]))
+
+  const contactsByStudio = rawContacts.reduce<Record<string, number>>((a, c) => { a[c.studio_id] = (a[c.studio_id] ?? 0) + 1; return a }, {})
+  const schoolsByStudio  = rawSchools.reduce<Record<string, number>>((a, s) => { a[s.studio_id] = (a[s.studio_id] ?? 0) + 1; return a }, {})
+  const fbByStudio       = rawFb.reduce<Record<string, number>>((a, g) => { a[g.studio_id] = (a[g.studio_id] ?? 0) + 1; return a }, {})
+  const latestCadenceBySchool = rawCadence.reduce<Record<string, string>>((a, c) => {
+    if (!a[c.school_id]) a[c.school_id] = c.status
+    return a
   }, {})
 
-  const enrolledByStudio = pipeline
-    .filter((e) => e.stage === 'new_enrollment')
-    .reduce<Record<string, number>>((acc, e) => {
-      acc[e.studio_id] = (acc[e.studio_id] ?? 0) + 1
-      return acc
-    }, {})
+  // --- Shape data for each tab ---
 
-  const profilesByStudio = profiles.reduce<Record<string, Profile>>((acc, p) => {
-    if (p.studio_id) acc[p.studio_id] = p
-    return acc
-  }, {})
+  const adminProfiles: AdminProfile[] = rawProfiles.map(p => ({
+    id: p.id,
+    display_name: p.display_name,
+    email: p.email,
+    role: p.role,
+    studio_name: p.studio_id ? (studioById.get(p.studio_id)?.name ?? null) : null,
+    created_at: p.created_at,
+  }))
 
-  const totalStudios = studios.length
-  const totalContacts = contacts.length
-  const totalEnrolled = pipeline.filter((e) => e.stage === 'enrolled').length
-  const adminCount = profiles.filter((p) => p.role === 'otb_admin').length
+  const adminStudios: AdminStudio[] = rawStudios.map(s => {
+    const owner = profileById.get(s.owner_user_id)
+    return {
+      id: s.id,
+      name: s.name,
+      owner_name: owner?.display_name ?? null,
+      owner_email: owner?.email ?? null,
+      contact_count: contactsByStudio[s.id] ?? 0,
+      school_count: schoolsByStudio[s.id] ?? 0,
+      fb_group_count: fbByStudio[s.id] ?? 0,
+      created_at: s.created_at,
+    }
+  })
+
+  const adminSchools: AdminSchoolRecord[] = rawSchools.map(s => ({
+    id: s.id,
+    studio_name: studioById.get(s.studio_id)?.name ?? '—',
+    school_name: s.school_name,
+    contact_name: s.contact_name,
+    email: s.email,
+    stage: s.stage,
+    cadence_status: (latestCadenceBySchool[s.id] ?? null) as CadenceStatus | null,
+    last_interacted_date: s.last_interacted_date,
+  }))
+
+  const adminContacts: AdminContact[] = rawContacts.map(c => ({
+    id: c.id,
+    studio_name: studioById.get(c.studio_id)?.name ?? '—',
+    name: c.name,
+    email: c.email,
+    phone: c.phone,
+    status: c.status,
+    created_at: c.created_at,
+  }))
+
+  const adminFinancials: AdminFinancial[] = rawFin.map(f => ({
+    id: f.id,
+    studio_name: studioById.get(f.studio_id)?.name ?? '—',
+    month: f.month,
+    revenue: f.revenue,
+    expenses: f.expenses,
+    notes: f.notes,
+  }))
+
+  const stats = {
+    totalStudios: rawStudios.length,
+    totalUsers: rawProfiles.length,
+    totalSchoolOutreach: rawSchools.length,
+    totalContacts: rawContacts.length,
+    activeCadences: rawCadence.filter(c => c.status === 'active').length,
+    totalFbGroups: rawFb.length,
+  }
 
   return (
     <AppShell>
-      <main className="flex-1 px-8 py-7 space-y-7">
-        <div>
-          <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
-            Admin
-          </h2>
-          <p className="text-sm text-[var(--ink-3)] mt-0.5">All studios across the platform</p>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'Studios', value: String(totalStudios) },
-            { label: 'Total Contacts', value: String(totalContacts) },
-            { label: 'Total Enrolled', value: String(totalEnrolled) },
-            { label: 'OTB Admins', value: String(adminCount) },
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 px-5 py-4">
-              <p className="text-xs text-[var(--ink-3)] mb-2 uppercase tracking-wide font-medium">{label}</p>
-              <p className="text-3xl text-[var(--ink)] leading-none" style={{ fontFamily: 'var(--font-heading)' }}>
-                {value}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--ink)]/8">
-            <h3 className="text-sm font-medium text-[var(--ink)]">All Studios</h3>
-          </div>
-          {studios.length === 0 ? (
-            <div className="flex items-center justify-center py-16">
-              <p className="text-sm text-[var(--ink-3)]">No studios yet.</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ink)]/8">
-                  <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Studio</th>
-                  <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide hidden md:table-cell">Owner</th>
-                  <th className="text-right px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Contacts</th>
-                  <th className="text-right px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Enrolled</th>
-                  <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide hidden lg:table-cell">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ink)]/6">
-                {studios.map((studio) => {
-                  const owner = profilesByStudio[studio.id]
-                  return (
-                    <tr key={studio.id} className="hover:bg-[var(--canvas)] transition-colors">
-                      <td className="px-5 py-3">
-                        <div>
-                          <p className="font-medium text-[var(--ink)]">{studio.name}</p>
-                          {(studio.city || studio.state) && (
-                            <p className="text-xs text-[var(--ink-3)]">
-                              {[studio.city, studio.state].filter(Boolean).join(', ')}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 text-[var(--ink-2)] hidden md:table-cell">
-                        {owner?.display_name ?? owner?.email ?? '—'}
-                      </td>
-                      <td className="px-5 py-3 text-right text-[var(--ink-2)]">
-                        {contactsByStudio[studio.id] ?? 0}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        <span className={`text-sm font-medium ${(enrolledByStudio[studio.id] ?? 0) > 0 ? 'text-[var(--green)]' : 'text-[var(--ink-3)]'}`}>
-                          {enrolledByStudio[studio.id] ?? 0}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-[var(--ink-3)] text-xs hidden lg:table-cell">
-                        {formatDate(studio.created_at)}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--ink)]/8">
-            <h3 className="text-sm font-medium text-[var(--ink)]">All Users</h3>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--ink)]/8">
-                <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Name</th>
-                <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide hidden md:table-cell">Email</th>
-                <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Role</th>
-                <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide hidden lg:table-cell">Joined</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--ink)]/6">
-              {profiles.map((profile) => (
-                <tr key={profile.id} className="hover:bg-[var(--canvas)] transition-colors">
-                  <td className="px-5 py-3 text-[var(--ink)]">{profile.display_name ?? '—'}</td>
-                  <td className="px-5 py-3 text-[var(--ink-2)] hidden md:table-cell">{profile.email ?? '—'}</td>
-                  <td className="px-5 py-3">
-                    <span className={[
-                      'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                      profile.role === 'otb_admin'
-                        ? 'bg-[var(--accent-light)] text-[var(--accent-text)]'
-                        : 'bg-white/8 text-[var(--ink-2)]',
-                    ].join(' ')}>
-                      {profile.role}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-[var(--ink-3)] text-xs hidden lg:table-cell">
-                    {formatDate(profile.created_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <main className="flex-1 px-8 py-7">
+        <AdminClient
+          callerRole={callerRole}
+          stats={stats}
+          profiles={adminProfiles}
+          studios={adminStudios}
+          schools={adminSchools}
+          contacts={adminContacts}
+          financials={adminFinancials}
+        />
       </main>
     </AppShell>
   )

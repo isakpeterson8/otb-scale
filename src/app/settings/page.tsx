@@ -31,7 +31,7 @@ export default async function SettingsPage() {
 
   return (
     <AppShell>
-      <main className="flex-1 px-8 py-7 max-w-2xl">
+      <main className="px-8 py-7 pb-16 max-w-2xl">
         <SettingsClient
           profile={profile ?? null}
           settings={clientSettings}
