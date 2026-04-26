@@ -53,10 +53,10 @@ export interface AdminContact {
 export interface AdminFinancial {
   id: string
   studio_name: string
-  month: string
-  revenue: number | null
+  year: number
+  month: number
+  collected_revenue: number | null
   expenses: number | null
-  notes: string | null
 }
 
 export default async function AdminPage() {
@@ -86,7 +86,7 @@ export default async function AdminPage() {
     adminClient.from('contacts').select('id, studio_id, name, email, phone, status, created_at').order('created_at', { ascending: false }),
     adminClient.from('school_outreach').select('id, studio_id, school_name, contact_name, email, stage, last_interacted_date').order('created_at', { ascending: false }),
     adminClient.from('facebook_groups').select('id, studio_id'),
-    adminClient.from('financial_months').select('id, studio_id, month, revenue, expenses, notes').order('month', { ascending: false }),
+    adminClient.from('financial_months').select('id, studio_id, year, month, collected_revenue, expenses').order('year', { ascending: false }),
     adminClient.from('cadence_enrollments').select('id, school_id, status').order('created_at', { ascending: false }),
   ])
 
@@ -103,7 +103,7 @@ export default async function AdminPage() {
   const rawContacts = (contactsRes.data  ?? []) as { id: string; studio_id: string; name: string; email: string | null; phone: string | null; status: string | null; created_at: string }[]
   const rawSchools  = (schoolRes.data    ?? []) as { id: string; studio_id: string; school_name: string; contact_name: string | null; email: string | null; stage: SchoolOutreachStage; last_interacted_date: string | null }[]
   const rawFb       = (fbRes.data        ?? []) as { id: string; studio_id: string }[]
-  const rawFin      = (financialsRes.data ?? []) as { id: string; studio_id: string; month: string; revenue: number | null; expenses: number | null; notes: string | null }[]
+  const rawFin      = (financialsRes.data ?? []) as { id: string; studio_id: string; year: number; month: number; collected_revenue: number | null; expenses: number | null }[]
   const rawCadence  = (cadenceRes.data   ?? []) as { id: string; school_id: string; status: string }[]
 
   // Build lookup maps
@@ -169,10 +169,10 @@ export default async function AdminPage() {
   const adminFinancials: AdminFinancial[] = rawFin.map(f => ({
     id: f.id,
     studio_name: studioById.get(f.studio_id)?.name ?? '—',
+    year: f.year,
     month: f.month,
-    revenue: f.revenue,
+    collected_revenue: f.collected_revenue,
     expenses: f.expenses,
-    notes: f.notes,
   }))
 
   const stats = {

@@ -414,28 +414,27 @@ export default function AdminClient({
               <thead>
                 <tr className="border-b border-[var(--ink)]/8">
                   <Th>Studio</Th>
-                  <Th>Month</Th>
-                  <Th right>Revenue</Th>
+                  <Th>Period</Th>
+                  <Th right>Collected Revenue</Th>
                   <Th right>Expenses</Th>
-                  <Th right>Net</Th>
-                  <Th>Notes</Th>
+                  <Th right>Profit</Th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ink)]/6">
                 {financials.length === 0
-                  ? <EmptyRow cols={6} msg="No financial records found." />
+                  ? <EmptyRow cols={5} msg="No financial records found." />
                   : financials.map(f => {
-                    const net = (f.revenue ?? 0) - (f.expenses ?? 0)
+                    const profit = (f.collected_revenue ?? 0) - (f.expenses ?? 0)
+                    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
                     return (
                       <tr key={f.id} className="hover:bg-[var(--canvas)] transition-colors">
                         <Td muted nowrap>{f.studio_name}</Td>
-                        <Td nowrap>{f.month}</Td>
-                        <td className="px-4 py-3 text-right text-sm text-[var(--ink-2)]">{formatCurrency(f.revenue)}</td>
+                        <Td nowrap>{monthNames[f.month - 1]} {f.year}</Td>
+                        <td className="px-4 py-3 text-right text-sm text-[var(--ink-2)]">{formatCurrency(f.collected_revenue)}</td>
                         <td className="px-4 py-3 text-right text-sm text-[var(--ink-2)]">{formatCurrency(f.expenses)}</td>
-                        <td className="px-4 py-3 text-right text-sm font-medium" style={{ color: net >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(net)}
+                        <td className="px-4 py-3 text-right text-sm font-medium" style={{ color: profit >= 0 ? '#15803d' : '#b91c1c' }}>
+                          {formatCurrency(profit)}
                         </td>
-                        <Td muted>{f.notes ?? '—'}</Td>
                       </tr>
                     )
                   })}

@@ -83,10 +83,23 @@ export interface CadenceQueueItem {
 export interface FinancialMonth {
   id: string
   studio_id: string
-  month: string
-  revenue: number | null
+  year: number
+  month: number
+  enrollment: number | null
+  booked_hrs: number | null
+  goal_hrs: number | null
+  avail_hrs: number | null
+  leads: number | null
+  consults: number | null
+  poss_reg: number | null
+  new_enrollments: number | null
+  disenrollments: number | null
+  est_revenue: number | null
+  collected_revenue: number | null
   expenses: number | null
   notes: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type PipelineStage =

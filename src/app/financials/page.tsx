@@ -4,44 +4,39 @@ import AppShell from '@/components/layout/AppShell'
 import FinancialsClient from './FinancialsClient'
 import type { FinancialMonth } from '@/types/database'
 
-function getLastNMonths(n: number): string[] {
-  const months: string[] = []
-  const now = new Date()
-  for (let i = 0; i < n; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
-  }
-  return months
-}
+const YEARS = [2024, 2025, 2026, 2027]
 
 export default async function FinancialsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data } = await supabase
-    .from('financial_months')
-    .select('*')
-    .order('month', { ascending: false })
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('studio_id')
+    .eq('id', user.id)
+    .single()
 
-  const dbMonths = (data ?? []) as FinancialMonth[]
+  let allMonths: FinancialMonth[] = []
+  if (profile?.studio_id) {
+    const { data } = await supabase
+      .from('financial_months')
+      .select('*')
+      .eq('studio_id', profile.studio_id)
+      .in('year', YEARS)
+    allMonths = (data ?? []) as FinancialMonth[]
+  }
 
-  const last12 = getLastNMonths(12)
-  const monthMap = Object.fromEntries(dbMonths.map((m) => [m.month, m]))
-
-  const months: FinancialMonth[] = last12.map((month) => ({
-    id: monthMap[month]?.id ?? '',
-    studio_id: monthMap[month]?.studio_id ?? '',
-    month,
-    revenue: monthMap[month]?.revenue ?? null,
-    expenses: monthMap[month]?.expenses ?? null,
-    notes: monthMap[month]?.notes ?? null,
-  }))
+  const byYear: Record<number, Record<number, FinancialMonth>> = {}
+  for (const m of allMonths) {
+    if (!byYear[m.year]) byYear[m.year] = {}
+    byYear[m.year][m.month] = m
+  }
 
   return (
     <AppShell>
-      <main className="flex-1 px-8 py-7">
-        <FinancialsClient months={months} />
+      <main className="px-8 py-7 pb-16">
+        <FinancialsClient initialData={byYear} />
       </main>
     </AppShell>
   )

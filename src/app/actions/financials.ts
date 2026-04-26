@@ -2,42 +2,27 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStudioId } from './_shared'
+import type { FinancialMonth } from '@/types/database'
 
-export async function upsertFinancialMonth(
-  month: string,
-  field: 'revenue' | 'expenses' | 'notes',
-  value: string
-) {
+type EditableFields = Partial<Pick<FinancialMonth,
+  'enrollment' | 'booked_hrs' | 'goal_hrs' | 'avail_hrs' |
+  'leads' | 'consults' | 'poss_reg' | 'new_enrollments' | 'disenrollments' |
+  'est_revenue' | 'collected_revenue' | 'expenses' | 'notes'
+>>
+
+export async function upsertMonth(year: number, month: number, data: EditableFields) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
   const { supabase, studioId } = ctx
 
-  const updateValue = field === 'notes' ? value : value ? Math.round(parseFloat(value) * 100) : null
-
-  const { data: existing } = await supabase
+  const { error } = await supabase
     .from('financial_months')
-    .select('id')
-    .eq('studio_id', studioId)
-    .eq('month', month)
-    .single()
+    .upsert(
+      { studio_id: studioId, year, month, ...data, updated_at: new Date().toISOString() },
+      { onConflict: 'studio_id,year,month' }
+    )
 
-  if (existing) {
-    const { error } = await supabase
-      .from('financial_months')
-      .update({ [field]: updateValue })
-      .eq('id', existing.id)
-
-    if (error) return { error: error.message }
-  } else {
-    const { error } = await supabase.from('financial_months').insert({
-      studio_id: studioId,
-      month,
-      [field]: updateValue,
-    })
-
-    if (error) return { error: error.message }
-  }
-
+  if (error) return { error: error.message }
   revalidatePath('/financials')
   return { error: null }
 }

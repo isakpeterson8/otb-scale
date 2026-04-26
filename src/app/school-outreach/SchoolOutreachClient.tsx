@@ -315,12 +315,6 @@ function TemplateViewerModal({
   onClose: () => void
 }) {
   const rawContent = getNextEmailContent(enrollment)
-  const [copiedSubject, setCopiedSubject] = useState(false)
-  const [copiedBody, setCopiedBody] = useState(false)
-  const [sending, setSending] = useState(false)
-  const [sendError, setSendError] = useState<string | null>(null)
-
-  if (!rawContent) return null
 
   const capitalize = (s: string) =>
     s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
@@ -332,20 +326,30 @@ function TemplateViewerModal({
     Location: settings?.location ?? '',
     phonenumber: settings?.phone ?? '',
   }
-  const content = {
+
+  const resolved = rawContent ? {
     ...rawContent,
     subject: applyAutoFills(rawContent.subject, fills),
     body: applyAutoFills(rawContent.body, fills),
-  }
+  } : null
+
+  const [subject, setSubject] = useState(resolved?.subject ?? '')
+  const [body, setBody] = useState(resolved?.body ?? '')
+  const [copiedSubject, setCopiedSubject] = useState(false)
+  const [copiedBody, setCopiedBody] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+
+  if (!resolved) return null
 
   function copySubject() {
-    navigator.clipboard.writeText(content.subject)
+    navigator.clipboard.writeText(subject)
     setCopiedSubject(true)
     setTimeout(() => setCopiedSubject(false), 2000)
   }
 
   function copyBody() {
-    navigator.clipboard.writeText(content.body)
+    navigator.clipboard.writeText(body)
     setCopiedBody(true)
     setTimeout(() => setCopiedBody(false), 2000)
   }
@@ -361,15 +365,15 @@ function TemplateViewerModal({
       enrollmentId: enrollment.id,
       toEmail: school.email,
       toName: school.contact_name,
-      subject: content.subject,
-      body: content.body,
+      subject,
+      body,
     })
     if (result.error) {
       setSendError(result.error)
       setSending(false)
       return
     }
-    await markEmailSent(enrollment.id, content.emailNumber)
+    await markEmailSent(enrollment.id, resolved!.emailNumber)
     onClose()
   }
 
@@ -378,7 +382,7 @@ function TemplateViewerModal({
       <div className="w-full max-w-xl bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 p-6 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-base font-medium text-[var(--ink)]">Email {content.emailNumber} — {school.school_name}</h3>
+            <h3 className="text-base font-medium text-[var(--ink)]">Email {resolved.emailNumber} — {school.school_name}</h3>
             <p className="text-xs text-[var(--ink-3)] mt-0.5">
               {school.contact_name ? `To: ${school.contact_name}` : 'Fill in $variables before sending'}
             </p>
@@ -390,7 +394,7 @@ function TemplateViewerModal({
           </button>
         </div>
 
-        {content.emailNumber > 1 && (
+        {resolved.emailNumber > 1 && (
           <div
             className="rounded-lg text-xs leading-relaxed mb-4"
             style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626', padding: '10px 14px' }}
@@ -410,12 +414,15 @@ function TemplateViewerModal({
               {copiedSubject ? 'Copied!' : 'Copy subject'}
             </button>
           </div>
-          <p className="text-sm text-[var(--ink)] bg-[var(--canvas)] px-3 py-2 rounded-lg border border-[var(--ink)]/10">
-            {content.subject}
-          </p>
+          <input
+            type="text"
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+          />
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs text-[var(--ink-3)] uppercase tracking-wide font-medium">Body</p>
             <button
@@ -426,9 +433,13 @@ function TemplateViewerModal({
               {copiedBody ? 'Copied!' : 'Copy body'}
             </button>
           </div>
-          <div className="bg-[var(--canvas)] rounded-lg border border-[var(--ink)]/10 px-4 py-3">
-            <HighlightedBody text={content.body} />
-          </div>
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            style={{ resize: 'vertical', minHeight: '200px' }}
+            className="w-full px-3 py-2.5 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] leading-relaxed focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+          />
+          <p className="text-xs text-[var(--ink-3)] mt-1">Edit this template before sending</p>
         </div>
 
         {sendError && (

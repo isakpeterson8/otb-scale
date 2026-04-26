@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/layout/AppShell'
-import type { Contact, PipelineEvent, FinancialMonth } from '@/types/database'
+import type { Contact, PipelineEvent } from '@/types/database'
 import { PIPELINE_STAGES } from '@/types/database'
 
 export default async function DashboardPage() {
@@ -19,7 +19,8 @@ export default async function DashboardPage() {
       .order('event_date', { ascending: false }),
     supabase
       .from('financial_months')
-      .select('month, revenue, expenses')
+      .select('year, month, collected_revenue, expenses')
+      .order('year', { ascending: false })
       .order('month', { ascending: false })
       .limit(6),
     supabase
@@ -31,17 +32,18 @@ export default async function DashboardPage() {
 
   const contacts = (contactsResult.data ?? []) as Contact[]
   const pipeline = (pipelineResult.data ?? []) as unknown as (PipelineEvent & { contacts: { name: string; email: string | null } | null })[]
-  const financials = (financialsResult.data ?? []) as FinancialMonth[]
+  type FinRow = { year: number; month: number; collected_revenue: number | null; expenses: number | null }
+  const financials = (financialsResult.data ?? []) as FinRow[]
   const recentEmails = emailResult.data ?? []
 
   const totalContacts = contacts.length
   const enrolledCount = pipeline.filter((e) => e.stage === 'new_enrollment').length
   const activeLeads = pipeline.filter((e) => !['new_enrollment', 'disenrolled'].includes(e.stage)).length
 
-  const thisMonth = new Date().toISOString().slice(0, 7)
-  const thisMonthFinancial = financials.find((f) => f.month === thisMonth)
-  const monthlyRevenue = thisMonthFinancial?.revenue != null
-    ? `$${(thisMonthFinancial.revenue / 100).toLocaleString()}`
+  const now = new Date()
+  const thisMonthFinancial = financials.find((f) => f.year === now.getFullYear() && f.month === now.getMonth() + 1)
+  const monthlyRevenue = thisMonthFinancial?.collected_revenue != null
+    ? `$${Math.round(thisMonthFinancial.collected_revenue).toLocaleString()}`
     : '—'
 
   const recentPipeline = pipeline.slice(0, 5)
@@ -190,12 +192,13 @@ export default async function DashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-[var(--ink)]/6">
                   {financials.slice(0, 4).map((f) => {
-                    const rev = f.revenue != null ? f.revenue / 100 : null
-                    const exp = f.expenses != null ? f.expenses / 100 : null
+                    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                    const rev = f.collected_revenue != null ? Math.round(f.collected_revenue) : null
+                    const exp = f.expenses != null ? Math.round(f.expenses) : null
                     const net = rev != null && exp != null ? rev - exp : null
                     return (
-                      <tr key={f.month} className="hover:bg-[var(--canvas)] transition-colors">
-                        <td className="px-5 py-3 text-[var(--ink-2)]">{f.month}</td>
+                      <tr key={`${f.year}-${f.month}`} className="hover:bg-[var(--canvas)] transition-colors">
+                        <td className="px-5 py-3 text-[var(--ink-2)]">{monthNames[f.month - 1]} {f.year}</td>
                         <td className="px-5 py-3 text-right text-[var(--ink)]">
                           {rev != null ? `$${rev.toLocaleString()}` : '—'}
                         </td>
