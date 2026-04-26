@@ -8,11 +8,27 @@ export default async function EmailTemplatesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: settings } = await supabase
-    .from('settings')
-    .select('display_name, studio_name, location, phone')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('studio_id')
+    .eq('id', user.id)
+    .single()
+
+  const [settingsRes, customRes] = await Promise.all([
+    supabase
+      .from('settings')
+      .select('display_name, studio_name, location, phone')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    profile?.studio_id
+      ? supabase
+          .from('custom_templates')
+          .select('template_key, subject, body')
+          .eq('studio_id', profile.studio_id)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const settings = settingsRes.data
 
   const capitalize = (s: string) =>
     s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
@@ -24,10 +40,15 @@ export default async function EmailTemplatesPage() {
     phonenumber: settings?.phone ?? '',
   }
 
+  const initialCustomTemplates: Record<string, { subject: string; body: string }> = {}
+  for (const row of customRes.data ?? []) {
+    initialCustomTemplates[row.template_key] = { subject: row.subject, body: row.body }
+  }
+
   return (
     <AppShell>
       <main className="flex-1 px-8 py-7">
-        <EmailTemplatesClient fills={fills} />
+        <EmailTemplatesClient fills={fills} initialCustomTemplates={initialCustomTemplates} />
       </main>
     </AppShell>
   )

@@ -6,7 +6,6 @@ import { upsertSettings, disconnectGmail } from '@/app/actions/settings'
 import {
   exportContacts,
   exportSchoolOutreach,
-  exportPipeline,
   exportFacebookGroups,
   exportFinancials,
 } from '@/app/actions/export'
@@ -68,7 +67,7 @@ function downloadCsv(csv: string, filename: string) {
 
 const today = new Date().toISOString().slice(0, 10)
 
-type ExportKey = 'contacts' | 'outreach' | 'pipeline' | 'fb' | 'financials' | 'all'
+type ExportKey = 'contacts' | 'outreach' | 'fb' | 'financials' | 'all'
 
 function DownloadIcon() {
   return (
@@ -92,32 +91,28 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
     setExportError(null)
     try {
       if (key === 'all') {
-        const [c, s, p, f, fin] = await Promise.all([
+        const [c, s, f, fin] = await Promise.all([
           exportContacts(),
           exportSchoolOutreach(),
-          exportPipeline(),
           exportFacebookGroups(),
           exportFinancials(),
         ])
         if (c.csv)   downloadCsv(c.csv,   `otb-contacts-${today}.csv`)
         if (s.csv)   downloadCsv(s.csv,   `otb-school-outreach-${today}.csv`)
-        if (p.csv)   downloadCsv(p.csv,   `otb-pipeline-${today}.csv`)
         if (f.csv)   downloadCsv(f.csv,   `otb-facebook-groups-${today}.csv`)
         if (fin.csv) downloadCsv(fin.csv, `otb-financials-${today}.csv`)
-        const firstError = [c, s, p, f, fin].find(r => r.error)?.error
+        const firstError = [c, s, f, fin].find(r => r.error)?.error
         if (firstError) setExportError(firstError)
       } else {
         const actions: Record<Exclude<ExportKey, 'all'>, () => Promise<{ csv: string | null; error: string | null }>> = {
-          contacts: exportContacts,
-          outreach:  exportSchoolOutreach,
-          pipeline:  exportPipeline,
-          fb:        exportFacebookGroups,
+          contacts:   exportContacts,
+          outreach:   exportSchoolOutreach,
+          fb:         exportFacebookGroups,
           financials: exportFinancials,
         }
         const filenames: Record<Exclude<ExportKey, 'all'>, string> = {
           contacts:   `otb-contacts-${today}.csv`,
           outreach:   `otb-school-outreach-${today}.csv`,
-          pipeline:   `otb-pipeline-${today}.csv`,
           fb:         `otb-facebook-groups-${today}.csv`,
           financials: `otb-financials-${today}.csv`,
         }
@@ -343,7 +338,6 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
           {([
             { key: 'contacts',   label: 'Contacts' },
             { key: 'outreach',   label: 'School Outreach' },
-            { key: 'pipeline',   label: 'Pipeline' },
             { key: 'fb',         label: 'Facebook Groups' },
             { key: 'financials', label: 'Financials' },
           ] as { key: ExportKey; label: string }[]).map(({ key, label }) => (

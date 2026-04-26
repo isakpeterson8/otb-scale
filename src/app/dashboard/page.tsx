@@ -3,55 +3,38 @@ import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/layout/AppShell'
-import type { Contact, PipelineEvent } from '@/types/database'
-import { PIPELINE_STAGES } from '@/types/database'
+import type { Contact } from '@/types/database'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const [contactsResult, pipelineResult, financialsResult, emailResult] = await Promise.all([
-    supabase.from('contacts').select('id, status, created_at').order('created_at', { ascending: false }),
+  const [contactsResult, financialsResult] = await Promise.all([
+    supabase.from('contacts').select('id, name, email, status, created_at').order('created_at', { ascending: false }),
     supabase
-      .from('pipeline_events')
-      .select('id, stage, event_date, notes, contacts(name, email)')
-      .order('event_date', { ascending: false }),
-    supabase
-      .from('financial_months')
-      .select('year, month, collected_revenue, expenses')
-      .order('year', { ascending: false })
-      .order('month', { ascending: false })
+      .from('studio_snapshots')
+      .select('snapshot_date, collected_revenue, expenses')
+      .order('snapshot_date', { ascending: false })
       .limit(6),
-    supabase
-      .from('email_sends')
-      .select('id, sent_at, subject')
-      .order('sent_at', { ascending: false })
-      .limit(5),
   ])
 
-  const contacts = (contactsResult.data ?? []) as Contact[]
-  const pipeline = (pipelineResult.data ?? []) as unknown as (PipelineEvent & { contacts: { name: string; email: string | null } | null })[]
-  type FinRow = { year: number; month: number; collected_revenue: number | null; expenses: number | null }
+  const contacts = (contactsResult.data ?? []) as (Contact & { name: string })[]
+  type FinRow = { snapshot_date: string; collected_revenue: number | null; expenses: number | null }
   const financials = (financialsResult.data ?? []) as FinRow[]
-  const recentEmails = emailResult.data ?? []
 
   const totalContacts = contacts.length
-  const enrolledCount = pipeline.filter((e) => e.stage === 'new_enrollment').length
-  const activeLeads = pipeline.filter((e) => !['new_enrollment', 'disenrolled'].includes(e.stage)).length
+  const recentContacts = contacts.slice(0, 5)
 
   const now = new Date()
-  const thisMonthFinancial = financials.find((f) => f.year === now.getFullYear() && f.month === now.getMonth() + 1)
+  const thisMonthDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const thisMonthFinancial = financials.find((f) => f.snapshot_date === thisMonthDate)
   const monthlyRevenue = thisMonthFinancial?.collected_revenue != null
     ? `$${Math.round(thisMonthFinancial.collected_revenue).toLocaleString()}`
     : '—'
 
-  const recentPipeline = pipeline.slice(0, 5)
-
   const stats = [
     { label: 'Total Contacts', value: String(totalContacts) },
-    { label: 'Active Leads', value: String(activeLeads) },
-    { label: 'New Enrollments', value: String(enrolledCount) },
     { label: 'Monthly Revenue', value: monthlyRevenue },
   ]
 
@@ -70,7 +53,7 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {stats.map(({ label, value }) => (
             <div
               key={label}
@@ -89,84 +72,36 @@ export default async function DashboardPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-3 bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ink)]/8">
-              <h2 className="text-sm font-medium text-[var(--ink)]">Recent Pipeline Activity</h2>
-              <Link
-                href="/pipeline"
-                className="text-xs text-[var(--accent-text)] hover:text-[var(--ink)] transition-colors"
-              >
-                View all
-              </Link>
-            </div>
-
-            {recentPipeline.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-2">
-                <p className="text-sm text-[var(--ink-3)]">No pipeline activity yet</p>
-                <Link href="/pipeline" className="text-xs text-[var(--accent-text)]">Add an event →</Link>
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--ink)]/6">
-                {recentPipeline.map((event) => {
-                  const contact = event.contacts as { name: string; email: string | null } | null
-                  return (
-                    <div key={event.id} className="flex items-center gap-3 px-5 py-3.5">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[var(--ink)] truncate">
-                          {contact?.name ?? 'Unknown'}
-                        </p>
-                        <p className="text-xs text-[var(--ink-3)] truncate mt-0.5">
-                          {event.stage.replace(/_/g, ' ')} · {formatDistanceToNow(new Date(event.event_date), { addSuffix: true })}
-                        </p>
-                      </div>
-                      <span
-                        className={[
-                          'shrink-0 text-xs px-2 py-0.5 rounded-full font-medium',
-                          event.stage === 'new_enrollment'
-                            ? 'bg-[var(--green-l)] text-[var(--green)]'
-                            : event.stage === 'disenrolled'
-                            ? 'bg-[var(--red-l)] text-[var(--red)]'
-                            : 'bg-[var(--accent-light)] text-[var(--accent-text)]',
-                        ].join(' ')}
-                      >
-                        {PIPELINE_STAGES.find((s) => s.value === event.stage)?.label ?? event.stage.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 flex flex-col">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ink)]/8">
+            <h2 className="text-sm font-medium text-[var(--ink)]">Recent Contacts</h2>
+            <Link
+              href="/contacts"
+              className="text-xs text-[var(--accent-text)] hover:text-[var(--ink)] transition-colors"
+            >
+              View all
+            </Link>
           </div>
 
-          <div className="lg:col-span-2 bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ink)]/8">
-              <h2 className="text-sm font-medium text-[var(--ink)]">Recent Emails</h2>
-              <Link
-                href="/emails"
-                className="text-xs text-[var(--accent-text)] hover:text-[var(--ink)] transition-colors"
-              >
-                View all
-              </Link>
+          {recentContacts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <p className="text-sm text-[var(--ink-3)]">No contacts yet</p>
+              <Link href="/contacts" className="text-xs text-[var(--accent-text)]">Add a contact →</Link>
             </div>
-
-            {recentEmails.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-2">
-                <p className="text-sm text-[var(--ink-3)]">No emails sent yet</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--ink)]/6">
-                {recentEmails.map((email) => (
-                  <div key={email.id} className="px-5 py-3.5">
-                    <p className="text-sm text-[var(--ink)] truncate">{email.subject}</p>
-                    <p className="text-xs text-[var(--ink-3)] mt-0.5">
-                      {formatDistanceToNow(new Date(email.sent_at), { addSuffix: true })}
+          ) : (
+            <div className="divide-y divide-[var(--ink)]/6">
+              {recentContacts.map((contact) => (
+                <div key={contact.id} className="flex items-center gap-3 px-5 py-3.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[var(--ink)] truncate">{contact.name}</p>
+                    <p className="text-xs text-[var(--ink-3)] truncate mt-0.5">
+                      {contact.email ?? '—'} · {formatDistanceToNow(new Date(contact.created_at), { addSuffix: true })}
                     </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {financials.length > 0 && (
@@ -192,13 +127,13 @@ export default async function DashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-[var(--ink)]/6">
                   {financials.slice(0, 4).map((f) => {
-                    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
                     const rev = f.collected_revenue != null ? Math.round(f.collected_revenue) : null
                     const exp = f.expenses != null ? Math.round(f.expenses) : null
                     const net = rev != null && exp != null ? rev - exp : null
+                    const monthYear = new Date(f.snapshot_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
                     return (
-                      <tr key={`${f.year}-${f.month}`} className="hover:bg-[var(--canvas)] transition-colors">
-                        <td className="px-5 py-3 text-[var(--ink-2)]">{monthNames[f.month - 1]} {f.year}</td>
+                      <tr key={f.snapshot_date} className="hover:bg-[var(--canvas)] transition-colors">
+                        <td className="px-5 py-3 text-[var(--ink-2)]">{monthYear}</td>
                         <td className="px-5 py-3 text-right text-[var(--ink)]">
                           {rev != null ? `$${rev.toLocaleString()}` : '—'}
                         </td>
