@@ -59,17 +59,6 @@ const NAV = [
     icon: <TrendingUp width={16} height={16} aria-hidden />,
   },
   {
-    label: 'Email Templates',
-    href: '/email-templates',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none" />
-        <path d="M1 5l7 5 7-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-        <path d="M10 8.5l3-2M6 8.5L3 6.5" stroke="currentColor" strokeWidth="1" opacity=".4" />
-      </svg>
-    ),
-  },
-  {
     label: 'Settings',
     href: '/settings',
     icon: (

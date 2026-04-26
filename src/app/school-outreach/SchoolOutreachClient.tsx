@@ -544,15 +544,24 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
           </h2>
           <p className="text-sm text-[var(--ink-3)] mt-0.5">Classroom visit pipeline</p>
         </div>
-        <button
-          onClick={() => { setEditSchool(null); setShowForm(true) }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-            <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-          Add school
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/email-templates"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors hover:opacity-80"
+            style={{ borderColor: '#04ADEF', color: '#04ADEF' }}
+          >
+            Browse Templates
+          </a>
+          <button
+            onClick={() => { setEditSchool(null); setShowForm(true) }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+              <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Add school
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

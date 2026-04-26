@@ -278,6 +278,15 @@ export default function EmailTemplatesClient({
   return (
     <div className="space-y-5">
       <div>
+        <a
+          href="/school-outreach"
+          className="inline-flex items-center gap-1 text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors mb-3"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+            <path d="M9 2L3 7l6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Back to School Outreach
+        </a>
         <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
           Email Templates
         </h2>
