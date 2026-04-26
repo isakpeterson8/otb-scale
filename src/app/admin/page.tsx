@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminSupabase } from '@/lib/supabase/admin'
+import { adminClient } from '@/lib/supabase/admin'
 import AppShell from '@/components/layout/AppShell'
 import AdminClient from './AdminClient'
 import type {
@@ -72,8 +72,6 @@ export default async function AdminPage() {
 
   const callerRole = (callerProfile?.role ?? 'studio_owner') as UserRole
 
-  const admin = createAdminSupabase()
-
   const [
     studiosRes,
     profilesRes,
@@ -83,14 +81,22 @@ export default async function AdminPage() {
     financialsRes,
     cadenceRes,
   ] = await Promise.all([
-    admin.from('studios').select('id, name, owner_user_id, created_at').order('created_at', { ascending: false }),
-    admin.from('profiles').select('id, studio_id, role, display_name, email, created_at').order('created_at', { ascending: false }),
-    admin.from('contacts').select('id, studio_id, name, email, phone, status, created_at').order('created_at', { ascending: false }),
-    admin.from('school_outreach').select('id, studio_id, school_name, contact_name, email, stage, last_interacted_date').order('created_at', { ascending: false }),
-    admin.from('facebook_groups').select('id, studio_id'),
-    admin.from('financial_months').select('id, studio_id, month, revenue, expenses, notes').order('month', { ascending: false }),
-    admin.from('cadence_enrollments').select('id, school_id, status').order('created_at', { ascending: false }),
+    adminClient.from('studios').select('id, name, owner_user_id, created_at').order('created_at', { ascending: false }),
+    adminClient.from('profiles').select('id, studio_id, role, display_name, email, created_at').order('created_at', { ascending: false }),
+    adminClient.from('contacts').select('id, studio_id, name, email, phone, status, created_at').order('created_at', { ascending: false }),
+    adminClient.from('school_outreach').select('id, studio_id, school_name, contact_name, email, stage, last_interacted_date').order('created_at', { ascending: false }),
+    adminClient.from('facebook_groups').select('id, studio_id'),
+    adminClient.from('financial_months').select('id, studio_id, month, revenue, expenses, notes').order('month', { ascending: false }),
+    adminClient.from('cadence_enrollments').select('id, school_id, status').order('created_at', { ascending: false }),
   ])
+
+  console.log('[admin] studios:',    studiosRes.data?.length,    studiosRes.error?.message)
+  console.log('[admin] profiles:',   profilesRes.data?.length,   profilesRes.error?.message)
+  console.log('[admin] contacts:',   contactsRes.data?.length,   contactsRes.error?.message)
+  console.log('[admin] schools:',    schoolRes.data?.length,     schoolRes.error?.message)
+  console.log('[admin] fb_groups:',  fbRes.data?.length,         fbRes.error?.message)
+  console.log('[admin] financials:', financialsRes.data?.length, financialsRes.error?.message)
+  console.log('[admin] cadence:',    cadenceRes.data?.length,    cadenceRes.error?.message)
 
   const rawStudios  = (studiosRes.data   ?? []) as { id: string; name: string; owner_user_id: string; created_at: string }[]
   const rawProfiles = (profilesRes.data  ?? []) as { id: string; studio_id: string | null; role: UserRole; display_name: string | null; email: string | null; created_at: string }[]
