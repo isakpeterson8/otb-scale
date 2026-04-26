@@ -189,7 +189,6 @@ export default function AdminClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--ink)]/8">
-                  <Th>Name</Th>
                   <Th>Email</Th>
                   <Th>Role</Th>
                   <Th>Studio</Th>
@@ -198,11 +197,10 @@ export default function AdminClient({
               </thead>
               <tbody className="divide-y divide-[var(--ink)]/6">
                 {profiles.length === 0
-                  ? <EmptyRow cols={5} msg="No users found." />
+                  ? <EmptyRow cols={4} msg="No users found." />
                   : profiles.map(p => (
                     <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
-                      <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.display_name ?? '—'}</td>
-                      <Td muted>{p.email ?? '—'}</Td>
+                      <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
                       <td className="px-4 py-3">
                         <RoleCell profile={p} canEdit={isSuperAdmin} />
                       </td>
