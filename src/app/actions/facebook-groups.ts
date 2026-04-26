@@ -6,6 +6,7 @@ import { getStudioId } from './_shared'
 export async function createFacebookGroup(formData: FormData) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
   const sizeRaw = formData.get('group_membership_size') as string
@@ -32,6 +33,7 @@ export async function createFacebookGroup(formData: FormData) {
 export async function updateFacebookGroup(id: string, formData: FormData) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
   const sizeRaw = formData.get('group_membership_size') as string
@@ -60,6 +62,7 @@ export async function updateFacebookGroup(id: string, formData: FormData) {
 export async function logPost(id: string) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
   const today = new Date().toISOString().slice(0, 10)
@@ -76,6 +79,7 @@ export async function logPost(id: string) {
 export async function deleteFacebookGroup(id: string) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
   const { error } = await supabase.from('facebook_groups').delete().eq('id', id)

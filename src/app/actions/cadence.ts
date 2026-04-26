@@ -1,8 +1,14 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import type { CadenceEnrollment } from '@/types/database'
+
+async function isViewOnly(): Promise<boolean> {
+  const cookieStore = await cookies()
+  return !!cookieStore.get('view_as_studio_id')?.value
+}
 
 async function getValidAccessToken(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
   const { data: settings } = await supabase
@@ -81,6 +87,7 @@ export async function sendCadenceEmail({
   subject: string
   body: string
 }): Promise<{ error: string | null; threadId: string | null }> {
+  if (await isViewOnly()) return { error: 'View only mode', threadId: null }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', threadId: null }
@@ -130,6 +137,7 @@ export async function sendCadenceEmail({
 }
 
 export async function enrollInCadence(schoolId: string, openingTemplate: string) {
+  if (await isViewOnly()) return { error: 'View only mode' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
@@ -156,6 +164,7 @@ export async function enrollInCadence(schoolId: string, openingTemplate: string)
 }
 
 export async function markEmailSent(enrollmentId: string, emailNumber: number) {
+  if (await isViewOnly()) return { error: 'View only mode' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
@@ -186,6 +195,7 @@ export async function markEmailSent(enrollmentId: string, emailNumber: number) {
 }
 
 export async function removeFromCadence(enrollmentId: string, reason: 'manual' | 'reply_detected') {
+  if (await isViewOnly()) return { error: 'View only mode' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }

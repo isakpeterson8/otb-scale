@@ -9,6 +9,7 @@ type SnapshotFields = Partial<Omit<StudioSnapshot, 'id' | 'studio_id' | 'created
 export async function createSnapshot(data: SnapshotFields): Promise<{ data: StudioSnapshot | null; error: string | null }> {
   const ctx = await getStudioId()
   if (!ctx) return { data: null, error: 'Unauthorized' }
+  if (ctx.viewOnly) return { data: null, error: 'View only mode' }
   const { supabase, studioId } = ctx
 
   const { data: created, error } = await supabase
@@ -25,6 +26,7 @@ export async function createSnapshot(data: SnapshotFields): Promise<{ data: Stud
 export async function updateSnapshot(id: string, data: SnapshotFields): Promise<{ error: string | null }> {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
   const { error } = await supabase
@@ -41,6 +43,7 @@ export async function updateSnapshot(id: string, data: SnapshotFields): Promise<
 export async function deleteSnapshot(id: string): Promise<{ error: string | null }> {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
   const { error } = await supabase

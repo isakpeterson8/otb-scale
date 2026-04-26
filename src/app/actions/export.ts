@@ -34,7 +34,7 @@ export async function exportContacts(): Promise<{ csv: string | null; error: str
   if (error) return { csv: null, error: error.message }
 
   const headers = row(['Name', 'Email', 'Phone', 'Status', 'Notes', 'Created At'])
-  const rows = (data ?? []).map(c =>
+  const rows = (data ?? []).map((c: Record<string, unknown>) =>
     row([c.name, c.email, c.phone, c.status, c.notes, c.created_at])
   )
   return { csv: [headers, ...rows].join('\n'), error: null }
@@ -74,8 +74,8 @@ export async function exportSchoolOutreach(): Promise<{ csv: string | null; erro
     'First Contact Date', 'Last Interacted Date',
     'Next Step', 'Next Step Due', 'Notes',
   ])
-  const rows = (schoolsRes.data ?? []).map(s => {
-    const cad = latestCadence.get(s.id)
+  const rows = (schoolsRes.data ?? []).map((s: Record<string, unknown>) => {
+    const cad = latestCadence.get(s.id as string)
     return row([
       s.school_name, s.contact_name, s.email, s.phone, s.stage,
       cad?.status ?? '', cad?.emails_sent ?? '',
@@ -100,8 +100,8 @@ export async function exportPipeline(): Promise<{ csv: string | null; error: str
   if (error) return { csv: null, error: error.message }
 
   const headers = row(['Event Date', 'Contact Name', 'Contact Email', 'Stage', 'Notes'])
-  const rows = (data ?? []).map(e => {
-    const contact = Array.isArray(e.contacts) ? e.contacts[0] : e.contacts
+  const rows = (data ?? []).map((e: Record<string, unknown>) => {
+    const contact = Array.isArray(e.contacts) ? (e.contacts as Record<string, unknown>[])[0] : e.contacts as Record<string, unknown>
     return row([e.event_date, contact?.name ?? '', contact?.email ?? '', e.stage, e.notes])
   })
   return { csv: [headers, ...rows].join('\n'), error: null }
@@ -125,7 +125,7 @@ export async function exportFacebookGroups(): Promise<{ csv: string | null; erro
     'Shared With', 'Posting Rules', 'Application Date', 'Acceptance Date',
     'Last Post Date', 'Active',
   ])
-  const rows = (data ?? []).map(g =>
+  const rows = (data ?? []).map((g: Record<string, unknown>) =>
     row([
       g.group_name, g.group_url, g.group_location, g.group_membership_size,
       g.post_type, g.shared_with, g.posting_rules,
@@ -154,8 +154,8 @@ export async function exportFinancials(): Promise<{ csv: string | null; error: s
     'Leads', 'Consults', 'Poss Reg', 'New Enrollments', 'Disenrollments',
     'Collected Revenue', 'Expenses', 'Net',
   ])
-  const rows = (data ?? []).map(f => {
-    const net = (f.collected_revenue ?? 0) - (f.expenses ?? 0)
+  const rows = (data ?? []).map((f: Record<string, unknown>) => {
+    const net = ((f.collected_revenue as number) ?? 0) - ((f.expenses as number) ?? 0)
     const monthYear = new Date(f.snapshot_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     return row([
       monthYear, f.enrollment, f.booked_hrs, f.goal_hrs, f.avail_hrs,

@@ -1,46 +1,26 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { updateUserRole, approveUser, rejectUser } from '@/app/actions/admin'
-import { formatDate, formatCurrency } from '@/lib/utils'
-import { SCHOOL_STAGES } from '@/types/database'
+import { updateUserRole, approveUser, rejectUser, enterViewAs } from '@/app/actions/admin'
+import { formatDate } from '@/lib/utils'
 import type { UserRole } from '@/types/database'
-import type {
-  AdminProfile,
-  AdminStudio,
-  AdminSchoolRecord,
-  AdminContact,
-  AdminFinancial,
-} from './page'
+import type { AdminProfile } from './page'
 
-type Tab = 'pending' | 'users' | 'studios' | 'outreach' | 'contacts' | 'financials'
+type Tab = 'pending' | 'users'
 
 const ROLE_OPTIONS: UserRole[] = ['studio_owner', 'otb_staff', 'otb_admin']
 const ROLE_BADGE: Record<UserRole, { label: string; bg: string; color: string }> = {
-  studio_owner: { label: 'Studio Owner', bg: 'rgba(0,0,0,0.06)',       color: '#374151' },
-  otb_staff:    { label: 'OTB Staff',    bg: 'rgba(109,40,217,0.1)',   color: '#6d28d9' },
-  otb_admin:    { label: 'Super Admin',  bg: 'rgba(4,173,239,0.15)',   color: '#0284a8' },
-}
-const CADENCE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
-  active:    { label: 'Active',    bg: 'rgba(4,173,239,0.12)',  color: '#0284a8' },
-  completed: { label: 'Completed', bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
-  removed:   { label: 'Removed',   bg: 'rgba(0,0,0,0.06)',     color: '#374151' },
-  replied:   { label: 'Replied',   bg: 'rgba(180,83,9,0.12)',  color: '#b45309' },
-}
-const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
-  student:  { bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
-  active:   { bg: 'rgba(4,173,239,0.12)',  color: '#0284a8' },
-  prospect: { bg: 'rgba(0,0,0,0.06)',      color: '#374151' },
-  lead:     { bg: 'rgba(180,83,9,0.12)',   color: '#b45309' },
-  inactive: { bg: 'rgba(220,38,38,0.1)',   color: '#b91c1c' },
+  studio_owner: { label: 'Studio Owner', bg: 'rgba(0,0,0,0.06)',      color: '#374151' },
+  otb_staff:    { label: 'OTB Staff',    bg: 'rgba(109,40,217,0.1)',  color: '#6d28d9' },
+  otb_admin:    { label: 'Super Admin',  bg: 'rgba(4,173,239,0.15)',  color: '#0284a8' },
 }
 const USER_STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   approved: { label: 'Approved', bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
-  pending:  { label: 'Pending',  bg: 'rgba(180,83,9,0.12)',  color: '#b45309' },
-  rejected: { label: 'Rejected', bg: 'rgba(220,38,38,0.1)',  color: '#b91c1c' },
+  pending:  { label: 'Pending',  bg: 'rgba(180,83,9,0.12)',   color: '#b45309' },
+  rejected: { label: 'Rejected', bg: 'rgba(220,38,38,0.1)',   color: '#b91c1c' },
 }
 
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
+function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
   return (
     <th className={`px-4 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}>
       {children}
@@ -56,23 +36,13 @@ function Td({ children, muted, right, nowrap }: { children: React.ReactNode; mut
   )
 }
 
-function StageBadge({ stage }: { stage: string }) {
-  const def = SCHOOL_STAGES.find(s => s.value === stage)
-  if (!def) return <span className="text-[var(--ink-3)] text-xs">—</span>
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: def.bg, color: def.text }}>
-      {def.label}
-    </span>
-  )
-}
-
 function RoleCell({ profile, canEdit }: { profile: AdminProfile; canEdit: boolean }) {
   const [isPending, startTransition] = useTransition()
   const badge = ROLE_BADGE[profile.role] ?? ROLE_BADGE.studio_owner
 
   if (!canEdit) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: badge.bg, color: badge.color }}>
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: badge.bg, color: badge.color }}>
         {badge.label}
       </span>
     )
@@ -119,6 +89,28 @@ function ApprovalButtons({ userId }: { userId: string }) {
   )
 }
 
+function ViewAsButton({ profile }: { profile: AdminProfile }) {
+  const [isPending, startTransition] = useTransition()
+  const disabled = !profile.studio_id || !profile.email || isPending
+
+  return (
+    <button
+      disabled={disabled}
+      onClick={() => {
+        if (!profile.studio_id || !profile.email) return
+        startTransition(async () => {
+          await enterViewAs(profile.studio_id!, profile.email!)
+        })
+      }}
+      title={!profile.studio_id ? 'No studio associated with this user' : 'View app as this user'}
+      className="px-3 py-1 rounded-lg text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-30"
+      style={{ background: 'rgba(4,173,239,0.12)', color: '#0284a8' }}
+    >
+      {isPending ? 'Loading…' : 'View as'}
+    </button>
+  )
+}
+
 function EmptyRow({ cols, msg }: { cols: number; msg: string }) {
   return (
     <tr>
@@ -129,41 +121,25 @@ function EmptyRow({ cols, msg }: { cols: number; msg: string }) {
 
 export default function AdminClient({
   callerRole,
-  stats,
   profiles,
   pendingProfiles,
-  studios,
-  schools,
-  contacts,
-  financials,
 }: {
   callerRole: UserRole
-  stats: {
-    totalStudios: number
-    totalUsers: number
-    totalSchoolOutreach: number
-    totalContacts: number
-    activeCadences: number
-    totalFbGroups: number
-  }
   profiles: AdminProfile[]
   pendingProfiles: AdminProfile[]
-  studios: AdminStudio[]
-  schools: AdminSchoolRecord[]
-  contacts: AdminContact[]
-  financials: AdminFinancial[]
 }) {
   const [tab, setTab] = useState<Tab>('pending')
+  const [search, setSearch] = useState('')
   const isSuperAdmin = callerRole === 'otb_admin'
 
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: 'pending',    label: 'Pending Approval', count: pendingProfiles.length },
-    { key: 'users',      label: 'Users',            count: profiles.length },
-    { key: 'studios',    label: 'Studios',           count: studios.length },
-    { key: 'outreach',   label: 'School Outreach',   count: schools.length },
-    { key: 'contacts',   label: 'Contacts',          count: contacts.length },
-    { key: 'financials', label: 'Financials',        count: financials.length },
+    { key: 'pending', label: 'Pending Approval', count: pendingProfiles.length },
+    { key: 'users',   label: 'Users',            count: profiles.length },
   ]
+
+  const filteredProfiles = search.trim()
+    ? profiles.filter(p => p.email?.toLowerCase().includes(search.toLowerCase()))
+    : profiles
 
   return (
     <div className="space-y-6">
@@ -175,25 +151,6 @@ export default function AdminClient({
         <p className="text-sm text-[var(--ink-3)] mt-0.5">
           Platform overview · {isSuperAdmin ? 'Super Admin' : 'Staff'}
         </p>
-      </div>
-
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {[
-          { label: 'Studios',         value: stats.totalStudios },
-          { label: 'Users',           value: stats.totalUsers },
-          { label: 'School Outreach', value: stats.totalSchoolOutreach },
-          { label: 'Contacts',        value: stats.totalContacts },
-          { label: 'Active Cadences', value: stats.activeCadences },
-          { label: 'FB Groups',       value: stats.totalFbGroups },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 px-4 py-4">
-            <p className="text-xs text-[var(--ink-3)] mb-1.5 uppercase tracking-wide font-medium">{label}</p>
-            <p className="text-3xl text-[var(--ink)] leading-none" style={{ fontFamily: 'var(--font-heading)' }}>
-              {value}
-            </p>
-          </div>
-        ))}
       </div>
 
       {/* Tab bar */}
@@ -246,200 +203,56 @@ export default function AdminClient({
 
       {/* Users tab */}
       {tab === 'users' && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ink)]/8">
-                  <Th>Email</Th>
-                  <Th>Role</Th>
-                  <Th>Status</Th>
-                  <Th>Studio</Th>
-                  <Th>Joined</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ink)]/6">
-                {profiles.length === 0
-                  ? <EmptyRow cols={5} msg="No users found." />
-                  : profiles.map(p => {
-                    const statusBadge = p.status ? USER_STATUS_BADGE[p.status] : null
-                    return (
-                    <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
-                      <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <RoleCell profile={p} canEdit={isSuperAdmin} />
-                      </td>
-                      <td className="px-4 py-3">
-                        {statusBadge
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
-                          : <span className="text-[var(--ink-3)] text-xs">—</span>}
-                      </td>
-                      <Td muted>{p.studio_name ?? '—'}</Td>
-                      <Td muted nowrap>{formatDate(p.created_at)}</Td>
-                    </tr>
-                    )
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        <div className="space-y-3">
+          {/* Search */}
+          <input
+            type="text"
+            placeholder="Search by email…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full max-w-sm px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+          />
 
-      {/* Studios tab */}
-      {tab === 'studios' && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ink)]/8">
-                  <Th>Studio</Th>
-                  <Th>Owner</Th>
-                  <Th right>Contacts</Th>
-                  <Th right>Schools</Th>
-                  <Th right>FB Groups</Th>
-                  <Th>Created</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ink)]/6">
-                {studios.length === 0
-                  ? <EmptyRow cols={6} msg="No studios found." />
-                  : studios.map(s => (
-                    <tr key={s.id} className="hover:bg-[var(--canvas)] transition-colors">
-                      <td className="px-4 py-3 font-medium text-[var(--ink)]">{s.name}</td>
-                      <td className="px-4 py-3">
-                        <p className="text-[var(--ink-2)]">{s.owner_name ?? '—'}</p>
-                        {s.owner_email && <p className="text-xs text-[var(--ink-3)]">{s.owner_email}</p>}
-                      </td>
-                      <Td right>{s.contact_count}</Td>
-                      <Td right>{s.school_count}</Td>
-                      <Td right>{s.fb_group_count}</Td>
-                      <Td muted nowrap>{formatDate(s.created_at)}</Td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* School Outreach tab */}
-      {tab === 'outreach' && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ink)]/8">
-                  <Th>Studio</Th>
-                  <Th>School</Th>
-                  <Th>Contact</Th>
-                  <Th>Email</Th>
-                  <Th>Stage</Th>
-                  <Th>Cadence</Th>
-                  <Th>Last Contact</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ink)]/6">
-                {schools.length === 0
-                  ? <EmptyRow cols={7} msg="No school outreach records." />
-                  : schools.map(s => {
-                    const cadBadge = s.cadence_status ? CADENCE_BADGE[s.cadence_status] : null
-                    return (
-                      <tr key={s.id} className="hover:bg-[var(--canvas)] transition-colors">
-                        <Td muted nowrap>{s.studio_name}</Td>
-                        <td className="px-4 py-3 font-medium text-[var(--ink)]">{s.school_name}</td>
-                        <Td>{s.contact_name ?? '—'}</Td>
-                        <Td muted>{s.email ?? '—'}</Td>
-                        <td className="px-4 py-3"><StageBadge stage={s.stage} /></td>
-                        <td className="px-4 py-3">
-                          {cadBadge
-                            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: cadBadge.bg, color: cadBadge.color }}>{cadBadge.label}</span>
-                            : <span className="text-[var(--ink-3)] text-xs">—</span>}
-                        </td>
-                        <Td muted nowrap>{formatDate(s.last_interacted_date)}</Td>
-                      </tr>
-                    )
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Contacts tab */}
-      {tab === 'contacts' && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ink)]/8">
-                  <Th>Studio</Th>
-                  <Th>Name</Th>
-                  <Th>Email</Th>
-                  <Th>Phone</Th>
-                  <Th>Status</Th>
-                  <Th>Added</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ink)]/6">
-                {contacts.length === 0
-                  ? <EmptyRow cols={6} msg="No contacts found." />
-                  : contacts.map(c => {
-                    const statusBadge = c.status ? STATUS_BADGE[c.status] : null
-                    return (
-                      <tr key={c.id} className="hover:bg-[var(--canvas)] transition-colors">
-                        <Td muted nowrap>{c.studio_name}</Td>
-                        <td className="px-4 py-3 font-medium text-[var(--ink)]">{c.name}</td>
-                        <Td muted>{c.email ?? '—'}</Td>
-                        <Td muted>{c.phone ?? '—'}</Td>
-                        <td className="px-4 py-3">
-                          {statusBadge
-                            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: statusBadge.bg, color: statusBadge.color }}>{c.status}</span>
-                            : <span className="text-[var(--ink-3)] text-xs">—</span>}
-                        </td>
-                        <Td muted nowrap>{formatDate(c.created_at)}</Td>
-                      </tr>
-                    )
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Financials tab */}
-      {tab === 'financials' && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--ink)]/8">
-                  <Th>Studio</Th>
-                  <Th>Period</Th>
-                  <Th right>Collected Revenue</Th>
-                  <Th right>Expenses</Th>
-                  <Th right>Profit</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ink)]/6">
-                {financials.length === 0
-                  ? <EmptyRow cols={5} msg="No financial records found." />
-                  : financials.map(f => {
-                    const profit = (f.collected_revenue ?? 0) - (f.expenses ?? 0)
-                    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-                    return (
-                      <tr key={f.id} className="hover:bg-[var(--canvas)] transition-colors">
-                        <Td muted nowrap>{f.studio_name}</Td>
-                        <Td nowrap>{monthNames[f.month - 1]} {f.year}</Td>
-                        <td className="px-4 py-3 text-right text-sm text-[var(--ink-2)]">{formatCurrency(f.collected_revenue)}</td>
-                        <td className="px-4 py-3 text-right text-sm text-[var(--ink-2)]">{formatCurrency(f.expenses)}</td>
-                        <td className="px-4 py-3 text-right text-sm font-medium" style={{ color: profit >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(profit)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-              </tbody>
-            </table>
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--ink)]/8">
+                    <Th>Email</Th>
+                    <Th>Role</Th>
+                    <Th>Status</Th>
+                    <Th>Studio</Th>
+                    <Th>Joined</Th>
+                    <Th></Th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--ink)]/6">
+                  {filteredProfiles.length === 0
+                    ? <EmptyRow cols={6} msg={search ? 'No users match that search.' : 'No users found.'} />
+                    : filteredProfiles.map(p => {
+                      const statusBadge = p.status ? USER_STATUS_BADGE[p.status] : null
+                      return (
+                        <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
+                          <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
+                          <td className="px-4 py-3">
+                            <RoleCell profile={p} canEdit={isSuperAdmin} />
+                          </td>
+                          <td className="px-4 py-3">
+                            {statusBadge
+                              ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
+                              : <span className="text-[var(--ink-3)] text-xs">—</span>}
+                          </td>
+                          <Td muted>{p.studio_name ?? '—'}</Td>
+                          <Td muted nowrap>{formatDate(p.created_at)}</Td>
+                          <td className="px-4 py-3 text-right">
+                            <ViewAsButton profile={p} />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

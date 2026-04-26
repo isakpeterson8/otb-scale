@@ -1,15 +1,27 @@
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { adminClient } from '@/lib/supabase/admin'
 
 type StudioContext = {
-  supabase: Awaited<ReturnType<typeof createClient>>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
   studioId: string
   userId: string
+  viewOnly: boolean
 }
 
 export async function getStudioId(): Promise<StudioContext | null> {
+  const cookieStore = await cookies()
+  const viewAsStudioId = cookieStore.get('view_as_studio_id')?.value
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
+
+  // Admin is viewing as another studio — use service-role client to bypass RLS
+  if (viewAsStudioId) {
+    return { supabase: adminClient, studioId: viewAsStudioId, userId: user.id, viewOnly: true }
+  }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -19,7 +31,7 @@ export async function getStudioId(): Promise<StudioContext | null> {
 
   // Fast path: profile already has a studio_id
   if (profile?.studio_id) {
-    return { supabase, studioId: profile.studio_id, userId: user.id }
+    return { supabase, studioId: profile.studio_id, userId: user.id, viewOnly: false }
   }
 
   // Look for a studio this user already owns
@@ -59,5 +71,5 @@ export async function getStudioId(): Promise<StudioContext | null> {
     console.error('[getStudioId] profile backfill failed:', profileUpdateError.message, profileUpdateError.code)
   }
 
-  return { supabase, studioId, userId: user.id }
+  return { supabase, studioId, userId: user.id, viewOnly: false }
 }

@@ -6,6 +6,7 @@ import { getStudioId } from './_shared'
 export async function createSchoolOutreach(formData: FormData) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
   const probRaw = formData.get('probability') as string
@@ -35,6 +36,7 @@ export async function createSchoolOutreach(formData: FormData) {
 export async function updateSchoolOutreach(id: string, formData: FormData) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
   const probRaw = formData.get('probability') as string
@@ -66,6 +68,7 @@ export async function updateSchoolOutreach(id: string, formData: FormData) {
 export async function deleteSchoolOutreach(id: string) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
   const { error } = await supabase.from('school_outreach').delete().eq('id', id)

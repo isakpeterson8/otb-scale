@@ -6,6 +6,7 @@ import { getStudioId } from './_shared'
 export async function createContact(formData: FormData) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
   const { error } = await supabase.from('contacts').insert({
@@ -26,6 +27,7 @@ export async function createContact(formData: FormData) {
 export async function updateContact(id: string, formData: FormData) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
   const { error } = await supabase
@@ -48,6 +50,7 @@ export async function updateContact(id: string, formData: FormData) {
 export async function deleteContact(id: string) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
   const { error } = await supabase.from('contacts').delete().eq('id', id)

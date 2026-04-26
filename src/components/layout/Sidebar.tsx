@@ -84,9 +84,10 @@ const NAV = [
 interface SidebarProps {
   displayName: string
   isAdmin: boolean
+  viewOnly?: boolean
 }
 
-export default function Sidebar({ displayName, isAdmin }: SidebarProps) {
+export default function Sidebar({ displayName, isAdmin, viewOnly }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -98,13 +99,21 @@ export default function Sidebar({ displayName, isAdmin }: SidebarProps) {
 
   return (
     <aside className="w-56 shrink-0 flex flex-col h-screen sticky top-0 bg-[var(--sidebar)]">
-      <div className="flex items-center px-5 py-6">
+      <div className="flex items-center gap-2 px-5 py-6">
         <img
           src="/otb-logo.png"
           alt="Outside The Bachs"
           width={120}
           style={{ objectFit: 'contain' }}
         />
+        {viewOnly && (
+          <span
+            className="text-xs px-1.5 py-0.5 rounded font-semibold shrink-0"
+            style={{ background: 'rgba(220,38,38,0.15)', color: '#b91c1c' }}
+          >
+            View Only
+          </span>
+        )}
       </div>
 
       <nav className="flex-1 px-3 py-2 space-y-0.5">

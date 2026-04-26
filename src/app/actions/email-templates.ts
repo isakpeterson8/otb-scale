@@ -10,6 +10,7 @@ export async function saveCustomTemplate(
 ): Promise<{ error: string | null }> {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
   const { error } = await supabase

@@ -1,9 +1,16 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 
+async function isViewOnly(): Promise<boolean> {
+  const cookieStore = await cookies()
+  return !!cookieStore.get('view_as_studio_id')?.value
+}
+
 export async function disconnectGmail() {
+  if (await isViewOnly()) return { error: 'View only mode' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
@@ -25,6 +32,7 @@ export async function disconnectGmail() {
 }
 
 export async function upsertSettings(formData: FormData) {
+  if (await isViewOnly()) return { error: 'View only mode' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }

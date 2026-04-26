@@ -69,6 +69,7 @@ function TemplateCard({
   const displayBody = applyAutoFills(effectiveBody, fills)
   const previewLines = applyAutoFills(template.body, fills).split('\n').filter(Boolean).slice(0, 2).join(' ')
   const isCustomized = customTemplate != null
+  const badge = CATEGORY_BADGE[template.category]
 
   function startEditing() {
     setEditSubject(effectiveSubject)
@@ -119,17 +120,12 @@ function TemplateCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <h3 className="text-sm font-medium text-[var(--ink)]">{template.name}</h3>
-              {(() => {
-                const badge = CATEGORY_BADGE[template.category]
-                return (
-                  <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
-                    style={{ background: badge.bg, color: badge.color }}
-                  >
-                    {badge.label}
-                  </span>
-                )
-              })()}
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                style={{ backgroundColor: badge.bg, color: badge.color }}
+              >
+                {badge.label}
+              </span>
               {isCustomized && (
                 <span
                   className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"

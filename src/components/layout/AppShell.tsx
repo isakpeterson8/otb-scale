@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from './Sidebar'
+import { ViewAsBanner } from './ViewAsBanner'
 import type { Profile } from '@/types/database'
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
@@ -27,10 +29,14 @@ export default async function AppShell({ children }: { children: React.ReactNode
     user.email?.split('@')[0] ??
     'User'
 
+  const cookieStore = await cookies()
+  const viewAsEmail = cookieStore.get('view_as_email')?.value ?? null
+
   return (
     <div className="flex min-h-screen bg-[var(--canvas)]">
-      <Sidebar displayName={displayName} isAdmin={isAdmin} />
+      <Sidebar displayName={displayName} isAdmin={isAdmin} viewOnly={!!viewAsEmail} />
       <div className="flex-1 flex flex-col min-w-0">
+        {viewAsEmail && <ViewAsBanner email={viewAsEmail} />}
         {children}
       </div>
     </div>
