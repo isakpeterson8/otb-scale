@@ -5,151 +5,129 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
+import { Resend } from 'resend'
 import type { UserRole } from '@/types/database'
 
-// ── Gmail helpers ────────────────────────────────────────────────────────────
+const resend = new Resend(process.env.RESEND_API_KEY)
 
-async function getAdminAccessToken(): Promise<{ token: string | null; error: string | null }> {
-  console.log('[admin-gmail] Step 1: fetching otb_admin profile for Gmail tokens')
+// ── Email helpers ─────────────────────────────────────────────────────────────
 
-  const { data: adminProfile, error: profileErr } = await adminClient
-    .from('profiles')
-    .select('id')
-    .eq('role', 'otb_admin')
-    .limit(1)
-    .maybeSingle()
-
-  if (profileErr) {
-    console.error('[admin-gmail] Step 1 FAILED: could not query profiles:', profileErr.message)
-    return { token: null, error: `Profile query failed: ${profileErr.message}` }
-  }
-  if (!adminProfile?.id) {
-    console.error('[admin-gmail] Step 2: no otb_admin profile found')
-    return { token: null, error: 'No otb_admin account found' }
-  }
-
-  console.log('[admin-gmail] Step 2: found admin profile, fetching Gmail settings for user', adminProfile.id)
-
-  const { data: settings, error: settingsErr } = await adminClient
-    .from('settings')
-    .select('gmail_access_token, gmail_refresh_token, gmail_token_expiry')
-    .eq('user_id', adminProfile.id)
-    .maybeSingle()
-
-  if (settingsErr) {
-    console.error('[admin-gmail] Step 2 FAILED: could not query settings:', settingsErr.message)
-    return { token: null, error: `Settings query failed: ${settingsErr.message}` }
-  }
-  if (!settings) {
-    console.error('[admin-gmail] Step 2: no settings row found for admin user', adminProfile.id)
-    return { token: null, error: 'No settings found for admin account' }
-  }
-
-  console.log('[admin-gmail] Step 3: settings found. Has access_token:', !!settings.gmail_access_token, '| Has refresh_token:', !!settings.gmail_refresh_token, '| Expiry:', settings.gmail_token_expiry)
-
-  if (!settings.gmail_access_token || !settings.gmail_refresh_token) {
-    console.error('[admin-gmail] Step 3: Gmail not connected — missing tokens')
-    return { token: null, error: 'Admin Gmail account is not connected. Visit Settings to connect Gmail.' }
-  }
-
-  const expiry = settings.gmail_token_expiry ? new Date(settings.gmail_token_expiry).getTime() : 0
-  const msUntilExpiry = expiry - Date.now()
-  const needsRefresh = msUntilExpiry < 60_000
-
-  console.log('[admin-gmail] Step 3: token expires in', Math.round(msUntilExpiry / 1000), 'seconds. Needs refresh:', needsRefresh)
-
-  if (!needsRefresh) {
-    console.log('[admin-gmail] Step 3: using existing access token (still valid)')
-    return { token: settings.gmail_access_token, error: null }
-  }
-
-  console.log('[admin-gmail] Step 4: refreshing token via Google OAuth...')
-  const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      refresh_token: settings.gmail_refresh_token,
-      grant_type: 'refresh_token',
-    }),
-  })
-
-  const refreshBody = await refreshRes.text()
-  console.log('[admin-gmail] Step 4: refresh response status:', refreshRes.status, '| body:', refreshBody)
-
-  if (!refreshRes.ok) {
-    console.error('[admin-gmail] Step 4 FAILED: token refresh returned', refreshRes.status)
-    return { token: null, error: `Token refresh failed (${refreshRes.status}): ${refreshBody}` }
-  }
-
-  const tokens = JSON.parse(refreshBody) as { access_token: string; expires_in: number }
-  const newExpiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-
-  await adminClient
-    .from('settings')
-    .update({ gmail_access_token: tokens.access_token, gmail_token_expiry: newExpiry })
-    .eq('user_id', adminProfile.id)
-
-  console.log('[admin-gmail] Step 4: token refreshed successfully, new expiry:', newExpiry)
-  return { token: tokens.access_token, error: null }
+function emailShell(bodyContent: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+          <!-- Logo -->
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <img src="https://studio.outsidethebachs.com/otb-logo.png" alt="Outside The Bachs" width="140" style="display:block;" />
+            </td>
+          </tr>
+          <!-- Card -->
+          <tr>
+            <td style="background:#ffffff;border-radius:12px;padding:36px 40px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+              ${bodyContent}
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top:24px;font-size:12px;color:#9ca3af;">
+              <a href="https://outsidethebachs.com" style="color:#9ca3af;text-decoration:none;">outsidethebachs.com</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
 }
 
-function buildRfc2822(to: string, from: string, subject: string, body: string): string {
-  const message = [
-    `To: ${to}`,
-    `From: ${from}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    '',
-    body,
-  ].join('\r\n')
-  return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+function approvalEmailHtml(): string {
+  return emailShell(`
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#111827;">Hi,</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#111827;">
+      Great news — your OTB Scale account has been approved!
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#111827;">
+      You can now log in and start using the platform.
+    </p>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr>
+        <td style="background:#04ADEF;border-radius:8px;">
+          <a href="https://studio.outsidethebachs.com" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+            Log in to OTB Scale
+          </a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#111827;">Welcome aboard!</p>
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#6b7280;">The Outside The Bachs Team</p>
+  `)
 }
 
-async function sendAdminEmail(to: string, subject: string, body: string): Promise<{ error: string | null }> {
-  const { token, error: tokenError } = await getAdminAccessToken()
-  if (!token) return { error: tokenError ?? 'Could not obtain Gmail token' }
+function approvalEmailText(): string {
+  return `Hi,
 
-  const { data: adminProfile } = await adminClient
-    .from('profiles')
-    .select('id, email')
-    .eq('role', 'otb_admin')
-    .limit(1)
-    .maybeSingle()
+Great news — your OTB Scale account has been approved!
 
-  const fromEmail = adminProfile?.email ?? 'noreply@outsidethebachs.com'
-  const fromHeader = `Outside The Bachs <${fromEmail}>`
+You can now log in at: https://studio.outsidethebachs.com
 
-  const raw = buildRfc2822(to, fromHeader, subject, body)
+Welcome aboard!
+The Outside The Bachs Team`
+}
 
-  console.log('[admin-gmail] Step 5: sending Gmail API request to:', to, '| subject:', subject)
+function rejectionEmailHtml(): string {
+  return emailShell(`
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#111827;">Hi,</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#111827;">
+      Thank you for your interest in OTB Scale. We'd love to connect with you to see if it's the right fit for your studio.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#111827;">
+      Let's schedule a quick strategy session — we'll walk you through the platform and answer any questions you have.
+    </p>
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr>
+        <td style="background:#04ADEF;border-radius:8px;">
+          <a href="https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+            Schedule a Strategy Session
+          </a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#111827;">Looking forward to connecting!</p>
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#6b7280;">The Outside The Bachs Team</p>
+  `)
+}
 
-  const gmailRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ raw }),
+function rejectionEmailText(): string {
+  return `Hi,
+
+Thank you for your interest in OTB Scale. We'd love to connect with you to see if it's the right fit for your studio.
+
+Schedule a strategy session here:
+https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request
+
+Looking forward to connecting!
+The Outside The Bachs Team`
+}
+
+async function sendAdminEmail(to: string, subject: string, html: string, text: string): Promise<{ error: string | null }> {
+  const { error } = await resend.emails.send({
+    from: 'Outside The Bachs <noreply@outsidethebachs.com>',
+    to: [to],
+    subject,
+    html,
+    text,
   })
-
-  const gmailBody = await gmailRes.text()
-  console.log('[admin-gmail] Step 5: Gmail API response status:', gmailRes.status, '| body:', gmailBody)
-
-  if (!gmailRes.ok) {
-    let errMsg: string
-    try {
-      errMsg = (JSON.parse(gmailBody) as { error?: { message?: string } }).error?.message ?? gmailBody
-    } catch {
-      errMsg = gmailBody
-    }
-    console.error('[admin-gmail] Step 5 FAILED: Gmail send error:', errMsg)
-    return { error: `Gmail send failed: ${errMsg}` }
-  }
-
-  console.log('[admin-gmail] Step 5: email sent successfully')
+  if (error) return { error: error.message }
   return { error: null }
 }
 
@@ -188,8 +166,9 @@ export async function approveUser(userId: string) {
   if (targetProfile?.email) {
     const { error: emailError } = await sendAdminEmail(
       targetProfile.email,
-      'Your Outside The Bachs account has been approved!',
-      `Hi,\n\nGreat news — your Outside The Bachs account has been approved. You can now log in and start using the platform.\n\nhttps://otb-scale.vercel.app/auth/login\n\nWelcome aboard!\n\nThe OTB Team`
+      "You're approved! Welcome to OTB Scale",
+      approvalEmailHtml(),
+      approvalEmailText(),
     )
     if (emailError) {
       console.error('[approveUser] email send failed:', emailError)
@@ -222,8 +201,9 @@ export async function rejectUser(userId: string) {
   if (targetProfile?.email) {
     const { error: emailError } = await sendAdminEmail(
       targetProfile.email,
-      'Update on your Outside The Bachs account',
-      `Hi,\n\nThank you for signing up for Outside The Bachs. Unfortunately, we weren't able to approve your account at this time.\n\nIf you believe this is an error or have any questions, please reply to this email.\n\nThe OTB Team`
+      'OTB Scale — Next Steps',
+      rejectionEmailHtml(),
+      rejectionEmailText(),
     )
     if (emailError) {
       console.error('[rejectUser] email send failed:', emailError)
