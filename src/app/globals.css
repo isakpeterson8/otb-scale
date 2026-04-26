@@ -1,4 +1,12 @@
 @font-face {
+  font-family: 'Rotis';
+  src: url('/fonts/RotisSemiSerifStd-Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Goldplay';
   src: url('/fonts/Goldplay-Bold.ttf') format('truetype');
   font-weight: bold;
@@ -44,7 +52,7 @@
   --border: rgba(0, 0, 0, 0.08);
   --border-s: rgba(0, 0, 0, 0.15);
 
-  --font-heading: 'Goldplay', serif;
+  --font-heading: 'Rotis', serif;
   --font-sans: 'Haboro', system-ui, sans-serif;
 }
 
