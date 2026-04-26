@@ -13,8 +13,8 @@ export interface Profile {
   id: string
   studio_id: string | null
   role: UserRole
-  display_name: string | null
   email: string | null
+  status: 'pending' | 'approved' | 'rejected' | null
   created_at: string
 }
 
