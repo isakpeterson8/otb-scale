@@ -233,10 +233,10 @@ function SnapshotModal({
               Enrollment
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Current Enrollment (number of students)" field="enrollment" placeholder="32" />
-              <Field label="Booked Hours" field="booked_hrs" placeholder="64" />
-              <Field label="Goal Hours" field="goal_hrs" placeholder="80" />
-              <Field label="Available Hours" field="avail_hrs" placeholder="90" />
+              <Field label="Current Enrollment (number of students)" field="enrollment" placeholder="—" />
+              <Field label="Booked Hours" field="booked_hrs" placeholder="—" />
+              <Field label="Goal Hours" field="goal_hrs" placeholder="—" />
+              <Field label="Available Hours" field="avail_hrs" placeholder="—" />
             </div>
           </div>
 
@@ -245,11 +245,11 @@ function SnapshotModal({
               Pipeline
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Leads" field="leads" placeholder="12" />
-              <Field label="Consults" field="consults" placeholder="5" />
-              <Field label="Possible Registrations" field="poss_reg" placeholder="3" />
-              <Field label="New Enrollments" field="new_enrollments" placeholder="2" />
-              <Field label="Disenrollments" field="disenrollments" placeholder="1" />
+              <Field label="Leads" field="leads" placeholder="—" />
+              <Field label="Consults" field="consults" placeholder="—" />
+              <Field label="Possible Registrations" field="poss_reg" placeholder="—" />
+              <Field label="New Enrollments" field="new_enrollments" placeholder="—" />
+              <Field label="Disenrollments" field="disenrollments" placeholder="—" />
             </div>
           </div>
 
@@ -258,8 +258,8 @@ function SnapshotModal({
               Revenue
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Collected Revenue ($)" field="collected_revenue" placeholder="4200" />
-              <Field label="Expenses ($)" field="expenses" placeholder="800" />
+              <Field label="Collected Revenue ($)" field="collected_revenue" placeholder="—" />
+              <Field label="Expenses ($)" field="expenses" placeholder="—" />
             </div>
           </div>
 
