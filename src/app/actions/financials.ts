@@ -2,25 +2,52 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStudioId } from './_shared'
-import type { FinancialMonth } from '@/types/database'
+import type { StudioSnapshot } from '@/types/database'
 
-type EditableFields = Partial<Pick<FinancialMonth,
-  'enrollment' | 'booked_hrs' | 'goal_hrs' | 'avail_hrs' |
-  'leads' | 'consults' | 'poss_reg' | 'new_enrollments' | 'disenrollments' |
-  'est_revenue' | 'collected_revenue' | 'expenses' | 'notes'
->>
+type SnapshotFields = Partial<Omit<StudioSnapshot, 'id' | 'studio_id' | 'created_at'>>
 
-export async function upsertMonth(year: number, month: number, data: EditableFields) {
+export async function createSnapshot(data: SnapshotFields): Promise<{ data: StudioSnapshot | null; error: string | null }> {
+  const ctx = await getStudioId()
+  if (!ctx) return { data: null, error: 'Unauthorized' }
+  const { supabase, studioId } = ctx
+
+  const { data: created, error } = await supabase
+    .from('studio_snapshots')
+    .insert({ studio_id: studioId, ...data })
+    .select()
+    .single()
+
+  if (error) return { data: null, error: error.message }
+  revalidatePath('/financials')
+  return { data: created as StudioSnapshot, error: null }
+}
+
+export async function updateSnapshot(id: string, data: SnapshotFields): Promise<{ error: string | null }> {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
   const { supabase, studioId } = ctx
 
   const { error } = await supabase
-    .from('financial_months')
-    .upsert(
-      { studio_id: studioId, year, month, ...data, updated_at: new Date().toISOString() },
-      { onConflict: 'studio_id,year,month' }
-    )
+    .from('studio_snapshots')
+    .update(data)
+    .eq('id', id)
+    .eq('studio_id', studioId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/financials')
+  return { error: null }
+}
+
+export async function deleteSnapshot(id: string): Promise<{ error: string | null }> {
+  const ctx = await getStudioId()
+  if (!ctx) return { error: 'Unauthorized' }
+  const { supabase, studioId } = ctx
+
+  const { error } = await supabase
+    .from('studio_snapshots')
+    .delete()
+    .eq('id', id)
+    .eq('studio_id', studioId)
 
   if (error) return { error: error.message }
   revalidatePath('/financials')

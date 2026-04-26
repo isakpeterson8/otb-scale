@@ -80,11 +80,10 @@ export interface CadenceQueueItem {
   email_templates?: Pick<EmailTemplate, 'name' | 'subject'>
 }
 
-export interface FinancialMonth {
+export interface StudioSnapshot {
   id: string
   studio_id: string
-  year: number
-  month: number
+  snapshot_date: string
   enrollment: number | null
   booked_hrs: number | null
   goal_hrs: number | null
@@ -97,9 +96,7 @@ export interface FinancialMonth {
   est_revenue: number | null
   collected_revenue: number | null
   expenses: number | null
-  notes: string | null
   created_at: string
-  updated_at: string
 }
 
 export type PipelineStage =

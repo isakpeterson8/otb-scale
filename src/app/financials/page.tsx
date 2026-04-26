@@ -2,9 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/layout/AppShell'
 import FinancialsClient from './FinancialsClient'
-import type { FinancialMonth } from '@/types/database'
-
-const YEARS = [2024, 2025, 2026, 2027]
+import type { StudioSnapshot } from '@/types/database'
 
 export default async function FinancialsPage() {
   const supabase = await createClient()
@@ -17,26 +15,20 @@ export default async function FinancialsPage() {
     .eq('id', user.id)
     .single()
 
-  let allMonths: FinancialMonth[] = []
+  let snapshots: StudioSnapshot[] = []
   if (profile?.studio_id) {
     const { data } = await supabase
-      .from('financial_months')
+      .from('studio_snapshots')
       .select('*')
       .eq('studio_id', profile.studio_id)
-      .in('year', YEARS)
-    allMonths = (data ?? []) as FinancialMonth[]
-  }
-
-  const byYear: Record<number, Record<number, FinancialMonth>> = {}
-  for (const m of allMonths) {
-    if (!byYear[m.year]) byYear[m.year] = {}
-    byYear[m.year][m.month] = m
+      .order('snapshot_date', { ascending: true })
+    snapshots = (data ?? []) as StudioSnapshot[]
   }
 
   return (
     <AppShell>
       <main className="px-8 py-7 pb-16">
-        <FinancialsClient initialData={byYear} />
+        <FinancialsClient initialSnapshots={snapshots} />
       </main>
     </AppShell>
   )

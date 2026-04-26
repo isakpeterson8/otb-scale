@@ -142,17 +142,25 @@ export async function exportFinancials(): Promise<{ csv: string | null; error: s
   const { supabase, studioId } = ctx
 
   const { data, error } = await supabase
-    .from('financial_months')
-    .select('month, revenue, expenses, notes')
+    .from('studio_snapshots')
+    .select('snapshot_date, enrollment, booked_hrs, goal_hrs, avail_hrs, leads, consults, poss_reg, new_enrollments, disenrollments, est_revenue, collected_revenue, expenses')
     .eq('studio_id', studioId)
-    .order('month', { ascending: false })
+    .order('snapshot_date', { ascending: false })
 
   if (error) return { csv: null, error: error.message }
 
-  const headers = row(['Month', 'Revenue', 'Expenses', 'Net', 'Notes'])
+  const headers = row([
+    'Date', 'Enrollment', 'Booked Hrs', 'Goal Hrs', 'Avail Hrs',
+    'Leads', 'Consults', 'Poss Reg', 'New Enrollments', 'Disenrollments',
+    'Est Revenue', 'Collected Revenue', 'Expenses', 'Net',
+  ])
   const rows = (data ?? []).map(f => {
-    const net = (f.revenue ?? 0) - (f.expenses ?? 0)
-    return row([f.month, dollars(f.revenue), dollars(f.expenses), dollars(net), f.notes])
+    const net = (f.collected_revenue ?? 0) - (f.expenses ?? 0)
+    return row([
+      f.snapshot_date, f.enrollment, f.booked_hrs, f.goal_hrs, f.avail_hrs,
+      f.leads, f.consults, f.poss_reg, f.new_enrollments, f.disenrollments,
+      f.est_revenue, f.collected_revenue, f.expenses, net.toFixed(2),
+    ])
   })
   return { csv: [headers, ...rows].join('\n'), error: null }
 }
