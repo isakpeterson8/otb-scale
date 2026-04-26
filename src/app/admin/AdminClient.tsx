@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { updateUserRole } from '@/app/actions/admin'
+import { updateUserRole, approveUser, rejectUser } from '@/app/actions/admin'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { SCHOOL_STAGES } from '@/types/database'
 import type { UserRole } from '@/types/database'
@@ -13,7 +13,7 @@ import type {
   AdminFinancial,
 } from './page'
 
-type Tab = 'users' | 'studios' | 'outreach' | 'contacts' | 'financials'
+type Tab = 'pending' | 'users' | 'studios' | 'outreach' | 'contacts' | 'financials'
 
 const ROLE_OPTIONS: UserRole[] = ['studio_owner', 'otb_staff', 'otb_admin']
 const ROLE_BADGE: Record<UserRole, { label: string; bg: string; color: string }> = {
@@ -33,6 +33,11 @@ const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
   prospect: { bg: 'rgba(0,0,0,0.06)',      color: '#374151' },
   lead:     { bg: 'rgba(180,83,9,0.12)',   color: '#b45309' },
   inactive: { bg: 'rgba(220,38,38,0.1)',   color: '#b91c1c' },
+}
+const USER_STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  approved: { label: 'Approved', bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
+  pending:  { label: 'Pending',  bg: 'rgba(180,83,9,0.12)',  color: '#b45309' },
+  rejected: { label: 'Rejected', bg: 'rgba(220,38,38,0.1)',  color: '#b91c1c' },
 }
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
@@ -90,6 +95,30 @@ function RoleCell({ profile, canEdit }: { profile: AdminProfile; canEdit: boolea
   )
 }
 
+function ApprovalButtons({ userId }: { userId: string }) {
+  const [isPending, startTransition] = useTransition()
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        disabled={isPending}
+        onClick={() => startTransition(async () => { await approveUser(userId) })}
+        className="px-3 py-1 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80"
+        style={{ background: '#16a34a' }}
+      >
+        Approve
+      </button>
+      <button
+        disabled={isPending}
+        onClick={() => startTransition(async () => { await rejectUser(userId) })}
+        className="px-3 py-1 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80"
+        style={{ background: '#dc2626' }}
+      >
+        Reject
+      </button>
+    </div>
+  )
+}
+
 function EmptyRow({ cols, msg }: { cols: number; msg: string }) {
   return (
     <tr>
@@ -102,6 +131,7 @@ export default function AdminClient({
   callerRole,
   stats,
   profiles,
+  pendingProfiles,
   studios,
   schools,
   contacts,
@@ -117,20 +147,22 @@ export default function AdminClient({
     totalFbGroups: number
   }
   profiles: AdminProfile[]
+  pendingProfiles: AdminProfile[]
   studios: AdminStudio[]
   schools: AdminSchoolRecord[]
   contacts: AdminContact[]
   financials: AdminFinancial[]
 }) {
-  const [tab, setTab] = useState<Tab>('users')
+  const [tab, setTab] = useState<Tab>('pending')
   const isSuperAdmin = callerRole === 'otb_admin'
 
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: 'users',      label: 'Users',           count: profiles.length },
-    { key: 'studios',    label: 'Studios',          count: studios.length },
-    { key: 'outreach',   label: 'School Outreach',  count: schools.length },
-    { key: 'contacts',   label: 'Contacts',         count: contacts.length },
-    { key: 'financials', label: 'Financials',       count: financials.length },
+    { key: 'pending',    label: 'Pending Approval', count: pendingProfiles.length },
+    { key: 'users',      label: 'Users',            count: profiles.length },
+    { key: 'studios',    label: 'Studios',           count: studios.length },
+    { key: 'outreach',   label: 'School Outreach',   count: schools.length },
+    { key: 'contacts',   label: 'Contacts',          count: contacts.length },
+    { key: 'financials', label: 'Financials',        count: financials.length },
   ]
 
   return (
@@ -182,6 +214,36 @@ export default function AdminClient({
         ))}
       </div>
 
+      {/* Pending Approval tab */}
+      {tab === 'pending' && (
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--ink)]/8">
+                  <Th>Email</Th>
+                  <Th>Joined</Th>
+                  <Th>Actions</Th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--ink)]/6">
+                {pendingProfiles.length === 0
+                  ? <EmptyRow cols={3} msg="No pending users." />
+                  : pendingProfiles.map(p => (
+                    <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
+                      <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
+                      <Td muted nowrap>{formatDate(p.created_at)}</Td>
+                      <td className="px-4 py-3">
+                        <ApprovalButtons userId={p.id} />
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Users tab */}
       {tab === 'users' && (
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
@@ -191,23 +253,32 @@ export default function AdminClient({
                 <tr className="border-b border-[var(--ink)]/8">
                   <Th>Email</Th>
                   <Th>Role</Th>
+                  <Th>Status</Th>
                   <Th>Studio</Th>
                   <Th>Joined</Th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ink)]/6">
                 {profiles.length === 0
-                  ? <EmptyRow cols={4} msg="No users found." />
-                  : profiles.map(p => (
+                  ? <EmptyRow cols={5} msg="No users found." />
+                  : profiles.map(p => {
+                    const statusBadge = p.status ? USER_STATUS_BADGE[p.status] : null
+                    return (
                     <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
                       <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
                       <td className="px-4 py-3">
                         <RoleCell profile={p} canEdit={isSuperAdmin} />
                       </td>
+                      <td className="px-4 py-3">
+                        {statusBadge
+                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
+                          : <span className="text-[var(--ink-3)] text-xs">—</span>}
+                      </td>
                       <Td muted>{p.studio_name ?? '—'}</Td>
                       <Td muted nowrap>{formatDate(p.created_at)}</Td>
                     </tr>
-                  ))}
+                    )
+                  })}
               </tbody>
             </table>
           </div>

@@ -14,6 +14,7 @@ export interface AdminProfile {
   email: string | null
   role: UserRole
   studio_name: string | null
+  status: 'pending' | 'approved' | 'rejected' | null
   created_at: string
 }
 
@@ -81,7 +82,7 @@ export default async function AdminPage() {
     cadenceRes,
   ] = await Promise.all([
     adminClient.from('studios').select('id, name, owner_user_id, created_at').order('created_at', { ascending: false }),
-    adminClient.from('profiles').select('id, studio_id, role, email, created_at').order('created_at', { ascending: false }),
+    adminClient.from('profiles').select('id, studio_id, role, email, status, created_at').order('created_at', { ascending: false }),
     adminClient.from('contacts').select('id, studio_id, name, email, phone, status, created_at').order('created_at', { ascending: false }),
     adminClient.from('school_outreach').select('id, studio_id, school_name, contact_name, email, stage, last_interacted_date').order('created_at', { ascending: false }),
     adminClient.from('facebook_groups').select('id, studio_id'),
@@ -98,7 +99,7 @@ export default async function AdminPage() {
   console.log('[admin] cadence:',    cadenceRes.data?.length,    cadenceRes.error?.message)
 
   const rawStudios  = (studiosRes.data   ?? []) as { id: string; name: string; owner_user_id: string; created_at: string }[]
-  const rawProfiles = (profilesRes.data  ?? []) as { id: string; studio_id: string | null; role: UserRole; email: string | null; created_at: string }[]
+  const rawProfiles = (profilesRes.data  ?? []) as { id: string; studio_id: string | null; role: UserRole; email: string | null; status: string | null; created_at: string }[]
   const rawContacts = (contactsRes.data  ?? []) as { id: string; studio_id: string; name: string; email: string | null; phone: string | null; status: string | null; created_at: string }[]
   const rawSchools  = (schoolRes.data    ?? []) as { id: string; studio_id: string; school_name: string; contact_name: string | null; email: string | null; stage: SchoolOutreachStage; last_interacted_date: string | null }[]
   const rawFb       = (fbRes.data        ?? []) as { id: string; studio_id: string }[]
@@ -124,8 +125,11 @@ export default async function AdminPage() {
     email: p.email,
     role: p.role,
     studio_name: p.studio_id ? (studioById.get(p.studio_id)?.name ?? null) : null,
+    status: (p.status ?? null) as AdminProfile['status'],
     created_at: p.created_at,
   }))
+
+  const pendingProfiles = adminProfiles.filter(p => p.status === 'pending')
 
   const adminStudios: AdminStudio[] = rawStudios.map(s => {
     const owner = profileById.get(s.owner_user_id)
@@ -187,6 +191,7 @@ export default async function AdminPage() {
           callerRole={callerRole}
           stats={stats}
           profiles={adminProfiles}
+          pendingProfiles={pendingProfiles}
           studios={adminStudios}
           schools={adminSchools}
           contacts={adminContacts}
