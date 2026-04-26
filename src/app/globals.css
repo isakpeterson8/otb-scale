@@ -1,0 +1,66 @@
+@font-face {
+  font-family: 'Myfont';
+  src: url('/fonts/Myfont-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@import "tailwindcss";
+
+:root {
+  --canvas: #ffffff;
+  --dark: #ffffff;
+  --dark-2: #f3f4f6;
+  --surface: #f3f4f6;
+  --surface-2: #e5e7eb;
+  --sidebar: #f3f4f6;
+
+  --accent: #04ADEF;
+  --accent-l: rgba(4, 173, 239, 0.15);
+  --accent-t: #04ADEF;
+  --accent-light: rgba(4, 173, 239, 0.15);
+  --accent-text: #04ADEF;
+
+  --ink: #000000;
+  --ink-2: rgba(0, 0, 0, 0.65);
+  --ink-3: rgba(0, 0, 0, 0.4);
+
+  --amber: #b45309;
+  --amber-l: rgba(180, 83, 9, 0.15);
+  --red: #dc2626;
+  --red-l: rgba(220, 38, 38, 0.15);
+  --green: #16a34a;
+  --green-l: rgba(22, 163, 74, 0.15);
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-s: rgba(0, 0, 0, 0.15);
+
+  --font-heading: 'Myfont', serif;
+  --font-sans: 'Myfont', system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-accent-text: var(--accent-text);
+  --color-sidebar: var(--sidebar);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --color-green: var(--green);
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--canvas);
+  color: var(--ink);
+}
