@@ -114,12 +114,12 @@ export default function Sidebar({ displayName, isAdmin, viewOnly, isOpen = false
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
       >
-        <div className="flex items-center justify-between gap-2 px-5 py-6">
+        <div className="flex items-center justify-between gap-2 px-4 py-5 md:px-5 md:py-6">
           <div className="flex items-center gap-2">
             <img
               src="/otb-logo.png"
               alt="Outside The Bachs"
-              width={120}
+              className="w-20 md:w-[120px]"
               style={{ objectFit: 'contain' }}
             />
             {viewOnly && (
