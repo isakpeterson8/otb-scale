@@ -224,6 +224,10 @@ function SnapshotModal({
             </div>
           </div>
 
+          <p className="text-xs text-[var(--ink-3)] leading-relaxed">
+            If you don&apos;t know a number, leave it blank or enter — instead of 0. Zeros will be counted in your averages and totals.
+          </p>
+
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-3)] mb-2 pb-1.5 border-b border-[var(--ink)]/8">
               Enrollment
@@ -245,7 +249,7 @@ function SnapshotModal({
               <Field label="Consults" field="consults" placeholder="5" />
               <Field label="Possible Registrations" field="poss_reg" placeholder="3" />
               <Field label="New Enrollments" field="new_enrollments" placeholder="2" />
-              <Field label="Disenrollments (number of students)" field="disenrollments" placeholder="1" />
+              <Field label="Disenrollments" field="disenrollments" placeholder="1" />
             </div>
           </div>
 
