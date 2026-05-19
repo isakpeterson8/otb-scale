@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { upsertWatchProgress } from '@/app/actions/library'
 import type { EducationLibraryItem } from '@/types/database'
 
 function VideoIcon() {
@@ -39,12 +40,75 @@ function CloseIcon() {
   )
 }
 
+const SAVE_INTERVAL_MS = 10_000
+
 export default function EducationClient({ items }: { items: EducationLibraryItem[] }) {
   const [playingVideo, setPlayingVideo] = useState<EducationLibraryItem | null>(null)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'pdf'>('all')
 
-  const categories = Array.from(new Set(items.map(i => i.category).filter(Boolean))) as string[]
+  // Refs for tracking — stable across renders, no stale-closure risk
+  const playingRef   = useRef<EducationLibraryItem | null>(null)
+  const currentTime  = useRef(0)
+  const duration     = useRef(0)
+  const lastSaveAt   = useRef(0)
+
+  // Keep ref in sync with state; reset counters when a new video starts
+  useEffect(() => {
+    playingRef.current = playingVideo
+    if (playingVideo) {
+      currentTime.current = 0
+      duration.current = 0
+      lastSaveAt.current = Date.now()
+    }
+  }, [playingVideo])
+
+  // Stable message listener — mounted once, reads from refs
+  useEffect(() => {
+    async function persist(force = false) {
+      const item = playingRef.current
+      if (!item || !duration.current) return
+      const now = Date.now()
+      if (!force && now - lastSaveAt.current < SAVE_INTERVAL_MS) return
+      lastSaveAt.current = now
+      const pct = Math.min(100, Math.round((currentTime.current / duration.current) * 100))
+      // fire-and-forget; errors are non-critical
+      upsertWatchProgress(item.id, pct, Math.round(currentTime.current), Math.round(duration.current))
+        .catch(() => {})
+    }
+
+    function onMessage(e: MessageEvent) {
+      try {
+        const msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        if (!msg?.event) return
+
+        if (msg.event === 'timeupdate') {
+          currentTime.current = msg.data?.currentTime ?? 0
+          duration.current    = msg.data?.duration    ?? 0
+          persist()
+        } else if (msg.event === 'ended') {
+          currentTime.current = duration.current
+          persist(true)
+        }
+      } catch {
+        // ignore malformed messages from other iframes
+      }
+    }
+
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, []) // mount once — all state accessed via refs
+
+  function closeModal() {
+    // Flush progress immediately on close
+    const item = playingRef.current
+    if (item && duration.current > 0) {
+      const pct = Math.min(100, Math.round((currentTime.current / duration.current) * 100))
+      upsertWatchProgress(item.id, pct, Math.round(currentTime.current), Math.round(duration.current))
+        .catch(() => {})
+    }
+    setPlayingVideo(null)
+  }
 
   const filtered = items.filter(item => {
     if (filterType !== 'all' && item.type !== filterType) return false
@@ -175,14 +239,14 @@ export default function EducationClient({ items }: { items: EducationLibraryItem
       {playingVideo && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setPlayingVideo(null)}
+          onClick={closeModal}
         >
           <div
             className="relative w-full max-w-4xl"
             onClick={e => e.stopPropagation()}
           >
             <button
-              onClick={() => setPlayingVideo(null)}
+              onClick={closeModal}
               className="absolute -top-10 right-0 text-white/70 hover:text-white transition-colors"
               aria-label="Close"
             >
