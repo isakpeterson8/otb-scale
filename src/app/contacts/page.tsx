@@ -1,17 +1,18 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import ContactsClient from './ContactsClient'
 import type { Contact } from '@/types/database'
 
 export default async function ContactsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  const ctx = await getStudioId()
+  if (!ctx) redirect('/auth/login')
+  const { supabase, studioId } = ctx
 
   const { data } = await supabase
     .from('contacts')
     .select('*')
+    .eq('studio_id', studioId)
     .order('created_at', { ascending: false })
 
   const contacts = (data ?? []) as Contact[]

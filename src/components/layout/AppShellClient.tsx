@@ -9,10 +9,10 @@ interface Props {
   displayName: string
   isAdmin: boolean
   viewOnly: boolean
-  viewAsEmail: string | null
+  viewAsStudioName: string | null
 }
 
-export default function AppShellClient({ children, displayName, isAdmin, viewOnly, viewAsEmail }: Props) {
+export default function AppShellClient({ children, displayName, isAdmin, viewOnly, viewAsStudioName }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -42,7 +42,7 @@ export default function AppShellClient({ children, displayName, isAdmin, viewOnl
       />
 
       <div className="flex-1 flex flex-col min-w-0 pt-14 md:pt-0 overflow-x-hidden">
-        {viewAsEmail && <ViewAsBanner email={viewAsEmail} />}
+        {viewAsStudioName && <ViewAsBanner studioName={viewAsStudioName} />}
         {children}
       </div>
     </div>
