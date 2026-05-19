@@ -1,29 +1,20 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import FinancialsClient from './FinancialsClient'
 import type { StudioSnapshot } from '@/types/database'
 
 export default async function FinancialsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  const ctx = await getStudioId()
+  if (!ctx) redirect('/auth/login')
+  const { supabase, studioId } = ctx
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('studio_id')
-    .eq('id', user.id)
-    .single()
-
-  let snapshots: StudioSnapshot[] = []
-  if (profile?.studio_id) {
-    const { data } = await supabase
-      .from('studio_snapshots')
-      .select('*')
-      .eq('studio_id', profile.studio_id)
-      .order('snapshot_date', { ascending: true })
-    snapshots = (data ?? []) as StudioSnapshot[]
-  }
+  const { data } = await supabase
+    .from('studio_snapshots')
+    .select('*')
+    .eq('studio_id', studioId)
+    .order('snapshot_date', { ascending: true })
+  const snapshots = (data ?? []) as StudioSnapshot[]
 
   return (
     <AppShell>

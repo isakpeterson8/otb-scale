@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { adminClient } from '@/lib/supabase/admin'
 import AppShellClient from './AppShellClient'
 import type { Profile } from '@/types/database'
 
@@ -29,14 +30,25 @@ export default async function AppShell({ children }: { children: React.ReactNode
     'User'
 
   const cookieStore = await cookies()
+  const viewAsStudioId = cookieStore.get('view_as_studio_id')?.value ?? null
   const viewAsEmail = cookieStore.get('view_as_email')?.value ?? null
+
+  let viewAsStudioName: string | null = null
+  if (viewAsStudioId) {
+    const { data: studio } = await adminClient
+      .from('studios')
+      .select('name')
+      .eq('id', viewAsStudioId)
+      .single()
+    viewAsStudioName = studio?.name ?? viewAsEmail
+  }
 
   return (
     <AppShellClient
       displayName={displayName}
       isAdmin={isAdmin}
-      viewOnly={!!viewAsEmail}
-      viewAsEmail={viewAsEmail}
+      viewOnly={!!viewAsStudioId}
+      viewAsStudioName={viewAsStudioName}
     >
       {children}
     </AppShellClient>

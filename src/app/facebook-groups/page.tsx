@@ -1,17 +1,18 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import FacebookGroupsClient from './FacebookGroupsClient'
 import type { FacebookGroup } from '@/types/database'
 
 export default async function FacebookGroupsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  const ctx = await getStudioId()
+  if (!ctx) redirect('/auth/login')
+  const { supabase, studioId } = ctx
 
   const { data } = await supabase
     .from('facebook_groups')
     .select('*')
+    .eq('studio_id', studioId)
     .order('group_name', { ascending: true })
 
   const groups = (data ?? []) as FacebookGroup[]
