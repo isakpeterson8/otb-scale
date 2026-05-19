@@ -3,8 +3,11 @@
 import Link from 'next/link'
 import { useState, useTransition, useRef } from 'react'
 import { createLibraryItem, deleteLibraryItem, updateLibraryItem } from '@/app/actions/library'
+import { formatDate } from '@/lib/utils'
 import type { EducationLibraryItem } from '@/types/database'
+import type { WatchStat } from '@/app/actions/library'
 
+type Tab = 'items' | 'stats'
 type UploadState = 'idle' | 'getting-url' | 'uploading' | 'done' | 'error'
 
 interface UploadProgress {
@@ -52,7 +55,175 @@ function PdfIcon() {
   )
 }
 
-export default function LibraryAdminClient({ items: initialItems }: { items: EducationLibraryItem[] }) {
+// ── Watch Stats components ────────────────────────────────────────────────────
+
+function WatchCell({ stat }: { stat: WatchStat | undefined }) {
+  if (!stat) {
+    return (
+      <td className="px-3 py-2 text-center">
+        <span className="text-xs" style={{ color: 'var(--ink-3)' }}>—</span>
+      </td>
+    )
+  }
+
+  return (
+    <td
+      className="px-3 py-2"
+      title={`Last watched: ${formatDate(stat.last_watched_at)}`}
+    >
+      <div className="flex flex-col items-center gap-1 min-w-[56px]">
+        {/* Progress bar */}
+        <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${stat.watch_pct}%`,
+              background: stat.completed ? 'var(--green)' : 'var(--accent-text)',
+            }}
+          />
+        </div>
+        {/* Percentage + checkmark */}
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-medium" style={{ color: stat.completed ? 'var(--green)' : 'var(--ink-2)' }}>
+            {stat.watch_pct}%
+          </span>
+          {stat.completed && (
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-label="Completed">
+              <circle cx="5" cy="5" r="4.5" fill="var(--green)" opacity=".15" />
+              <path d="M3 5l1.5 1.5 2.5-2.5" stroke="var(--green)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        {/* Last watched subtitle */}
+        <span className="text-[10px] leading-none" style={{ color: 'var(--ink-3)' }}>
+          {formatDate(stat.last_watched_at)}
+        </span>
+      </div>
+    </td>
+  )
+}
+
+function WatchStatsTable({
+  items,
+  watchStats,
+}: {
+  items: EducationLibraryItem[]
+  watchStats: WatchStat[]
+}) {
+  const videoItems = items.filter(i => i.type === 'video')
+
+  // Collect unique studios that have any watch data
+  const studioMap = new Map<string, string>() // id -> name
+  for (const s of watchStats) {
+    studioMap.set(s.studio_id, s.studio_name)
+  }
+  const studios = Array.from(studioMap.entries()).map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  // Build lookup: item_id + studio_id -> WatchStat
+  const lookup = new Map<string, WatchStat>()
+  for (const s of watchStats) {
+    lookup.set(`${s.item_id}::${s.studio_id}`, s)
+  }
+
+  if (watchStats.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-16 text-center">
+        <p className="text-sm" style={{ color: 'var(--ink-3)' }}>
+          No watch data yet. Studio owners will appear here once they start watching videos.
+        </p>
+      </div>
+    )
+  }
+
+  if (videoItems.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-16 text-center">
+        <p className="text-sm" style={{ color: 'var(--ink-3)' }}>No video items in the library.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-[var(--ink)]/8">
+      <table className="text-sm border-collapse">
+        <thead>
+          <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+            <th
+              className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap sticky left-0 z-10"
+              style={{ color: 'var(--ink-3)', background: 'var(--surface)', minWidth: 200 }}
+            >
+              Video
+            </th>
+            {studios.map(s => (
+              <th
+                key={s.id}
+                className="px-3 py-3 text-center text-xs font-medium whitespace-nowrap"
+                style={{ color: 'var(--ink-2)', minWidth: 80 }}
+              >
+                {s.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {videoItems.map((item, idx) => (
+            <tr
+              key={item.id}
+              style={{
+                borderBottom: idx < videoItems.length - 1 ? '1px solid rgba(0,0,0,0.06)' : undefined,
+              }}
+            >
+              {/* Video title — sticky left column */}
+              <td
+                className="px-4 py-2 sticky left-0 z-10"
+                style={{ background: 'var(--surface)' }}
+              >
+                <div className="flex items-center gap-2.5">
+                  {item.cf_uid ? (
+                    <img
+                      src={`https://cloudflarestream.com/${item.cf_uid}/thumbnails/thumbnail.jpg`}
+                      alt=""
+                      className="w-10 h-7 object-cover rounded shrink-0"
+                    />
+                  ) : (
+                    <div
+                      className="w-10 h-7 rounded flex items-center justify-center shrink-0"
+                      style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }}
+                    >
+                      <VideoIcon />
+                    </div>
+                  )}
+                  <span className="text-xs font-medium truncate max-w-[140px]" style={{ color: 'var(--ink)' }}>
+                    {item.title}
+                  </span>
+                </div>
+              </td>
+              {/* One cell per studio */}
+              {studios.map(s => (
+                <WatchCell
+                  key={s.id}
+                  stat={lookup.get(`${item.id}::${s.id}`)}
+                />
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function LibraryAdminClient({
+  items: initialItems,
+  watchStats,
+}: {
+  items: EducationLibraryItem[]
+  watchStats: WatchStat[]
+}) {
+  const [tab, setTab] = useState<Tab>('items')
   const [items, setItems] = useState(initialItems)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm())
@@ -97,13 +268,12 @@ export default function LibraryAdminClient({ items: initialItems }: { items: Edu
 
       setUpload({ state: 'uploading', percent: 0 })
 
-      // Dynamically import tus-js-client to avoid SSR issues
       const { Upload } = await import('tus-js-client')
 
       await new Promise<void>((resolve, reject) => {
         const tusUpload = new Upload(file, {
           uploadUrl: uploadURL,
-          chunkSize: 50 * 1024 * 1024, // 50MB chunks
+          chunkSize: 50 * 1024 * 1024,
           retryDelays: [0, 1000, 3000],
           metadata: { name: file.name, filetype: file.type },
           onProgress(bytesUploaded, bytesTotal) {
@@ -166,7 +336,6 @@ export default function LibraryAdminClient({ items: initialItems }: { items: Edu
         setShowForm(false)
         setForm(emptyForm())
         setUpload({ state: 'idle', percent: 0 })
-        // Refresh items
         window.location.reload()
       }
     })
@@ -195,254 +364,241 @@ export default function LibraryAdminClient({ items: initialItems }: { items: Edu
     })
   }
 
+  const watchedVideoCount = new Set(watchStats.map(s => s.item_id)).size
+  const watchedStudioCount = new Set(watchStats.map(s => s.studio_id)).size
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Link href="/admin" className="text-sm text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors">
+            <Link href="/admin" className="text-sm hover:text-[var(--ink)] transition-colors" style={{ color: 'var(--ink-3)' }}>
               Admin
             </Link>
-            <span className="text-[var(--ink-3)] text-sm">/</span>
-            <span className="text-sm text-[var(--ink)]">Education Library</span>
+            <span className="text-sm" style={{ color: 'var(--ink-3)' }}>/</span>
+            <span className="text-sm" style={{ color: 'var(--ink)' }}>Education Library</span>
           </div>
-          <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
+          <h2 className="text-2xl" style={{ fontFamily: 'var(--font-heading)', color: 'var(--ink)' }}>
             Education Library
           </h2>
-          <p className="text-sm text-[var(--ink-3)] mt-0.5">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--ink-3)' }}>{items.length} item{items.length !== 1 ? 's' : ''}</p>
         </div>
-        <button
-          onClick={() => { setShowForm(true); setFormError(null) }}
-          className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-opacity"
-          style={{ background: 'var(--accent-text)' }}
-        >
-          + Add Item
-        </button>
+        {tab === 'items' && (
+          <button
+            onClick={() => { setShowForm(true); setFormError(null) }}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-opacity"
+            style={{ background: 'var(--accent-text)' }}
+          >
+            + Add Item
+          </button>
+        )}
       </div>
 
-      {/* Add Item form */}
-      {showForm && (
-        <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 p-5 space-y-4">
-          <h3 className="text-sm font-medium text-[var(--ink)]">New Library Item</h3>
+      {/* Tabs */}
+      <div className="flex items-center gap-1" style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+        {([
+          { key: 'items' as Tab, label: 'Library Items' },
+          { key: 'stats' as Tab, label: `Watch Stats${watchedStudioCount > 0 ? ` · ${watchedStudioCount} studio${watchedStudioCount !== 1 ? 's' : ''}` : ''}` },
+        ]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={[
+              'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
+              tab === key
+                ? 'border-[var(--accent-text)] text-[var(--ink)]'
+                : 'border-transparent text-[var(--ink-3)] hover:text-[var(--ink-2)]',
+            ].join(' ')}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-          {/* Type selector */}
-          <div className="flex gap-2">
-            {(['video', 'pdf'] as const).map(t => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => { handleFormChange('type', t); setUpload({ state: 'idle', percent: 0 }); setForm(f => ({ ...f, cf_uid: '', pdf_url: '' })) }}
-                className={[
-                  'flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors',
-                  form.type === t
-                    ? 'border-[var(--accent-text)] bg-[var(--accent-l)] text-[var(--accent-text)]'
-                    : 'border-[var(--ink)]/15 text-[var(--ink-2)] hover:border-[var(--ink)]/30',
-                ].join(' ')}
-              >
-                {t === 'video' ? <VideoIcon /> : <PdfIcon />}
-                {t === 'video' ? 'Video' : 'PDF'}
-              </button>
-            ))}
-          </div>
+      {/* ── Items tab ── */}
+      {tab === 'items' && (
+        <>
+          {/* Add Item form */}
+          {showForm && (
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 p-5 space-y-4">
+              <h3 className="text-sm font-medium" style={{ color: 'var(--ink)' }}>New Library Item</h3>
 
-          {/* File upload */}
-          <div>
-            <label className="block text-xs text-[var(--ink-3)] mb-1">
-              {form.type === 'video' ? 'Video file' : 'PDF file'}
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                ref={fileRef}
-                type="file"
-                accept={form.type === 'video' ? 'video/*' : 'application/pdf'}
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={upload.state === 'uploading' || upload.state === 'getting-url'}
-                className="px-3 py-2 rounded-lg border border-[var(--ink)]/20 bg-[var(--canvas)] text-sm text-[var(--ink-2)] hover:border-[var(--ink)]/40 disabled:opacity-50 transition-colors"
-              >
-                {upload.state === 'idle' ? 'Choose file…' : upload.state === 'done' ? 'Change file' : '…'}
-              </button>
-              {upload.state === 'getting-url' && <span className="text-xs text-[var(--ink-3)]">Preparing upload…</span>}
-              {upload.state === 'uploading' && (
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-1.5 rounded-full bg-[var(--ink)]/10 overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${upload.percent}%`, background: 'var(--accent-text)' }} />
-                  </div>
-                  <span className="text-xs text-[var(--ink-3)]">{upload.percent}%</span>
+              {/* Type selector */}
+              <div className="flex gap-2">
+                {(['video', 'pdf'] as const).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => { handleFormChange('type', t); setUpload({ state: 'idle', percent: 0 }); setForm(f => ({ ...f, cf_uid: '', pdf_url: '' })) }}
+                    className={[
+                      'flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors',
+                      form.type === t
+                        ? 'border-[var(--accent-text)] bg-[var(--accent-l)] text-[var(--accent-text)]'
+                        : 'border-[var(--ink)]/15 text-[var(--ink-2)] hover:border-[var(--ink)]/30',
+                    ].join(' ')}
+                  >
+                    {t === 'video' ? <VideoIcon /> : <PdfIcon />}
+                    {t === 'video' ? 'Video' : 'PDF'}
+                  </button>
+                ))}
+              </div>
+
+              {/* File upload */}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--ink-3)' }}>
+                  {form.type === 'video' ? 'Video file' : 'PDF file'}
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept={form.type === 'video' ? 'video/*' : 'application/pdf'}
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={upload.state === 'uploading' || upload.state === 'getting-url'}
+                    className="px-3 py-2 rounded-lg border border-[var(--ink)]/20 bg-[var(--canvas)] text-sm text-[var(--ink-2)] hover:border-[var(--ink)]/40 disabled:opacity-50 transition-colors"
+                  >
+                    {upload.state === 'idle' ? 'Choose file…' : upload.state === 'done' ? 'Change file' : '…'}
+                  </button>
+                  {upload.state === 'getting-url' && <span className="text-xs" style={{ color: 'var(--ink-3)' }}>Preparing upload…</span>}
+                  {upload.state === 'uploading' && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ink)/10' }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${upload.percent}%`, background: 'var(--accent-text)' }} />
+                      </div>
+                      <span className="text-xs" style={{ color: 'var(--ink-3)' }}>{upload.percent}%</span>
+                    </div>
+                  )}
+                  {upload.state === 'done' && (
+                    <span className="text-xs flex items-center gap-1" style={{ color: 'var(--green)' }}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/><path d="M3.5 6l2 2 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                      Uploaded
+                    </span>
+                  )}
+                  {upload.state === 'error' && (
+                    <span className="text-xs" style={{ color: 'var(--red)' }}>{upload.error ?? 'Upload failed'}</span>
+                  )}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--ink-3)' }}>Title *</label>
+                <input type="text" value={form.title} onChange={e => handleFormChange('title', e.target.value)} placeholder="e.g. How to Run a Facebook Ad Campaign" className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--ink-3)' }}>Description</label>
+                <textarea value={form.description} onChange={e => handleFormChange('description', e.target.value)} placeholder="What will studio owners learn from this?" rows={2} className={inputClass + ' resize-none'} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--ink-3)' }}>Category (optional tag)</label>
+                <input type="text" value={form.category} onChange={e => handleFormChange('category', e.target.value)} placeholder="e.g. Marketing, Operations, Finance" className={inputClass} />
+              </div>
+
+              {formError && (
+                <p className="text-xs px-3 py-2 rounded-lg" style={{ color: 'var(--red)', background: 'var(--red-l)' }}>{formError}</p>
               )}
-              {upload.state === 'done' && (
-                <span className="text-xs text-[var(--green)] flex items-center gap-1">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/><path d="M3.5 6l2 2 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-                  Uploaded
-                </span>
-              )}
-              {upload.state === 'error' && (
-                <span className="text-xs text-[var(--red)]">{upload.error ?? 'Upload failed'}</span>
-              )}
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving || upload.state === 'uploading' || upload.state === 'getting-url'}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  style={{ background: 'var(--accent-text)' }}
+                >
+                  {saving ? 'Saving…' : 'Save Item'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); setForm(emptyForm()); setUpload({ state: 'idle', percent: 0 }); setFormError(null) }}
+                  className="px-4 py-2 rounded-lg text-sm border border-[var(--ink)]/15 hover:border-[var(--ink)]/30 transition-colors"
+                  style={{ color: 'var(--ink-2)' }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-[var(--ink-3)] mb-1">Title *</label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={e => handleFormChange('title', e.target.value)}
-              placeholder="e.g. How to Run a Facebook Ad Campaign"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-[var(--ink-3)] mb-1">Description</label>
-            <textarea
-              value={form.description}
-              onChange={e => handleFormChange('description', e.target.value)}
-              placeholder="What will studio owners learn from this?"
-              rows={2}
-              className={inputClass + ' resize-none'}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-[var(--ink-3)] mb-1">Category (optional tag)</label>
-            <input
-              type="text"
-              value={form.category}
-              onChange={e => handleFormChange('category', e.target.value)}
-              placeholder="e.g. Marketing, Operations, Finance"
-              className={inputClass}
-            />
-          </div>
-
-          {formError && (
-            <p className="text-xs text-[var(--red)] bg-[var(--red-l)] px-3 py-2 rounded-lg">{formError}</p>
           )}
 
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || upload.state === 'uploading' || upload.state === 'getting-url'}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
-              style={{ background: 'var(--accent-text)' }}
-            >
-              {saving ? 'Saving…' : 'Save Item'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowForm(false); setForm(emptyForm()); setUpload({ state: 'idle', percent: 0 }); setFormError(null) }}
-              className="px-4 py-2 rounded-lg text-sm text-[var(--ink-2)] hover:text-[var(--ink)] border border-[var(--ink)]/15 hover:border-[var(--ink)]/30 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+          {/* Items list */}
+          {items.length === 0 && !showForm ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: 'var(--surface)', color: 'var(--ink-3)' }}>
+                <VideoIcon />
+              </div>
+              <p className="text-sm" style={{ color: 'var(--ink-3)' }}>No items yet. Click &ldquo;Add Item&rdquo; to upload your first resource.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {items.map((item, idx) => (
+                <div key={item.id} className="rounded-xl border border-[var(--ink)]/8 overflow-hidden" style={{ background: 'var(--surface)' }}>
+                  {editingId === item.id ? (
+                    <div className="p-4 space-y-3">
+                      <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} className={inputClass} />
+                      <textarea value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputClass + ' resize-none'} />
+                      <input type="text" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} placeholder="Category" className={inputClass} />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleUpdate(item.id)} disabled={saving} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--accent-text)' }}>
+                          {saving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="px-3 py-1.5 rounded-lg text-xs border border-[var(--ink)]/15" style={{ color: 'var(--ink-2)' }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-4 p-4">
+                      {/* Thumbnail / icon */}
+                      <div className="shrink-0 w-16 h-12 rounded-lg overflow-hidden flex items-center justify-center" style={{ background: 'var(--surface-2)' }}>
+                        {item.type === 'video' && item.cf_uid ? (
+                          <img src={`https://cloudflarestream.com/${item.cf_uid}/thumbnails/thumbnail.jpg`} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span style={{ color: 'var(--ink-3)' }}>{item.type === 'video' ? <VideoIcon /> : <PdfIcon />}</span>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>{item.title}</p>
+                          {item.category && (
+                            <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-full border border-[var(--ink)]/12" style={{ color: 'var(--ink-3)' }}>
+                              {item.category}
+                            </span>
+                          )}
+                        </div>
+                        {item.description && (
+                          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--ink-3)' }}>{item.description}</p>
+                        )}
+                        <p className="text-xs mt-0.5 capitalize" style={{ color: 'var(--ink-3)' }}>{item.type} · #{idx + 1}</p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={() => startEdit(item)} className="px-2.5 py-1 rounded-lg text-xs border border-[var(--ink)]/15 hover:border-[var(--ink)]/30 transition-colors" style={{ color: 'var(--ink-2)' }}>
+                          Edit
+                        </button>
+                        <button onClick={() => handleDelete(item.id)} disabled={deleting} className="px-2.5 py-1 rounded-lg text-xs border border-[var(--red)]/20 hover:bg-[var(--red-l)] disabled:opacity-50 transition-colors" style={{ color: 'var(--red)' }}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Items list */}
-      {items.length === 0 && !showForm ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-12 h-12 rounded-xl bg-[var(--surface)] flex items-center justify-center mb-4 text-[var(--ink-3)]">
-            <VideoIcon />
-          </div>
-          <p className="text-sm text-[var(--ink-3)]">No items yet. Click &ldquo;Add Item&rdquo; to upload your first resource.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {items.map((item, idx) => (
-            <div
-              key={item.id}
-              className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden"
-            >
-              {editingId === item.id ? (
-                <div className="p-4 space-y-3">
-                  <input
-                    type="text"
-                    value={editForm.title}
-                    onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
-                    className={inputClass}
-                  />
-                  <textarea
-                    value={editForm.description}
-                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                    rows={2}
-                    className={inputClass + ' resize-none'}
-                  />
-                  <input
-                    type="text"
-                    value={editForm.category}
-                    onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
-                    placeholder="Category"
-                    className={inputClass}
-                  />
-                  <div className="flex gap-2">
-                    <button onClick={() => handleUpdate(item.id)} disabled={saving} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--accent-text)' }}>
-                      {saving ? 'Saving…' : 'Save'}
-                    </button>
-                    <button onClick={() => setEditingId(null)} className="px-3 py-1.5 rounded-lg text-xs border border-[var(--ink)]/15 text-[var(--ink-2)] hover:text-[var(--ink)]">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4 p-4">
-                  {/* Thumbnail / icon */}
-                  <div className="shrink-0 w-16 h-12 rounded-lg overflow-hidden flex items-center justify-center bg-[var(--surface-2)]">
-                    {item.type === 'video' && item.cf_uid ? (
-                      <img
-                        src={`https://cloudflarestream.com/${item.cf_uid}/thumbnails/thumbnail.jpg`}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-[var(--ink-3)]">
-                        {item.type === 'video' ? <VideoIcon /> : <PdfIcon />}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-[var(--ink)] truncate">{item.title}</p>
-                      {item.category && (
-                        <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-full border border-[var(--ink)]/12 text-[var(--ink-3)]">
-                          {item.category}
-                        </span>
-                      )}
-                    </div>
-                    {item.description && (
-                      <p className="text-xs text-[var(--ink-3)] mt-0.5 truncate">{item.description}</p>
-                    )}
-                    <p className="text-xs text-[var(--ink-3)] mt-0.5 capitalize">{item.type} · #{idx + 1}</p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => startEdit(item)}
-                      className="px-2.5 py-1 rounded-lg text-xs border border-[var(--ink)]/15 text-[var(--ink-2)] hover:text-[var(--ink)] hover:border-[var(--ink)]/30 transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      disabled={deleting}
-                      className="px-2.5 py-1 rounded-lg text-xs border border-[var(--red)]/20 text-[var(--red)] hover:bg-[var(--red-l)] disabled:opacity-50 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+      {/* ── Watch Stats tab ── */}
+      {tab === 'stats' && (
+        <WatchStatsTable items={items} watchStats={watchStats} />
       )}
     </div>
   )

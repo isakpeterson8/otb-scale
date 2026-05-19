@@ -10,6 +10,18 @@ export interface Studio {
   created_at: string
 }
 
+export interface WatchProgress {
+  id: string
+  studio_id: string
+  item_id: string
+  watch_pct: number
+  seconds_watched: number
+  duration_seconds: number
+  completed: boolean
+  last_watched_at: string
+  updated_at: string
+}
+
 export interface EducationLibraryItem {
   id: string
   title: string

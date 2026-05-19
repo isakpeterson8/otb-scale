@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
+import { getStudioId } from './_shared'
 import type { EducationLibraryItem } from '@/types/database'
 
 async function requireAdmin() {
@@ -112,6 +113,85 @@ export async function reorderLibraryItems(orderedIds: string[]) {
   revalidatePath('/admin/library')
   revalidatePath('/education')
   return { error: null }
+}
+
+// ── Watch progress ────────────────────────────────────────────────────────────
+
+export async function upsertWatchProgress(
+  itemId: string,
+  watchPct: number,
+  secondsWatched: number,
+  durationSeconds: number,
+): Promise<{ error: string | null }> {
+  const ctx = await getStudioId()
+  if (!ctx) return { error: 'No studio' }
+  if (ctx.viewOnly) return { error: null } // don't record for admin view-as sessions
+
+  const completed = watchPct >= 90
+
+  const { error } = await ctx.supabase
+    .from('education_watch_progress')
+    .upsert(
+      {
+        studio_id: ctx.studioId,
+        item_id: itemId,
+        watch_pct: Math.min(100, Math.max(0, watchPct)),
+        seconds_watched: secondsWatched,
+        duration_seconds: durationSeconds,
+        completed,
+        last_watched_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'studio_id,item_id' },
+    )
+
+  if (error) return { error: error.message }
+  return { error: null }
+}
+
+export interface WatchStat {
+  studio_id: string
+  studio_name: string
+  item_id: string
+  watch_pct: number
+  seconds_watched: number
+  duration_seconds: number
+  completed: boolean
+  last_watched_at: string
+}
+
+export async function getWatchStats(): Promise<{ data: WatchStat[]; error: string | null }> {
+  // Admin-only: uses service role to bypass RLS
+  if (!await requireAdmin()) return { data: [], error: 'Unauthorized' }
+
+  const { data, error } = await adminClient
+    .from('education_watch_progress')
+    .select('studio_id, item_id, watch_pct, seconds_watched, duration_seconds, completed, last_watched_at, studios:studio_id(name)')
+    .order('last_watched_at', { ascending: false })
+
+  if (error) return { data: [], error: error.message }
+
+  const stats: WatchStat[] = (data ?? []).map((row: {
+    studio_id: string
+    item_id: string
+    watch_pct: number
+    seconds_watched: number
+    duration_seconds: number
+    completed: boolean
+    last_watched_at: string
+    studios: { name: string }[] | null
+  }) => ({
+    studio_id: row.studio_id,
+    studio_name: row.studios?.[0]?.name ?? 'Unknown',
+    item_id: row.item_id,
+    watch_pct: row.watch_pct,
+    seconds_watched: row.seconds_watched,
+    duration_seconds: row.duration_seconds,
+    completed: row.completed,
+    last_watched_at: row.last_watched_at,
+  }))
+
+  return { data: stats, error: null }
 }
 
 export async function getLibraryItems(): Promise<{ data: EducationLibraryItem[]; error: string | null }> {
