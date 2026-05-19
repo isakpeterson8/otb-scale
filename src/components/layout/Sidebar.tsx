@@ -59,6 +59,27 @@ const NAV = [
     icon: <TrendingUp width={16} height={16} aria-hidden />,
   },
   {
+    label: 'Education Library',
+    href: '/education',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <path d="M2 4l6-2 6 2v8l-6 2-6-2V4z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+        <path d="M8 2v10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity=".5" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Cadence Check-In',
+    href: '/cadence',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M5 1v3M11 1v3M2 7h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M5 10h2M5 12.5h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity=".5" />
+      </svg>
+    ),
+  },
+  {
     label: 'Settings',
     href: '/settings',
     icon: (

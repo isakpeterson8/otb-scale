@@ -6,6 +6,19 @@ export interface Studio {
   owner_id: string
   city: string | null
   state: string | null
+  subscription_tier: string
+  created_at: string
+}
+
+export interface EducationLibraryItem {
+  id: string
+  title: string
+  description: string | null
+  type: 'video' | 'pdf'
+  cf_uid: string | null
+  pdf_url: string | null
+  category: string | null
+  position: number
   created_at: string
 }
 

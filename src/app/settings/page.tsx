@@ -19,6 +19,17 @@ export default async function SettingsPage() {
   // Derive connection status server-side — never send raw tokens to the client
   const gmailConnected = !!(fullSettings?.gmail_access_token)
 
+  // Fetch studio tier if user has a studio
+  let subscriptionTier = 'free'
+  if (profile?.studio_id) {
+    const { data: studio } = await supabase
+      .from('studios')
+      .select('subscription_tier')
+      .eq('id', profile.studio_id)
+      .single()
+    subscriptionTier = studio?.subscription_tier ?? 'free'
+  }
+
   // Strip token fields before passing to client component
   const clientSettings = fullSettings
     ? {
@@ -37,6 +48,7 @@ export default async function SettingsPage() {
           settings={clientSettings}
           email={user.email ?? ''}
           gmailConnected={gmailConnected}
+          subscriptionTier={subscriptionTier}
         />
       </main>
     </AppShell>

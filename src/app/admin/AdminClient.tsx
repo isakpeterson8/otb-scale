@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { updateUserRole, approveUser, rejectUser, enterViewAs } from '@/app/actions/admin'
+import { updateUserRole, approveUser, rejectUser, enterViewAs, updateStudioTier } from '@/app/actions/admin'
 import { formatDate } from '@/lib/utils'
+import { TIER_LABELS } from '@/lib/features'
 import type { UserRole } from '@/types/database'
 import type { AdminProfile } from './page'
 
@@ -18,6 +20,13 @@ const USER_STATUS_BADGE: Record<string, { label: string; bg: string; color: stri
   approved: { label: 'Approved', bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
   pending:  { label: 'Pending',  bg: 'rgba(180,83,9,0.12)',   color: '#b45309' },
   rejected: { label: 'Rejected', bg: 'rgba(220,38,38,0.1)',   color: '#b91c1c' },
+}
+const TIER_OPTIONS = ['free', 'scale', 'graduate', 'lifetime'] as const
+const TIER_BADGE: Record<string, { bg: string; color: string }> = {
+  free:     { bg: 'rgba(0,0,0,0.06)',        color: '#6b7280' },
+  scale:    { bg: 'rgba(4,173,239,0.15)',    color: '#0284a8' },
+  graduate: { bg: 'rgba(109,40,217,0.1)',    color: '#6d28d9' },
+  lifetime: { bg: 'rgba(22,163,74,0.12)',    color: '#15803d' },
 }
 
 function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
@@ -60,6 +69,34 @@ function RoleCell({ profile, canEdit }: { profile: AdminProfile; canEdit: boolea
     >
       {ROLE_OPTIONS.map(r => (
         <option key={r} value={r}>{ROLE_BADGE[r].label}</option>
+      ))}
+    </select>
+  )
+}
+
+function TierCell({ profile }: { profile: AdminProfile }) {
+  const [isPending, startTransition] = useTransition()
+
+  if (!profile.studio_id) {
+    return <span className="text-[var(--ink-3)] text-xs">—</span>
+  }
+
+  const tier = profile.subscription_tier ?? 'free'
+  const badge = TIER_BADGE[tier] ?? TIER_BADGE.free
+
+  return (
+    <select
+      value={tier}
+      disabled={isPending}
+      onChange={e => {
+        const newTier = e.target.value
+        startTransition(async () => { await updateStudioTier(profile.studio_id!, newTier) })
+      }}
+      className="px-2 py-0.5 rounded-lg border text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] disabled:opacity-50"
+      style={{ backgroundColor: badge.bg, color: badge.color, borderColor: badge.color + '40' }}
+    >
+      {TIER_OPTIONS.map(t => (
+        <option key={t} value={t}>{TIER_LABELS[t]}</option>
       ))}
     </select>
   )
@@ -111,14 +148,6 @@ function ViewAsButton({ profile }: { profile: AdminProfile }) {
   )
 }
 
-function EmptyRow({ cols, msg }: { cols: number; msg: string }) {
-  return (
-    <tr>
-      <td colSpan={cols} className="px-4 py-12 text-center text-sm text-[var(--ink-3)]">{msg}</td>
-    </tr>
-  )
-}
-
 export default function AdminClient({
   callerRole,
   profiles,
@@ -131,6 +160,7 @@ export default function AdminClient({
   const [tab, setTab] = useState<Tab>('pending')
   const [search, setSearch] = useState('')
   const isSuperAdmin = callerRole === 'otb_admin'
+  const isAdmin = callerRole === 'otb_admin' || callerRole === 'otb_staff'
 
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: 'pending', label: 'Pending Approval', count: pendingProfiles.length },
@@ -147,13 +177,33 @@ export default function AdminClient({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
-          Admin
-        </h2>
-        <p className="text-sm text-[var(--ink-3)] mt-0.5">
-          Platform overview · {isSuperAdmin ? 'Super Admin' : 'Staff'}
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
+            Admin
+          </h2>
+          <p className="text-sm text-[var(--ink-3)] mt-0.5">
+            Platform overview · {isSuperAdmin ? 'Super Admin' : 'Staff'}
+          </p>
+        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/library"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'rgba(4,173,239,0.12)', color: '#0284a8' }}
+            >
+              Education Library
+            </Link>
+            <Link
+              href="/admin/cadence"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'rgba(109,40,217,0.1)', color: '#6d28d9' }}
+            >
+              Cadence Analysis
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Tab bar */}
@@ -254,6 +304,7 @@ export default function AdminClient({
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <RoleCell profile={p} canEdit={isSuperAdmin} />
+                          <TierCell profile={p} />
                           {statusBadge
                             ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
                             : null}
@@ -269,6 +320,7 @@ export default function AdminClient({
                       <tr className="border-b border-[var(--ink)]/8">
                         <Th>Email</Th>
                         <Th>Role</Th>
+                        <Th>Tier</Th>
                         <Th>Status</Th>
                         <Th>Name</Th>
                         <Th>Joined</Th>
@@ -283,6 +335,9 @@ export default function AdminClient({
                             <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
                             <td className="px-4 py-3">
                               <RoleCell profile={p} canEdit={isSuperAdmin} />
+                            </td>
+                            <td className="px-4 py-3">
+                              <TierCell profile={p} />
                             </td>
                             <td className="px-4 py-3">
                               {statusBadge

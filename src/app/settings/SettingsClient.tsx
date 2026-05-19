@@ -9,6 +9,7 @@ import {
   exportFacebookGroups,
   exportFinancials,
 } from '@/app/actions/export'
+import { hasFeatureAccess } from '@/lib/features'
 import type { Profile, UserSettings } from '@/types/database'
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
   settings: UserSettings | null
   email: string
   gmailConnected: boolean
+  subscriptionTier?: string
 }
 
 function OAuthNotice({
@@ -78,7 +80,8 @@ function DownloadIcon() {
   )
 }
 
-export default function SettingsClient({ profile, settings, email, gmailConnected }: Props) {
+export default function SettingsClient({ profile, settings, email, gmailConnected, subscriptionTier = 'free' }: Props) {
+  const hasGmailAccess = hasFeatureAccess(subscriptionTier, 'gmail_integration')
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -243,73 +246,87 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
         </Section>
 
         <Section title="Email Integration">
-          <div className="flex items-center gap-4">
-            <span
-              className="text-sm transition-colors"
-              style={{ color: gmailEnabled ? 'rgba(0,0,0,0.4)' : '#000000', fontWeight: gmailEnabled ? 400 : 600 }}
-            >
-              Copy to clipboard
-            </span>
-            <button
-              type="button"
-              onClick={() => setGmailEnabled(!gmailEnabled)}
-              className={[
-                'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors',
-                gmailEnabled ? 'bg-[var(--accent)]' : 'bg-[var(--ink)]/15',
-              ].join(' ')}
-              role="switch"
-              aria-checked={gmailEnabled}
-            >
-              <span
-                className={[
-                  'pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform',
-                  gmailEnabled ? 'translate-x-5' : 'translate-x-0',
-                ].join(' ')}
-              />
-            </button>
-            <span
-              className="text-sm transition-colors"
-              style={{ color: gmailEnabled ? '#04ADEF' : 'rgba(0,0,0,0.4)', fontWeight: gmailEnabled ? 600 : 400 }}
-            >
-              Send from app
-            </span>
-          </div>
+          {!hasGmailAccess ? (
+            <div className="flex items-center gap-3 px-3 py-3 rounded-lg border border-[var(--ink)]/8" style={{ background: 'rgba(0,0,0,0.03)' }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <rect x="3" y="7" width="10" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" style={{ color: 'var(--ink-3)' }} />
+                <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" style={{ color: 'var(--ink-3)' }} />
+              </svg>
+              <p className="text-sm" style={{ color: 'var(--ink-3)' }}>
+                Upgrade to Scale to unlock Gmail Integration.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-4">
+                <span
+                  className="text-sm transition-colors"
+                  style={{ color: gmailEnabled ? 'rgba(0,0,0,0.4)' : '#000000', fontWeight: gmailEnabled ? 400 : 600 }}
+                >
+                  Copy to clipboard
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setGmailEnabled(!gmailEnabled)}
+                  className={[
+                    'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                    gmailEnabled ? 'bg-[var(--accent)]' : 'bg-[var(--ink)]/15',
+                  ].join(' ')}
+                  role="switch"
+                  aria-checked={gmailEnabled}
+                >
+                  <span
+                    className={[
+                      'pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform',
+                      gmailEnabled ? 'translate-x-5' : 'translate-x-0',
+                    ].join(' ')}
+                  />
+                </button>
+                <span
+                  className="text-sm transition-colors"
+                  style={{ color: gmailEnabled ? '#04ADEF' : 'rgba(0,0,0,0.4)', fontWeight: gmailEnabled ? 600 : 400 }}
+                >
+                  Send from app
+                </span>
+              </div>
 
-          {gmailEnabled && (
-            <div className="pt-1">
-              {gmailConnected ? (
-                <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--green-l)] border border-[var(--green)]/20">
-                  <div className="flex items-center gap-2">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                      <circle cx="7" cy="7" r="6" stroke="var(--green)" strokeWidth="1.3" />
-                      <path d="M4.5 7l2 2 3-3" stroke="var(--green)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <p className="text-xs text-[var(--green)] font-medium">Gmail connected</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleDisconnect}
-                    disabled={isPending}
-                    className="text-xs text-[var(--ink-3)] hover:text-[var(--red)] transition-colors disabled:opacity-50"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--ink)]/8">
-                  <p className="text-xs text-[var(--ink-2)]">Connect your Gmail account to send emails directly from the app.</p>
-                  <a
-                    href="/api/auth/google"
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--ink)] text-xs font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors self-start sm:self-auto"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                      <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                    Connect Gmail
-                  </a>
+              {gmailEnabled && (
+                <div className="pt-1">
+                  {gmailConnected ? (
+                    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-[var(--green-l)] border border-[var(--green)]/20">
+                      <div className="flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                          <circle cx="7" cy="7" r="6" stroke="var(--green)" strokeWidth="1.3" />
+                          <path d="M4.5 7l2 2 3-3" stroke="var(--green)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <p className="text-xs text-[var(--green)] font-medium">Gmail connected</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDisconnect}
+                        disabled={isPending}
+                        className="text-xs text-[var(--ink-3)] hover:text-[var(--red)] transition-colors disabled:opacity-50"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--ink)]/8">
+                      <p className="text-xs text-[var(--ink-2)]">Connect your Gmail account to send emails directly from the app.</p>
+                      <a
+                        href="/api/auth/google"
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--ink)] text-xs font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors self-start sm:self-auto"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                          <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        </svg>
+                        Connect Gmail
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </Section>
 

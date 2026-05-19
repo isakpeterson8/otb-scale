@@ -13,6 +13,7 @@ export interface AdminProfile {
   display_name: string | null
   status: 'pending' | 'approved' | 'rejected' | null
   created_at: string
+  subscription_tier: string | null
 }
 
 export default async function AdminPage() {
@@ -28,15 +29,18 @@ export default async function AdminPage() {
 
   const callerRole = (callerProfile?.role ?? 'studio_owner') as UserRole
 
-  const [profilesRes, settingsRes] = await Promise.all([
+  const [profilesRes, settingsRes, studiosRes] = await Promise.all([
     adminClient.from('profiles').select('id, studio_id, role, email, status, created_at').order('created_at', { ascending: false }),
     adminClient.from('settings').select('user_id, display_name'),
+    adminClient.from('studios').select('id, subscription_tier'),
   ])
 
   const rawProfiles = (profilesRes.data ?? []) as { id: string; studio_id: string | null; role: UserRole; email: string | null; status: string | null; created_at: string }[]
   const rawSettings = (settingsRes.data ?? []) as { user_id: string; display_name: string | null }[]
+  const rawStudios = (studiosRes.data ?? []) as { id: string; subscription_tier: string }[]
 
   const displayNameById = new Map(rawSettings.map(s => [s.user_id, s.display_name]))
+  const tierByStudioId = new Map(rawStudios.map(s => [s.id, s.subscription_tier]))
 
   const adminProfiles: AdminProfile[] = rawProfiles.map(p => ({
     id: p.id,
@@ -46,6 +50,7 @@ export default async function AdminPage() {
     display_name: displayNameById.get(p.id) ?? null,
     status: (p.status ?? null) as AdminProfile['status'],
     created_at: p.created_at,
+    subscription_tier: p.studio_id ? (tierByStudioId.get(p.studio_id) ?? 'free') : null,
   }))
 
   const pendingProfiles = adminProfiles.filter(p => p.status === 'pending')

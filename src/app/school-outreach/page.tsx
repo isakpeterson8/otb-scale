@@ -1,14 +1,38 @@
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
+import UpgradeBanner from '@/components/UpgradeBanner'
 import SchoolOutreachClient from './SchoolOutreachClient'
 import { checkGmailReplies } from '@/app/actions/cadence'
+import { hasFeatureAccess } from '@/lib/features'
 import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/database'
 
 export default async function SchoolOutreachPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
   const { supabase, studioId, userId, viewOnly } = ctx
+
+  const { data: studio } = await supabase
+    .from('studios')
+    .select('subscription_tier')
+    .eq('id', studioId)
+    .single()
+
+  const tier = studio?.subscription_tier ?? 'free'
+  const hasAccess = hasFeatureAccess(tier, 'school_outreach')
+
+  if (!hasAccess) {
+    return (
+      <AppShell>
+        <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
+          <h2 className="text-2xl text-[var(--ink)] mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
+            School Outreach
+          </h2>
+          <UpgradeBanner feature="School Outreach" />
+        </main>
+      </AppShell>
+    )
+  }
 
   const [{ data: schools }, { data: settings }] = await Promise.all([
     supabase
