@@ -78,7 +78,7 @@ async function fetchSheetData(): Promise<{ headers: string[]; rows: string[][] }
 
   // Fetch spreadsheet data
   const sheetsRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetsId}/values/Sheet1`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetsId}/values/A1%3AZ`,
     { headers: { Authorization: `Bearer ${access_token}` } }
   )
 
