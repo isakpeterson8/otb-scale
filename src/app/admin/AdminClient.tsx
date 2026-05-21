@@ -10,7 +10,7 @@ import type { AdminProfile } from './page'
 
 type Tab = 'pending' | 'users'
 
-const ROLE_OPTIONS: UserRole[] = ['studio_owner', 'otb_staff', 'otb_admin']
+const ROLE_OPTIONS: UserRole[] = ['studio_owner', 'otb_staff']
 const ROLE_BADGE: Record<UserRole, { label: string; bg: string; color: string }> = {
   studio_owner: { label: 'Studio Owner', bg: 'rgba(0,0,0,0.06)',      color: '#374151' },
   otb_staff:    { label: 'OTB Staff',    bg: 'rgba(109,40,217,0.1)',  color: '#6d28d9' },

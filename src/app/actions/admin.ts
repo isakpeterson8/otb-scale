@@ -138,6 +138,7 @@ export async function updateUserRole(profileId: string, role: UserRole) {
 
   const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (caller?.role !== 'otb_admin') return { error: 'Only super admins can change roles' }
+  if (role === 'otb_admin') return { error: 'Super admin role cannot be granted via the UI' }
 
   const { error } = await adminClient.from('profiles').update({ role }).eq('id', profileId)
   if (error) return { error: error.message }
