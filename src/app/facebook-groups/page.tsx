@@ -9,7 +9,7 @@ import type { FacebookGroup } from '@/types/database'
 export default async function FacebookGroupsPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId } = ctx
+  const { supabase, studioId, isAdmin } = ctx
 
   const { data: studio } = await supabase
     .from('studios')
@@ -18,7 +18,7 @@ export default async function FacebookGroupsPage() {
     .single()
 
   const tier = studio?.subscription_tier ?? 'free'
-  const hasAccess = hasFeatureAccess(tier, 'facebook_groups')
+  const hasAccess = isAdmin || hasFeatureAccess(tier, 'facebook_groups')
 
   const groups: FacebookGroup[] = hasAccess
     ? ((await supabase

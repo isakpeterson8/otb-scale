@@ -8,6 +8,7 @@ type StudioContext = {
   studioId: string
   userId: string
   viewOnly: boolean
+  isAdmin: boolean
 }
 
 export async function getStudioId(): Promise<StudioContext | null> {
@@ -20,18 +21,20 @@ export async function getStudioId(): Promise<StudioContext | null> {
 
   // Admin is viewing as another studio — use service-role client to bypass RLS
   if (viewAsStudioId) {
-    return { supabase: adminClient, studioId: viewAsStudioId, userId: user.id, viewOnly: true }
+    return { supabase: adminClient, studioId: viewAsStudioId, userId: user.id, viewOnly: true, isAdmin: true }
   }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('studio_id, display_name')
+    .select('studio_id, display_name, role')
     .eq('id', user.id)
     .single()
 
+  const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
+
   // Fast path: profile already has a studio_id
   if (profile?.studio_id) {
-    return { supabase, studioId: profile.studio_id, userId: user.id, viewOnly: false }
+    return { supabase, studioId: profile.studio_id, userId: user.id, viewOnly: false, isAdmin }
   }
 
   // Look for a studio this user already owns
@@ -71,5 +74,5 @@ export async function getStudioId(): Promise<StudioContext | null> {
     console.error('[getStudioId] profile backfill failed:', profileUpdateError.message, profileUpdateError.code)
   }
 
-  return { supabase, studioId, userId: user.id, viewOnly: false }
+  return { supabase, studioId, userId: user.id, viewOnly: false, isAdmin }
 }

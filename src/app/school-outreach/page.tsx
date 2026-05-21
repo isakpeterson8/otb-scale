@@ -10,7 +10,7 @@ import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/da
 export default async function SchoolOutreachPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, userId, viewOnly } = ctx
+  const { supabase, studioId, userId, viewOnly, isAdmin } = ctx
 
   const { data: studio } = await supabase
     .from('studios')
@@ -19,7 +19,7 @@ export default async function SchoolOutreachPage() {
     .single()
 
   const tier = studio?.subscription_tier ?? 'free'
-  const hasAccess = hasFeatureAccess(tier, 'school_outreach')
+  const hasAccess = isAdmin || hasFeatureAccess(tier, 'school_outreach')
 
   if (!hasAccess) {
     return (

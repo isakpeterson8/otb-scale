@@ -1,11 +1,8 @@
 interface Props {
   feature: string
-  tier?: 'scale' | 'lifetime'
 }
 
-export default function UpgradeBanner({ feature, tier = 'scale' }: Props) {
-  const planLabel = tier === 'lifetime' ? 'Lifetime' : 'Scale'
-
+export default function UpgradeBanner({ feature }: Props) {
   return (
     <div className="flex-1 flex items-center justify-center min-h-[360px] px-4">
       <div className="text-center max-w-xs">
@@ -25,11 +22,19 @@ export default function UpgradeBanner({ feature, tier = 'scale' }: Props) {
           className="text-lg font-medium mb-2"
           style={{ fontFamily: 'var(--font-heading)', color: 'var(--ink)' }}
         >
-          Upgrade to {planLabel}
+          Upgrade needed.
         </h3>
         <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
-          Upgrade to the {planLabel} plan to unlock {feature}.
-          Contact your OTB advisor to upgrade.
+          Upgrade to unlock {feature}.{' '}
+          Contact{' '}
+          <a
+            href="mailto:support@outsidethebachs.com"
+            className="underline"
+            style={{ color: 'var(--accent-text)' }}
+          >
+            support@outsidethebachs.com
+          </a>{' '}
+          to upgrade.
         </p>
       </div>
     </div>

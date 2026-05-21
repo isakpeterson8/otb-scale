@@ -9,7 +9,7 @@ import { getLibraryItems } from '@/app/actions/library'
 export default async function EducationPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId } = ctx
+  const { supabase, studioId, isAdmin } = ctx
 
   const { data: studio } = await supabase
     .from('studios')
@@ -18,7 +18,7 @@ export default async function EducationPage() {
     .single()
 
   const tier = studio?.subscription_tier ?? 'free'
-  const hasAccess = hasFeatureAccess(tier, 'education_library')
+  const hasAccess = isAdmin || hasFeatureAccess(tier, 'education_library')
 
   if (!hasAccess) {
     return (
