@@ -15,7 +15,11 @@ export default async function AdminCadencePage() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'otb_admin' && profile?.role !== 'otb_staff') {
+  const isAdminByRole = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
+  const isAdminByEmail = !!(user.email && adminEmails.includes(user.email.toLowerCase()))
+
+  if (!isAdminByRole && !isAdminByEmail) {
     redirect('/dashboard')
   }
 

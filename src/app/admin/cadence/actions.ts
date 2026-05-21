@@ -15,8 +15,13 @@ async function requireAdmin() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'otb_admin' && profile?.role !== 'otb_staff') return null
-  return user
+  if (profile?.role === 'otb_admin' || profile?.role === 'otb_staff') return user
+
+  // Fallback: profiles table lookup can fail when admin profile id doesn't match auth user id
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
+  if (user.email && adminEmails.includes(user.email.toLowerCase())) return user
+
+  return null
 }
 
 async function fetchSheetData(): Promise<{ headers: string[]; rows: string[][] }> {
