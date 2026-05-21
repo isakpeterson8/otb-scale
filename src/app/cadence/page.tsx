@@ -39,7 +39,7 @@ export default async function CadencePage() {
         {hasAccess ? (
           <div className="flex-1 rounded-xl border border-[var(--ink)]/8 overflow-hidden" style={{ minHeight: '600px' }}>
             <iframe
-              src="http://cadence.outsidethebachs.com/"
+              src="https://cadence.outsidethebachs.com/"
               className="w-full h-full"
               style={{ border: 'none', minHeight: '600px' }}
               title="Cadence Check-In Form"
