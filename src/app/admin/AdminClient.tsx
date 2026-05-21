@@ -77,7 +77,7 @@ function RoleCell({ profile, canEdit }: { profile: AdminProfile; canEdit: boolea
 function TierCell({ profile }: { profile: AdminProfile }) {
   const [isPending, startTransition] = useTransition()
 
-  if (!profile.studio_id) {
+  if (profile.role === 'otb_admin' || profile.role === 'otb_staff' || !profile.studio_id) {
     return <span className="text-[var(--ink-3)] text-xs">—</span>
   }
 
