@@ -9,7 +9,10 @@ import { getLibraryItems } from '@/app/actions/library'
 export default async function EducationPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, isAdmin } = ctx
+  const { supabase, studioId, userEmail } = ctx
+
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
+  const isAdmin = !!(userEmail && adminEmails.includes(userEmail.toLowerCase()))
 
   const { data: studio } = await supabase
     .from('studios')

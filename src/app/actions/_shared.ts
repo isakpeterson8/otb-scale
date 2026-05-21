@@ -7,6 +7,7 @@ type StudioContext = {
   supabase: any
   studioId: string
   userId: string
+  userEmail: string | null
   viewOnly: boolean
   isAdmin: boolean
 }
@@ -21,7 +22,7 @@ export async function getStudioId(): Promise<StudioContext | null> {
 
   // Admin is viewing as another studio — use service-role client to bypass RLS
   if (viewAsStudioId) {
-    return { supabase: adminClient, studioId: viewAsStudioId, userId: user.id, viewOnly: true, isAdmin: true }
+    return { supabase: adminClient, studioId: viewAsStudioId, userId: user.id, userEmail: user.email ?? null, viewOnly: true, isAdmin: true }
   }
 
   const { data: profile } = await supabase
@@ -30,11 +31,17 @@ export async function getStudioId(): Promise<StudioContext | null> {
     .eq('id', user.id)
     .single()
 
-  const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
+  // Three-way admin check: profiles table role, AND ADMIN_EMAILS env var as fallback
+  // (admin profiles may have been manually inserted with a UUID that doesn't match auth user ID)
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
+  const isAdmin =
+    profile?.role === 'otb_admin' ||
+    profile?.role === 'otb_staff' ||
+    !!(user.email && adminEmails.includes(user.email.toLowerCase()))
 
   // Fast path: profile already has a studio_id
   if (profile?.studio_id) {
-    return { supabase, studioId: profile.studio_id, userId: user.id, viewOnly: false, isAdmin }
+    return { supabase, studioId: profile.studio_id, userId: user.id, userEmail: user.email ?? null, viewOnly: false, isAdmin }
   }
 
   // Look for a studio this user already owns
@@ -74,5 +81,5 @@ export async function getStudioId(): Promise<StudioContext | null> {
     console.error('[getStudioId] profile backfill failed:', profileUpdateError.message, profileUpdateError.code)
   }
 
-  return { supabase, studioId, userId: user.id, viewOnly: false, isAdmin }
+  return { supabase, studioId, userId: user.id, userEmail: user.email ?? null, viewOnly: false, isAdmin }
 }

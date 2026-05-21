@@ -7,7 +7,13 @@ import { hasFeatureAccess } from '@/lib/features'
 export default async function CadencePage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, isAdmin } = ctx
+  const { supabase, studioId, userEmail } = ctx
+
+  // Explicit server-side admin check in the page itself.
+  // Compares auth email to ADMIN_EMAILS env var — does not rely on profiles table row lookup,
+  // which can fail when admin profiles were manually inserted with a non-matching ID.
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
+  const isAdmin = !!(userEmail && adminEmails.includes(userEmail.toLowerCase()))
 
   const { data: studio } = await supabase
     .from('studios')

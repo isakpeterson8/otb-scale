@@ -10,7 +10,10 @@ import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/da
 export default async function SchoolOutreachPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, userId, viewOnly, isAdmin } = ctx
+  const { supabase, studioId, userId, viewOnly, isAdmin: ctxIsAdmin, userEmail } = ctx
+
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
+  const isAdmin = ctxIsAdmin || !!(userEmail && adminEmails.includes(userEmail.toLowerCase()))
 
   const { data: studio } = await supabase
     .from('studios')
