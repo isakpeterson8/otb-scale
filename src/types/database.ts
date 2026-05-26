@@ -31,6 +31,8 @@ export interface EducationLibraryItem {
   pdf_url: string | null
   category: string | null
   position: number
+  transcript_text: string | null
+  is_placeholder: boolean
   created_at: string
 }
 
