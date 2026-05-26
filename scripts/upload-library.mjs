@@ -381,6 +381,23 @@ async function main() {
       continue
     }
 
+    // Patch requireSignedURLs=false (TUS metadata not always honoured)
+    try {
+      const patchRes = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/${cfUid}`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${CF_API_TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requireSignedURLs: false }),
+        }
+      )
+      if (!patchRes.ok) {
+        console.warn(`         ⚠  requireSignedURLs patch failed (${patchRes.status}) — video may be locked`)
+      }
+    } catch (patchErr) {
+      console.warn(`         ⚠  requireSignedURLs patch error: ${patchErr.message}`)
+    }
+
     // Insert into DB
     const { error: dbErr } = await supabase.from('education_library_items').insert({
       title:           item.title,
