@@ -5,6 +5,7 @@ import UpgradeBanner from '@/components/UpgradeBanner'
 import EducationClient from './EducationClient'
 import { hasFeatureAccess } from '@/lib/features'
 import { getLibraryItems } from '@/app/actions/library'
+import { getResources } from '@/app/actions/resources'
 
 export default async function EducationPage() {
   const ctx = await getStudioId()
@@ -36,12 +37,15 @@ export default async function EducationPage() {
     )
   }
 
-  const { data: items } = await getLibraryItems()
+  const [{ data: items }, { data: resources }] = await Promise.all([
+    getLibraryItems(),
+    getResources(),
+  ])
 
   return (
     <AppShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
-        <EducationClient items={items} />
+        <EducationClient items={items} resources={resources} />
       </main>
     </AppShell>
   )

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { upsertWatchProgress } from '@/app/actions/library'
-import type { EducationLibraryItem } from '@/types/database'
+import type { EducationLibraryItem, Resource } from '@/types/database'
+import ResourcesClient from '@/app/resources/ResourcesClient'
 
 // ── Category definitions (in display order) ───────────────────────────────────
 const CATEGORIES = [
@@ -73,7 +74,14 @@ function ChevronUp() {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function EducationClient({ items }: { items: EducationLibraryItem[] }) {
+export default function EducationClient({
+  items,
+  resources = [],
+}: {
+  items: EducationLibraryItem[]
+  resources?: Resource[]
+}) {
+  const [tab, setTab]                           = useState<'videos' | 'resources'>('videos')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [playingVideo, setPlayingVideo]         = useState<EducationLibraryItem | null>(null)
   const [mobileNavOpen, setMobileNavOpen]       = useState(false)
@@ -157,16 +165,59 @@ export default function EducationClient({ items }: { items: EducationLibraryItem
     return item.title.toLowerCase().includes(q) || (item.description ?? '').toLowerCase().includes(q)
   })
 
-  if (items.length === 0) {
+  const toggleBar = (
+    <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--surface)' }}>
+      <button
+        onClick={() => setTab('videos')}
+        className={[
+          'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
+          tab === 'videos'
+            ? 'bg-[var(--accent-l)] text-[var(--accent-text)]'
+            : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
+        ].join(' ')}
+      >
+        Videos
+      </button>
+      <button
+        onClick={() => setTab('resources')}
+        className={[
+          'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
+          tab === 'resources'
+            ? 'bg-[var(--accent-l)] text-[var(--accent-text)]'
+            : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
+        ].join(' ')}
+      >
+        Resources
+      </button>
+    </div>
+  )
+
+  if (items.length === 0 && tab === 'videos') {
     return (
       <div className="space-y-4">
         <div>
           <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>Education Library</h2>
-          <p className="text-sm text-[var(--ink-3)] mt-0.5">Resources to help you grow your studio</p>
+          <p className="text-sm text-[var(--ink-3)] mt-0.5">Videos and shared resources from OTB</p>
         </div>
+        {toggleBar}
         <div className="flex items-center justify-center py-24">
-          <p className="text-sm text-[var(--ink-3)]">No resources available yet — check back soon!</p>
+          <p className="text-sm text-[var(--ink-3)]">No videos available yet — check back soon!</p>
         </div>
+      </div>
+    )
+  }
+
+  if (tab === 'resources') {
+    return (
+      <div className="space-y-5">
+        <div>
+          <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
+            Education Library
+          </h2>
+          <p className="text-sm text-[var(--ink-3)] mt-0.5">Videos and shared resources from OTB</p>
+        </div>
+        {toggleBar}
+        <ResourcesClient resources={resources} />
       </div>
     )
   }
@@ -178,8 +229,9 @@ export default function EducationClient({ items }: { items: EducationLibraryItem
         <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
           Education Library
         </h2>
-        <p className="text-sm text-[var(--ink-3)] mt-0.5">Resources to help you grow your studio</p>
+        <p className="text-sm text-[var(--ink-3)] mt-0.5">Videos and shared resources from OTB</p>
       </div>
+      {toggleBar}
 
       <div className="flex gap-7">
         {/* ── Sidebar (desktop ≥ lg) ─────────────────────────────────────────── */}
