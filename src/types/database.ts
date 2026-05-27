@@ -36,6 +36,17 @@ export interface EducationLibraryItem {
   created_at: string
 }
 
+export interface Resource {
+  id: string
+  title: string
+  description: string | null
+  url: string
+  icon_type: 'doc' | 'sheet' | 'slides' | 'folder' | 'form' | 'pdf' | 'link'
+  category: string | null
+  position: number
+  created_at: string
+}
+
 export interface Profile {
   id: string
   studio_id: string | null

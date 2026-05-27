@@ -69,6 +69,17 @@ const NAV = [
     ),
   },
   {
+    label: 'Resources',
+    href: '/resources',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <path d="M3 2h6l4 4v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M9 2v4h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M5 8.5h6M5 11h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity=".5" />
+      </svg>
+    ),
+  },
+  {
     label: 'Cadence Check-In',
     href: '/cadence',
     icon: (

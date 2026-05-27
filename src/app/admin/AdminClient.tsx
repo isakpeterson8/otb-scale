@@ -196,6 +196,13 @@ export default function AdminClient({
               Education Library
             </Link>
             <Link
+              href="/admin/resources"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'rgba(73,37,47,0.15)', color: 'var(--accent-text)' }}
+            >
+              Resources
+            </Link>
+            <Link
               href="/admin/cadence"
               className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
               style={{ background: 'rgba(109,40,217,0.1)', color: '#6d28d9' }}
