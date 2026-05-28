@@ -1,8 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/layout/AppShell'
 import SettingsClient from './SettingsClient'
 import type { Profile, UserSettings } from '@/types/database'
+
+export const metadata: Metadata = { title: 'Settings' }
 
 export default async function SettingsPage() {
   const supabase = await createClient()

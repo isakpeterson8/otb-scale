@@ -1,8 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/layout/AppShell'
 import ResourcesAdminClient from './ResourcesAdminClient'
 import { getResources } from '@/app/actions/resources'
+
+export const metadata: Metadata = { title: 'Resource Library' }
 
 export default async function AdminResourcesPage() {
   const supabase = await createClient()

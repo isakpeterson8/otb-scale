@@ -1,8 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import FinancialsClient from './FinancialsClient'
 import type { StudioSnapshot } from '@/types/database'
+
+export const metadata: Metadata = { title: 'Financials' }
 
 export default async function FinancialsPage() {
   const ctx = await getStudioId()

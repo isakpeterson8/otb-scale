@@ -1,8 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import ResourcesClient from './ResourcesClient'
 import { getResources } from '@/app/actions/resources'
+
+export const metadata: Metadata = { title: 'Resources' }
 
 export default async function ResourcesPage() {
   const ctx = await getStudioId()

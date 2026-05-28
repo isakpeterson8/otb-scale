@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
@@ -5,6 +6,8 @@ import UpgradeBanner from '@/components/UpgradeBanner'
 import FacebookGroupsClient from './FacebookGroupsClient'
 import { hasFeatureAccess } from '@/lib/features'
 import type { FacebookGroup } from '@/types/database'
+
+export const metadata: Metadata = { title: 'Facebook Groups' }
 
 export default async function FacebookGroupsPage() {
   const ctx = await getStudioId()

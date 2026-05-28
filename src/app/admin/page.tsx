@@ -1,9 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import AppShell from '@/components/layout/AppShell'
 import AdminClient from './AdminClient'
 import type { UserRole } from '@/types/database'
+
+export const metadata: Metadata = { title: 'Admin Overview' }
 
 export interface AdminProfile {
   id: string

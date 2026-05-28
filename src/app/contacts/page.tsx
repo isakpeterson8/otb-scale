@@ -1,8 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import ContactsClient from './ContactsClient'
 import type { Contact } from '@/types/database'
+
+export const metadata: Metadata = { title: 'Contacts' }
 
 export default async function ContactsPage() {
   const ctx = await getStudioId()

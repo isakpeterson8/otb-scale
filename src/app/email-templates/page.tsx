@@ -1,7 +1,10 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '@/components/layout/AppShell'
 import EmailTemplatesClient from './EmailTemplatesClient'
+
+export const metadata: Metadata = { title: 'Email Templates' }
 
 export default async function EmailTemplatesPage() {
   const supabase = await createClient()

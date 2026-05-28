@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
@@ -6,6 +7,8 @@ import SchoolOutreachClient from './SchoolOutreachClient'
 import { checkGmailReplies } from '@/app/actions/cadence'
 import { hasFeatureAccess } from '@/lib/features'
 import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/database'
+
+export const metadata: Metadata = { title: 'School Outreach' }
 
 export default async function SchoolOutreachPage() {
   const ctx = await getStudioId()

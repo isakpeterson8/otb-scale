@@ -2,8 +2,11 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'OTB Scale',
-  description: 'Studio Platform',
+  title: {
+    default: 'Studio | Outside The Bachs: Scale',
+    template: '%s | Outside The Bachs: Scale',
+  },
+  description: 'Studio growth platform for Outside The Bachs: Scale members.',
   icons: { icon: '/otb-logo.png' },
 }
 
