@@ -11,7 +11,7 @@ export default async function DashboardPage({
 }) {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, isAdmin } = ctx
+  const { supabase, studioId, isAdmin, viewOnly } = ctx
 
   const { data: studio } = await supabase
     .from('studios')
@@ -19,7 +19,8 @@ export default async function DashboardPage({
     .eq('id', studioId)
     .single()
   const tier = studio?.subscription_tier ?? 'free'
-  const isFreeTier = !isAdmin && tier === 'free'
+  // In View As mode mirror the viewed studio's tier; real admins are never gated
+  const isFreeTier = viewOnly ? tier === 'free' : (!isAdmin && tier === 'free')
 
   const { toast } = await searchParams
 

@@ -133,16 +133,19 @@ interface SidebarProps {
   isAdmin: boolean
   tier?: string | null
   viewOnly?: boolean
+  viewAsTier?: string | null
   isOpen?: boolean
   onClose?: () => void
 }
 
-export default function Sidebar({ displayName, isAdmin, tier, viewOnly, isOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ displayName, isAdmin, tier, viewOnly, viewAsTier, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [lockedModal, setLockedModal] = useState<string | null>(null) // feature label
 
-  const isFree = !isAdmin && tier === 'free'
+  // In View As mode use the viewed studio's tier; otherwise use the real user's tier
+  const effectiveTier = viewOnly && viewAsTier != null ? viewAsTier : tier
+  const isFree = viewOnly ? viewAsTier === 'free' : (!isAdmin && tier === 'free')
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -311,7 +314,8 @@ export default function Sidebar({ displayName, isAdmin, tier, viewOnly, isOpen =
             </>
           )}
 
-          {isAdmin && (
+          {/* Admin link — shown for admins, hidden when mirroring a studio in View As mode */}
+          {isAdmin && !viewOnly && (
             <Link
               href="/admin"
               onClick={onClose}
@@ -336,8 +340,8 @@ export default function Sidebar({ displayName, isAdmin, tier, viewOnly, isOpen =
             </div>
             <div className="min-w-0 flex-1">
               <span className="text-sm text-[var(--ink)]/60 truncate block">{displayName}</span>
-              {tier && (() => {
-                const badge = TIER_BADGE[tier] ?? TIER_BADGE.free
+              {effectiveTier && (() => {
+                const badge = TIER_BADGE[effectiveTier] ?? TIER_BADGE.free
                 return (
                   <span
                     className="inline-block mt-0.5 px-1.5 py-px rounded text-[10px] font-semibold leading-tight"

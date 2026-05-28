@@ -3,7 +3,14 @@
 import { useTransition } from 'react'
 import { exitViewAs } from '@/app/actions/admin'
 
-export function ViewAsBanner({ studioName }: { studioName: string }) {
+const TIER_LABELS: Record<string, string> = {
+  free: 'Free',
+  scale: 'Scale',
+  graduate: 'Graduate',
+  lifetime: 'Lifetime',
+}
+
+export function ViewAsBanner({ studioName, tier }: { studioName: string; tier?: string | null }) {
   const [isPending, startTransition] = useTransition()
 
   function handleExit() {
@@ -13,12 +20,17 @@ export function ViewAsBanner({ studioName }: { studioName: string }) {
     })
   }
 
+  const tierLabel = tier ? TIER_LABELS[tier] ?? tier : null
+  const bannerText = tierLabel
+    ? `Viewing as ${studioName} — ${tierLabel} Tier — Read only mode`
+    : `Viewing as ${studioName} — Read only mode`
+
   return (
     <div
       className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm font-medium"
       style={{ background: 'rgba(139,69,19,0.15)', color: '#c97b3a', borderBottom: '1px solid rgba(139,69,19,0.25)' }}
     >
-      <span className="truncate mr-3 min-w-0">Viewing as {studioName} — Read only mode</span>
+      <span className="truncate mr-3 min-w-0">{bannerText}</span>
       <button
         onClick={handleExit}
         disabled={isPending}

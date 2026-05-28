@@ -53,7 +53,18 @@ export async function proxy(request: NextRequest) {
   if (user) {
     const blocked = FREE_TIER_BLOCKED.find(r => pathname.startsWith(r.path))
     if (blocked) {
-      // Fetch profile role + studio tier (2 small queries, only on these specific routes)
+      // Fast path: admin in View As mode for a free-tier studio — redirect without a DB query
+      const viewAsStudioId = request.cookies.get('view_as_studio_id')?.value
+      const viewAsTier = request.cookies.get('view_as_tier')?.value
+      if (viewAsStudioId && viewAsTier === 'free') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        url.searchParams.delete('toast')
+        if (blocked.toast) url.searchParams.set('toast', blocked.toast)
+        return NextResponse.redirect(url)
+      }
+
+      // Regular check: fetch profile role + studio tier (2 small queries, only on these specific routes)
       const { data: profile } = await supabase
         .from('profiles')
         .select('studio_id, role')

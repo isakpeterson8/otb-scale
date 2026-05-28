@@ -43,6 +43,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const cookieStore = await cookies()
   const viewAsStudioId = cookieStore.get('view_as_studio_id')?.value ?? null
   const viewAsEmail = cookieStore.get('view_as_email')?.value ?? null
+  // The tier of the studio being viewed (set when admin enters View As mode)
+  const viewAsTier = viewAsStudioId ? (cookieStore.get('view_as_tier')?.value ?? null) : null
 
   let viewAsStudioName: string | null = null
   if (viewAsStudioId) {
@@ -61,6 +63,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       tier={studioTier}
       viewOnly={!!viewAsStudioId}
       viewAsStudioName={viewAsStudioName}
+      viewAsTier={viewAsTier}
     >
       {children}
     </AppShellClient>

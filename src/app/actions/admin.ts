@@ -233,9 +233,18 @@ export async function enterViewAs(studioId: string, email: string): Promise<void
   const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (caller?.role !== 'otb_admin' && caller?.role !== 'otb_staff') return
 
+  // Fetch the viewed studio's tier so we can mirror their tier restrictions
+  const { data: studio } = await adminClient
+    .from('studios')
+    .select('subscription_tier')
+    .eq('id', studioId)
+    .single()
+  const viewedTier = studio?.subscription_tier ?? 'free'
+
   const cookieStore = await cookies()
   cookieStore.set('view_as_studio_id', studioId, { httpOnly: true, path: '/', sameSite: 'strict' })
   cookieStore.set('view_as_email', email, { httpOnly: true, path: '/', sameSite: 'strict' })
+  cookieStore.set('view_as_tier', viewedTier, { httpOnly: true, path: '/', sameSite: 'strict' })
   redirect('/dashboard')
 }
 
@@ -243,6 +252,7 @@ export async function exitViewAs(): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.delete('view_as_studio_id')
   cookieStore.delete('view_as_email')
+  cookieStore.delete('view_as_tier')
 }
 
 // ── Tier upgrade requests ─────────────────────────────────────────────────────

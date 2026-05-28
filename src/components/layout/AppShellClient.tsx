@@ -11,9 +11,10 @@ interface Props {
   tier: string | null
   viewOnly: boolean
   viewAsStudioName: string | null
+  viewAsTier: string | null
 }
 
-export default function AppShellClient({ children, displayName, isAdmin, tier, viewOnly, viewAsStudioName }: Props) {
+export default function AppShellClient({ children, displayName, isAdmin, tier, viewOnly, viewAsStudioName, viewAsTier }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -39,12 +40,13 @@ export default function AppShellClient({ children, displayName, isAdmin, tier, v
         isAdmin={isAdmin}
         tier={tier}
         viewOnly={viewOnly}
+        viewAsTier={viewAsTier}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
 
       <div className="flex-1 flex flex-col min-w-0 pt-14 md:pt-0 overflow-x-hidden">
-        {viewAsStudioName && <ViewAsBanner studioName={viewAsStudioName} />}
+        {viewAsStudioName && <ViewAsBanner studioName={viewAsStudioName} tier={viewAsTier} />}
         {children}
       </div>
     </div>

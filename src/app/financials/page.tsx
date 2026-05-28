@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: 'Financials' }
 export default async function FinancialsPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, isAdmin } = ctx
+  const { supabase, studioId, isAdmin, viewOnly } = ctx
 
   const { data: studio } = await supabase
     .from('studios')
@@ -21,7 +21,7 @@ export default async function FinancialsPage() {
     .single()
   const tier = studio?.subscription_tier ?? 'free'
 
-  if (!isAdmin && !hasFeatureAccess(tier, 'financials')) {
+  if (viewOnly ? !hasFeatureAccess(tier, 'financials') : (!isAdmin && !hasFeatureAccess(tier, 'financials'))) {
     return (
       <AppShell>
         <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
