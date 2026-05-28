@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { approveUser, rejectUser, enterViewAs, updateStudioTier } from '@/app/actions/admin'
+import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest } from '@/app/actions/admin'
 import { formatDate } from '@/lib/utils'
 import { TIER_LABELS } from '@/lib/features'
 import type { UserRole } from '@/types/database'
 import type { AdminProfile } from './page'
 
-type Tab = 'pending' | 'users'
+type Tab = 'pending' | 'users' | 'tiers'
+type TierFilter = 'all' | 'free' | 'pending_upgrade' | 'scale' | 'graduate' | 'lifetime'
 
 const ROLE_BADGE: Record<UserRole, { label: string; bg: string; color: string }> = {
   studio_owner: { label: 'Studio Owner', bg: 'rgba(0,0,0,0.06)',      color: '#374151' },
@@ -127,6 +128,21 @@ function ViewAsButton({ profile }: { profile: AdminProfile }) {
   )
 }
 
+function ApproveTierButton({ profile }: { profile: AdminProfile }) {
+  const [isPending, startTransition] = useTransition()
+  if (!profile.studio_id || !profile.requested_tier) return null
+  return (
+    <button
+      disabled={isPending}
+      onClick={() => startTransition(async () => { await approveTierRequest(profile.studio_id!) })}
+      className="px-3 py-1 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80"
+      style={{ background: '#15803d' }}
+    >
+      {isPending ? 'Approving…' : `Approve → ${profile.requested_tier}`}
+    </button>
+  )
+}
+
 export default function AdminClient({
   callerRole,
   profiles,
@@ -138,12 +154,16 @@ export default function AdminClient({
 }) {
   const [tab, setTab] = useState<Tab>('pending')
   const [search, setSearch] = useState('')
+  const [tierFilter, setTierFilter] = useState<TierFilter>('all')
   const isSuperAdmin = callerRole === 'otb_admin'
   const isAdmin = callerRole === 'otb_admin' || callerRole === 'otb_staff'
+
+  const pendingUpgradeCount = profiles.filter(p => p.requested_tier).length
 
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: 'pending', label: 'Pending Approval', count: pendingProfiles.length },
     { key: 'users',   label: 'Users',            count: profiles.length },
+    { key: 'tiers',   label: 'Tiers',            count: pendingUpgradeCount },
   ]
 
   const filteredProfiles = search.trim()
@@ -258,6 +278,97 @@ export default function AdminClient({
       )}
 
       {/* Users tab */}
+      {tab === 'tiers' && (() => {
+        const tierFilterOptions: { key: TierFilter; label: string }[] = [
+          { key: 'all',            label: 'All' },
+          { key: 'free',           label: 'Free' },
+          { key: 'pending_upgrade',label: `Pending Upgrade${pendingUpgradeCount > 0 ? ` (${pendingUpgradeCount})` : ''}` },
+          { key: 'scale',          label: 'Scale' },
+          { key: 'graduate',       label: 'Graduate' },
+          { key: 'lifetime',       label: 'Lifetime' },
+        ]
+        const studioOwners = profiles.filter(p => p.role === 'studio_owner')
+        const filtered = studioOwners.filter(p => {
+          if (tierFilter === 'all') return true
+          if (tierFilter === 'pending_upgrade') return !!p.requested_tier
+          return (p.subscription_tier ?? 'free') === tierFilter
+        })
+        return (
+          <div className="space-y-3">
+            {/* Filter chips */}
+            <div className="flex flex-wrap gap-1.5">
+              {tierFilterOptions.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setTierFilter(key)}
+                  className={[
+                    'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                    tierFilter === key
+                      ? 'bg-[var(--accent-l)] text-[var(--accent-text)]'
+                      : 'bg-[var(--surface)] text-[var(--ink-3)] hover:text-[var(--ink-2)]',
+                  ].join(' ')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
+              {filtered.length === 0 ? (
+                <p className="px-4 py-12 text-center text-sm text-[var(--ink-3)]">No users match this filter.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--ink)]/8">
+                        <Th>Email</Th>
+                        <Th>Name</Th>
+                        <Th>Current Tier</Th>
+                        <Th>Requested Tier</Th>
+                        <Th>Joined</Th>
+                        <Th></Th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--ink)]/6">
+                      {filtered.map(p => {
+                        const tier = p.subscription_tier ?? 'free'
+                        const badge = TIER_BADGE[tier] ?? TIER_BADGE.free
+                        const reqBadge = p.requested_tier ? (TIER_BADGE[p.requested_tier] ?? TIER_BADGE.free) : null
+                        return (
+                          <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
+                            <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
+                            <Td muted>{p.display_name ?? '—'}</Td>
+                            <td className="px-4 py-3">
+                              <TierCell profile={p} />
+                            </td>
+                            <td className="px-4 py-3">
+                              {reqBadge ? (
+                                <span
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ backgroundColor: reqBadge.bg, color: reqBadge.color }}
+                                >
+                                  {p.requested_tier}
+                                </span>
+                              ) : (
+                                <span className="text-[var(--ink-3)] text-xs">—</span>
+                              )}
+                            </td>
+                            <Td muted nowrap>{formatDate(p.created_at)}</Td>
+                            <td className="px-4 py-3 text-right">
+                              <ApproveTierButton profile={p} />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
       {tab === 'users' && (
         <div className="space-y-3">
           {/* Search */}

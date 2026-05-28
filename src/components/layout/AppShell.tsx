@@ -24,6 +24,17 @@ export default async function AppShell({ children }: { children: React.ReactNode
     if (profile?.status !== 'approved') redirect('/pending')
   }
 
+  // Fetch studio tier for sidebar badge (only for studio owners with a linked studio)
+  let studioTier: string | null = null
+  if (!isAdmin && profile?.studio_id) {
+    const { data: studio } = await supabase
+      .from('studios')
+      .select('subscription_tier')
+      .eq('id', profile.studio_id)
+      .single()
+    studioTier = studio?.subscription_tier ?? 'free'
+  }
+
   const displayName =
     user.user_metadata?.full_name ??
     user.email?.split('@')[0] ??
@@ -47,6 +58,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
     <AppShellClient
       displayName={displayName}
       isAdmin={isAdmin}
+      tier={studioTier}
       viewOnly={!!viewAsStudioId}
       viewAsStudioName={viewAsStudioName}
     >

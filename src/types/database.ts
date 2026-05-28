@@ -7,6 +7,9 @@ export interface Studio {
   city: string | null
   state: string | null
   subscription_tier: string
+  requested_tier: string | null
+  tier_updated_at: string | null
+  tier_updated_by: string | null
   created_at: string
 }
 

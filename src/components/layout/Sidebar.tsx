@@ -91,15 +91,23 @@ const NAV = [
   },
 ]
 
+const TIER_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  free:     { label: 'Free',     bg: 'rgba(255,248,240,0.08)', color: 'rgba(255,248,240,0.4)' },
+  scale:    { label: 'Scale',    bg: 'rgba(4,173,239,0.15)',   color: '#0284a8' },
+  graduate: { label: 'Graduate', bg: 'rgba(109,40,217,0.12)',  color: '#7c3aed' },
+  lifetime: { label: 'Lifetime', bg: 'rgba(22,163,74,0.14)',   color: '#15803d' },
+}
+
 interface SidebarProps {
   displayName: string
   isAdmin: boolean
+  tier?: string | null
   viewOnly?: boolean
   isOpen?: boolean
   onClose?: () => void
 }
 
-export default function Sidebar({ displayName, isAdmin, viewOnly, isOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ displayName, isAdmin, tier, viewOnly, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -205,7 +213,20 @@ export default function Sidebar({ displayName, isAdmin, viewOnly, isOpen = false
                 {initials(displayName)}
               </span>
             </div>
-            <span className="text-sm text-[var(--ink)]/60 truncate">{displayName}</span>
+            <div className="min-w-0 flex-1">
+              <span className="text-sm text-[var(--ink)]/60 truncate block">{displayName}</span>
+              {tier && (() => {
+                const badge = TIER_BADGE[tier] ?? TIER_BADGE.free
+                return (
+                  <span
+                    className="inline-block mt-0.5 px-1.5 py-px rounded text-[10px] font-semibold leading-tight"
+                    style={{ background: badge.bg, color: badge.color }}
+                  >
+                    {badge.label}
+                  </span>
+                )
+              })()}
+            </div>
           </div>
           <button
             onClick={handleSignOut}
