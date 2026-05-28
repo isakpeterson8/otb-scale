@@ -9,6 +9,17 @@ import { TrendingUp } from 'lucide-react'
 
 const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
 
+const SETTINGS_NAV_ITEM = {
+  label: 'Settings',
+  href: '/settings',
+  icon: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
+}
+
 // Nav items always visible to all tiers
 const NAV_FREE = [
   {
@@ -38,6 +49,7 @@ const NAV_FREE = [
     href: '/financials',
     icon: <TrendingUp width={16} height={16} aria-hidden />,
   },
+  SETTINGS_NAV_ITEM,
 ]
 
 // Nav items locked for free tier (shown with lock icon + modal trigger)
@@ -102,16 +114,7 @@ const NAV_ALL = [
     icon: NAV_LOCKED[1].icon,
   },
   NAV_LOCKED[3], // Cadence Check-In
-  {
-    label: 'Settings',
-    href: '/settings',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      </svg>
-    ),
-  },
+  SETTINGS_NAV_ITEM,
 ]
 
 const LockIcon = () => (

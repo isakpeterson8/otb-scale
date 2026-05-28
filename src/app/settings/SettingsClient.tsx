@@ -80,7 +80,17 @@ function DownloadIcon() {
   )
 }
 
+const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
+
+const TIER_DISPLAY: Record<string, string> = {
+  free: 'Free',
+  scale: 'Scale',
+  graduate: 'Graduate',
+  lifetime: 'Lifetime',
+}
+
 export default function SettingsClient({ profile, settings, email, gmailConnected, subscriptionTier = 'free' }: Props) {
+  const isFreeTier = subscriptionTier === 'free'
   const hasGmailAccess = hasFeatureAccess(subscriptionTier, 'gmail_integration')
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -224,6 +234,7 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
           </Field>
         </Section>
 
+        {!isFreeTier && (
         <Section title="Email Defaults">
           <Field label="Default sender name">
             <input
@@ -244,7 +255,9 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
             />
           </Field>
         </Section>
+        )}
 
+        {!isFreeTier && (
         <Section title="Email Integration">
           {!hasGmailAccess ? (
             <div className="flex items-center gap-3 px-3 py-3 rounded-lg border border-[var(--ink)]/8" style={{ background: 'rgba(0,0,0,0.03)' }}>
@@ -329,6 +342,7 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
             </>
           )}
         </Section>
+        )}
 
         {error && (
           <p className="text-xs text-[var(--red)] bg-[var(--red-l)] px-3 py-2 rounded-lg">{error}</p>
@@ -348,16 +362,55 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
         </div>
       </form>
 
+      {isFreeTier && (
+        <div
+          className="rounded-xl p-6 space-y-4"
+          style={{ background: 'var(--surface)', border: '1px solid rgba(255,248,240,0.08)' }}
+        >
+          <h3 className="text-sm font-medium text-[var(--ink)] border-b border-[var(--ink)]/8 pb-3">Your Plan</h3>
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-block px-2 py-0.5 rounded text-xs font-semibold"
+              style={{ background: 'rgba(255,248,240,0.08)', color: 'rgba(255,248,240,0.4)' }}
+            >
+              Free
+            </span>
+            <span className="text-sm" style={{ color: 'var(--ink-3)' }}>Current plan</span>
+          </div>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>
+            You&apos;re on the Free plan. Book a Strategy Session to learn about upgrading to Scale.
+          </p>
+          <a
+            href={STRATEGY_SESSION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ background: 'var(--accent-text)', color: 'var(--ink)' }}
+          >
+            Book a Strategy Session
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+              <path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+        </div>
+      )}
+
       <Section title="Export Your Data">
         <p className="text-xs text-[var(--ink-3)] -mt-2">Download your studio data as CSV files</p>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {([
-            { key: 'contacts',   label: 'Contacts' },
-            { key: 'outreach',   label: 'School Outreach' },
-            { key: 'fb',         label: 'Facebook Groups' },
-            { key: 'financials', label: 'Financials' },
-          ] as { key: ExportKey; label: string }[]).map(({ key, label }) => (
+          {(isFreeTier
+            ? ([
+                { key: 'contacts',   label: 'Contacts' },
+                { key: 'financials', label: 'Financials' },
+              ] as { key: ExportKey; label: string }[])
+            : ([
+                { key: 'contacts',   label: 'Contacts' },
+                { key: 'outreach',   label: 'School Outreach' },
+                { key: 'fb',         label: 'Facebook Groups' },
+                { key: 'financials', label: 'Financials' },
+              ] as { key: ExportKey; label: string }[])
+          ).map(({ key, label }) => (
             <button
               key={key}
               type="button"
@@ -371,15 +424,17 @@ export default function SettingsClient({ profile, settings, email, gmailConnecte
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={() => handleExport('all')}
-          disabled={exporting !== null}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--ink)]/20 bg-[var(--canvas)] text-sm font-medium text-[var(--ink)] hover:border-[var(--accent-text)] hover:text-[var(--accent-text)] disabled:opacity-50 transition-colors"
-        >
-          <DownloadIcon />
-          {exporting === 'all' ? 'Downloading all…' : 'Export All Data'}
-        </button>
+        {!isFreeTier && (
+          <button
+            type="button"
+            onClick={() => handleExport('all')}
+            disabled={exporting !== null}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--ink)]/20 bg-[var(--canvas)] text-sm font-medium text-[var(--ink)] hover:border-[var(--accent-text)] hover:text-[var(--accent-text)] disabled:opacity-50 transition-colors"
+          >
+            <DownloadIcon />
+            {exporting === 'all' ? 'Downloading all…' : 'Export All Data'}
+          </button>
+        )}
 
         {exportError && (
           <p className="text-xs text-[var(--red)] bg-[var(--red-l)] px-3 py-2 rounded-lg">{exportError}</p>
