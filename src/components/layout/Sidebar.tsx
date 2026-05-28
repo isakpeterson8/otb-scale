@@ -286,15 +286,15 @@ export default function Sidebar({ displayName, isAdmin, tier, viewOnly, viewAsTi
               {/* Free tier: separator */}
               <div className="my-1.5 mx-3 border-t border-white/6" />
 
-              {/* Free tier: locked items */}
+              {/* Free tier: locked items — icon + lock only, no text label */}
               {NAV_LOCKED.map(({ label, icon }) => (
                 <button
                   key={label}
                   onClick={() => { setLockedModal(label); onClose?.() }}
                   className={lockedItemClass}
+                  title={label}
                 >
                   <span className="text-[var(--ink)]/20">{icon}</span>
-                  <span className="flex-1">{label}</span>
                   <LockIcon />
                 </button>
               ))}

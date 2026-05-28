@@ -150,10 +150,7 @@ export default function DashboardClient({ isFreeTier, toastMessage, latestSnapsh
         >
           <div>
             <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-              Want to unlock school outreach, Facebook group tracking, and email cadences?
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--ink-3)' }}>
-              All included in the Scale plan — book a free session to learn more.
+              Want more features? Book a free session to learn more.
             </p>
           </div>
           <a
