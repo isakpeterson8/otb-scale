@@ -6,8 +6,6 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
-import type { UserRole } from '@/types/database'
-
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 // ── Email helpers ─────────────────────────────────────────────────────────────
@@ -131,21 +129,12 @@ async function sendAdminEmail(to: string, subject: string, html: string, text: s
   return { error: null }
 }
 
-export async function updateUserRole(profileId: string, role: UserRole) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'otb_admin') return { error: 'Only super admins can change roles' }
-  if (role === 'otb_admin') return { error: 'Super admin role cannot be granted via the UI' }
-
-  const { error } = await adminClient.from('profiles').update({ role }).eq('id', profileId)
-  if (error) return { error: error.message }
-
-  revalidatePath('/admin')
-  return { error: null }
-}
+// Role assignment is intentionally NOT exposed via the UI.
+// To promote a user, run this in the Supabase SQL Editor:
+//   UPDATE profiles SET role = 'otb_staff' WHERE email = 'user@example.com';
+//   UPDATE profiles SET role = 'otb_admin' WHERE email = 'user@example.com';
+// To demote back to studio owner:
+//   UPDATE profiles SET role = 'studio_owner' WHERE email = 'user@example.com';
 
 export async function approveUser(userId: string) {
   const supabase = await createClient()

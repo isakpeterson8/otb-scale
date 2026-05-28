@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { updateUserRole, approveUser, rejectUser, enterViewAs, updateStudioTier } from '@/app/actions/admin'
+import { approveUser, rejectUser, enterViewAs, updateStudioTier } from '@/app/actions/admin'
 import { formatDate } from '@/lib/utils'
 import { TIER_LABELS } from '@/lib/features'
 import type { UserRole } from '@/types/database'
@@ -10,7 +10,6 @@ import type { AdminProfile } from './page'
 
 type Tab = 'pending' | 'users'
 
-const ROLE_OPTIONS: UserRole[] = ['studio_owner', 'otb_staff']
 const ROLE_BADGE: Record<UserRole, { label: string; bg: string; color: string }> = {
   studio_owner: { label: 'Studio Owner', bg: 'rgba(0,0,0,0.06)',      color: '#374151' },
   otb_staff:    { label: 'OTB Staff',    bg: 'rgba(109,40,217,0.1)',  color: '#6d28d9' },
@@ -45,32 +44,12 @@ function Td({ children, muted, right, nowrap }: { children: React.ReactNode; mut
   )
 }
 
-function RoleCell({ profile, canEdit }: { profile: AdminProfile; canEdit: boolean }) {
-  const [isPending, startTransition] = useTransition()
+function RoleCell({ profile }: { profile: AdminProfile }) {
   const badge = ROLE_BADGE[profile.role] ?? ROLE_BADGE.studio_owner
-
-  if (!canEdit) {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: badge.bg, color: badge.color }}>
-        {badge.label}
-      </span>
-    )
-  }
-
   return (
-    <select
-      value={profile.role}
-      disabled={isPending}
-      onChange={e => {
-        const newRole = e.target.value as UserRole
-        startTransition(async () => { await updateUserRole(profile.id, newRole) })
-      }}
-      className="px-2 py-0.5 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-xs text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] disabled:opacity-50"
-    >
-      {ROLE_OPTIONS.map(r => (
-        <option key={r} value={r}>{ROLE_BADGE[r].label}</option>
-      ))}
-    </select>
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: badge.bg, color: badge.color }}>
+      {badge.label}
+    </span>
   )
 }
 
@@ -310,7 +289,7 @@ export default function AdminClient({
                           <ViewAsButton profile={p} />
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <RoleCell profile={p} canEdit={isSuperAdmin} />
+                          <RoleCell profile={p} />
                           <TierCell profile={p} />
                           {statusBadge
                             ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
@@ -341,7 +320,7 @@ export default function AdminClient({
                           <tr key={p.id} className="hover:bg-[var(--canvas)] transition-colors">
                             <td className="px-4 py-3 font-medium text-[var(--ink)]">{p.email ?? '—'}</td>
                             <td className="px-4 py-3">
-                              <RoleCell profile={p} canEdit={isSuperAdmin} />
+                              <RoleCell profile={p} />
                             </td>
                             <td className="px-4 py-3">
                               <TierCell profile={p} />
