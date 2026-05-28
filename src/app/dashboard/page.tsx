@@ -1,11 +1,8 @@
-import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import DashboardClient from './DashboardClient'
 import type { SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
-
-export const metadata: Metadata = { title: 'Dashboard' }
 
 export default async function DashboardPage() {
   const ctx = await getStudioId()
