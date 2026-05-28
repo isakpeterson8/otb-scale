@@ -4,11 +4,52 @@ import AppShell from '@/components/layout/AppShell'
 import DashboardClient from './DashboardClient'
 import type { SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ toast?: string }>
+}) {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId } = ctx
+  const { supabase, studioId, isAdmin } = ctx
 
+  const { data: studio } = await supabase
+    .from('studios')
+    .select('subscription_tier')
+    .eq('id', studioId)
+    .single()
+  const tier = studio?.subscription_tier ?? 'free'
+  const isFreeTier = !isAdmin && tier === 'free'
+
+  const { toast } = await searchParams
+
+  // Free tier: only fetch snapshot data
+  if (isFreeTier) {
+    const { data: snapshotData } = await supabase
+      .from('studio_snapshots')
+      .select('snapshot_date, enrollment, collected_revenue')
+      .eq('studio_id', studioId)
+      .order('snapshot_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    return (
+      <AppShell>
+        <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
+          <DashboardClient
+            isFreeTier
+            toastMessage={toast}
+            latestSnapshot={(snapshotData ?? null) as Pick<StudioSnapshot, 'snapshot_date' | 'enrollment' | 'collected_revenue'> | null}
+            schools={[]}
+            enrollments={[]}
+            activeGroups={[]}
+          />
+        </main>
+      </AppShell>
+    )
+  }
+
+  // Paid tier: fetch all data
   const [snapshotRes, schoolsRes, groupsRes] = await Promise.all([
     supabase
       .from('studio_snapshots')
@@ -45,6 +86,8 @@ export default async function DashboardPage() {
     <AppShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <DashboardClient
+          isFreeTier={false}
+          toastMessage={toast}
           latestSnapshot={(snapshotRes.data ?? null) as Pick<StudioSnapshot, 'snapshot_date' | 'enrollment' | 'collected_revenue'> | null}
           schools={(schoolsRes.data ?? []) as Pick<SchoolOutreach, 'id' | 'school_name' | 'stage'>[]}
           enrollments={enrollmentsData}
