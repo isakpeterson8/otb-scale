@@ -10,7 +10,6 @@ const FREE_TIER_BLOCKED: { path: string; toast: string }[] = [
   { path: '/school-outreach', toast: 'School Outreach is available on the Scale plan.' },
   { path: '/education',       toast: 'The Education Library is available on the Scale plan.' },
   { path: '/cadence',         toast: 'Cadence Check-In is available on the Scale plan.' },
-  { path: '/financials',      toast: 'Financials is available on the Scale plan.' },
   { path: '/settings',        toast: '' }, // silent redirect
 ]
 

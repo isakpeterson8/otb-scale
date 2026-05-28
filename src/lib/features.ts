@@ -6,7 +6,6 @@ export type Feature =
   | 'cadence_form'
   | 'gmail_integration'
   | 'education_library'
-  | 'financials'
   | 'resources'
 
 const ACCESS_MATRIX: Record<Feature, SubscriptionTier[]> = {
@@ -15,7 +14,6 @@ const ACCESS_MATRIX: Record<Feature, SubscriptionTier[]> = {
   cadence_form:      ['scale', 'graduate', 'lifetime'],
   gmail_integration: ['scale', 'graduate', 'lifetime'],
   education_library: ['scale', 'graduate', 'lifetime'],
-  financials:        ['scale', 'graduate', 'lifetime'],
   resources:         ['scale', 'graduate', 'lifetime'],
 }
 
@@ -29,7 +27,6 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   cadence_form:      'Cadence Form',
   gmail_integration: 'Gmail Integration',
   education_library: 'Education Library',
-  financials:        'Financials',
   resources:         'Resources',
 }
 
