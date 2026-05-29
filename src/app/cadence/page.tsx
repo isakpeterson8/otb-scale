@@ -26,7 +26,7 @@ export default async function CadencePage() {
             Cadence Check-In
           </h2>
           <p className="text-sm text-[var(--ink-3)] mt-0.5">
-            Complete your weekly cadence check-in to track progress and get support from your OTB advisor.
+            Complete your weekly cadence check-in to track progress and get support.
           </p>
         </div>
 
