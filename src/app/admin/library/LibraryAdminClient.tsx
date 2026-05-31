@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useTransition, useRef } from 'react'
-import { createLibraryItem, deleteLibraryItem, updateLibraryItem } from '@/app/actions/library'
+import { createLibraryItem, deleteLibraryItem, updateLibraryItem, attachVideoToItem } from '@/app/actions/library'
 import { formatDate } from '@/lib/utils'
 import type { EducationLibraryItem } from '@/types/database'
 import type { WatchStat } from '@/app/actions/library'
@@ -235,8 +235,69 @@ export default function LibraryAdminClient({
   const [formError, setFormError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Per-row upload state for attaching videos to existing placeholder items
+  const [attachingId, setAttachingId] = useState<string | null>(null)
+  const [attachUpload, setAttachUpload] = useState<UploadProgress>({ state: 'idle', percent: 0 })
+  const [attachError, setAttachError] = useState<string | null>(null)
+  const attachFileRef = useRef<HTMLInputElement>(null)
+
   function handleFormChange(k: keyof FormState, v: string) {
     setForm(f => ({ ...f, [k]: v }))
+  }
+
+  // Upload a video to an existing placeholder item and flip is_placeholder → false
+  async function handleAttachFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !attachingId) return
+    setAttachError(null)
+    setAttachUpload({ state: 'getting-url', percent: 0 })
+
+    try {
+      const res = await fetch('/api/cf/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: file.name, size: file.size }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setAttachUpload({ state: 'error', percent: 0, error: data.error ?? 'Failed to get upload URL' })
+        return
+      }
+      const { uid, uploadURL } = await res.json()
+      setAttachUpload({ state: 'uploading', percent: 0 })
+
+      const { Upload } = await import('tus-js-client')
+      await new Promise<void>((resolve, reject) => {
+        const tusUpload = new Upload(file, {
+          uploadUrl: uploadURL,
+          chunkSize: 50 * 1024 * 1024,
+          retryDelays: [0, 1000, 3000],
+          metadata: { name: file.name, filetype: file.type },
+          onProgress(bytesUploaded, bytesTotal) {
+            setAttachUpload({ state: 'uploading', percent: Math.round((bytesUploaded / bytesTotal) * 100) })
+          },
+          onSuccess() { setAttachUpload({ state: 'done', percent: 100 }); resolve() },
+          onError(err) { setAttachUpload({ state: 'error', percent: 0, error: String(err) }); reject(err) },
+        })
+        tusUpload.start()
+      })
+
+      // Save cf_uid to the DB and flip is_placeholder = false
+      const idToAttach = attachingId
+      const result = await attachVideoToItem(idToAttach, uid)
+      if (result.error) {
+        setAttachError(result.error)
+        setAttachUpload({ state: 'error', percent: 0, error: result.error })
+      } else {
+        setItems(prev => prev.map(i =>
+          i.id === idToAttach ? { ...i, cf_uid: uid, is_placeholder: false } : i
+        ))
+        setAttachingId(null)
+        setAttachUpload({ state: 'idle', percent: 0 })
+      }
+    } catch {
+      setAttachUpload(u => u.state !== 'error' ? { state: 'error', percent: 0, error: 'Upload failed' } : u)
+    }
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -450,6 +511,14 @@ export default function LibraryAdminClient({
                   {form.type === 'video' ? 'Video file' : 'PDF file'}
                 </label>
                 <div className="flex items-center gap-3">
+                  {/* Hidden file input for attaching to existing placeholder rows */}
+                  <input
+                    ref={attachFileRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleAttachFile}
+                    className="hidden"
+                  />
                   <input
                     ref={fileRef}
                     type="file"
@@ -579,13 +648,67 @@ export default function LibraryAdminClient({
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={() => startEdit(item)} className="px-2.5 py-1 rounded-lg text-xs border border-[var(--ink)]/15 hover:border-[var(--ink)]/30 transition-colors" style={{ color: 'var(--ink-2)' }}>
-                          Edit
-                        </button>
-                        <button onClick={() => handleDelete(item.id)} disabled={deleting} className="px-2.5 py-1 rounded-lg text-xs border border-[var(--red)]/20 hover:bg-[var(--red-l)] disabled:opacity-50 transition-colors" style={{ color: 'var(--red)' }}>
-                          Delete
-                        </button>
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <div className="flex items-center gap-2">
+                          {/* Placeholder video items get an Upload button instead of Edit */}
+                          {item.type === 'video' && item.is_placeholder && !item.cf_uid ? (
+                            attachingId === item.id ? (
+                              <div className="flex items-center gap-2">
+                                {attachUpload.state === 'getting-url' && (
+                                  <span className="text-xs" style={{ color: 'var(--ink-3)' }}>Preparing…</span>
+                                )}
+                                {attachUpload.state === 'uploading' && (
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,248,240,0.08)' }}>
+                                      <div className="h-full rounded-full transition-all" style={{ width: `${attachUpload.percent}%`, background: 'var(--accent-text)' }} />
+                                    </div>
+                                    <span className="text-xs" style={{ color: 'var(--ink-3)' }}>{attachUpload.percent}%</span>
+                                  </div>
+                                )}
+                                {attachUpload.state === 'done' && (
+                                  <span className="text-xs" style={{ color: 'var(--green)' }}>✓ Saved</span>
+                                )}
+                                {attachUpload.state === 'error' && (
+                                  <span className="text-xs" style={{ color: 'var(--red)' }}>{attachUpload.error ?? 'Failed'}</span>
+                                )}
+                                {(attachUpload.state === 'idle' || attachUpload.state === 'error') && (
+                                  <button
+                                    onClick={() => { attachFileRef.current?.click() }}
+                                    className="px-2.5 py-1 rounded-lg text-xs border border-[var(--accent-text)]/30 hover:border-[var(--accent-text)] transition-colors"
+                                    style={{ color: 'var(--accent-text)' }}
+                                  >
+                                    Choose file…
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => { setAttachingId(null); setAttachUpload({ state: 'idle', percent: 0 }); setAttachError(null) }}
+                                  className="px-2 py-1 rounded-lg text-xs border border-[var(--ink)]/12"
+                                  style={{ color: 'var(--ink-3)' }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setAttachingId(item.id); setAttachUpload({ state: 'idle', percent: 0 }); setAttachError(null); setTimeout(() => attachFileRef.current?.click(), 50) }}
+                                className="px-2.5 py-1 rounded-lg text-xs border border-[var(--accent-text)]/25 hover:border-[var(--accent-text)]/60 transition-colors"
+                                style={{ color: 'var(--accent-text)' }}
+                              >
+                                Upload Video
+                              </button>
+                            )
+                          ) : (
+                            <button onClick={() => startEdit(item)} className="px-2.5 py-1 rounded-lg text-xs border border-[var(--ink)]/15 hover:border-[var(--ink)]/30 transition-colors" style={{ color: 'var(--ink-2)' }}>
+                              Edit
+                            </button>
+                          )}
+                          <button onClick={() => handleDelete(item.id)} disabled={deleting} className="px-2.5 py-1 rounded-lg text-xs border border-[var(--red)]/20 hover:bg-[var(--red-l)] disabled:opacity-50 transition-colors" style={{ color: 'var(--red)' }}>
+                            Delete
+                          </button>
+                        </div>
+                        {attachError && attachingId === item.id && (
+                          <p className="text-xs" style={{ color: 'var(--red)' }}>{attachError}</p>
+                        )}
                       </div>
                     </div>
                   )}

@@ -98,6 +98,24 @@ export async function deleteLibraryItem(id: string) {
   return { error: null }
 }
 
+// Attach an uploaded Cloudflare video to an existing placeholder item.
+// Also flips is_placeholder → false so the card becomes playable immediately.
+export async function attachVideoToItem(id: string, cfUid: string): Promise<{ error: string | null }> {
+  if (!await requireAdmin()) return { error: 'Unauthorized' }
+  if (!cfUid.trim()) return { error: 'cf_uid is required' }
+
+  const { error } = await adminClient
+    .from('education_library_items')
+    .update({ cf_uid: cfUid, is_placeholder: false })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/library')
+  revalidatePath('/education')
+  return { error: null }
+}
+
 export async function reorderLibraryItems(orderedIds: string[]) {
   if (!await requireAdmin()) return { error: 'Unauthorized' }
 
