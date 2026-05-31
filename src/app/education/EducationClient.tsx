@@ -74,25 +74,58 @@ function ChevronUp() {
   )
 }
 
+function LinkIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+      <path d="M5.5 8.5l3-3M8 5.5l.7-.7a2.5 2.5 0 013.5 3.5l-1.4 1.4a2.5 2.5 0 01-3.5 0M6 8.5l-1.4 1.4a2.5 2.5 0 01-3.5-3.5L2.5 5a2.5 2.5 0 013.5 0l.7.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function EducationClient({
   items,
   resources = [],
+  initialVideoId,
+  initialCategorySlug,
+  errorParam,
 }: {
   items: EducationLibraryItem[]
   resources?: Resource[]
+  initialVideoId?: string
+  initialCategorySlug?: string
+  errorParam?: string
 }) {
   const [tab, setTab]                           = useState<'videos' | 'resources'>('videos')
-  const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategorySlug ?? '')
   const [playingVideo, setPlayingVideo]         = useState<EducationLibraryItem | null>(null)
   const [mobileNavOpen, setMobileNavOpen]       = useState(false)
   const [search, setSearch]                     = useState('')
+  const [copied, setCopied]                     = useState(false)
+  const [errorToast, setErrorToast]             = useState<string | null>(
+    errorParam === 'not-found' ? 'Video not found' : null
+  )
 
   // Watch progress tracking refs — stable, no stale-closure risk
   const playingRef  = useRef<EducationLibraryItem | null>(null)
   const currentTime = useRef(0)
   const duration    = useRef(0)
   const lastSaveAt  = useRef(0)
+
+  // Dismiss error toast after 4s
+  useEffect(() => {
+    if (!errorToast) return
+    const t = setTimeout(() => setErrorToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [errorToast])
+
+  // Open initial video on mount (deep link)
+  useEffect(() => {
+    if (!initialVideoId) return
+    const item = items.find(i => i.id === initialVideoId)
+    if (item) setPlayingVideo(item)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     playingRef.current = playingVideo
@@ -133,6 +166,13 @@ export default function EducationClient({
     return () => window.removeEventListener('message', onMessage)
   }, [])
 
+  function openVideo(item: EducationLibraryItem) {
+    setPlayingVideo(item)
+    if (item.slug && item.category) {
+      window.history.replaceState(null, '', `/education/${item.category}/${item.slug}`)
+    }
+  }
+
   function closeModal() {
     const item = playingRef.current
     if (item && duration.current > 0) {
@@ -140,6 +180,13 @@ export default function EducationClient({
       upsertWatchProgress(item.id, pct, Math.round(currentTime.current), Math.round(duration.current)).catch(() => {})
     }
     setPlayingVideo(null)
+    window.history.replaceState(null, '', '/education')
+  }
+
+  function handleCopyLink() {
+    navigator.clipboard.writeText(window.location.href).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   // Build map of category → items
@@ -314,7 +361,7 @@ export default function EducationClient({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {categoryItems.map(item => (
-                <VideoCard key={item.id} item={item} onPlay={setPlayingVideo} />
+                <VideoCard key={item.id} item={item} onPlay={openVideo} />
               ))}
             </div>
           )}
@@ -331,14 +378,24 @@ export default function EducationClient({
             className="relative w-full max-w-3xl my-8"
             onClick={e => e.stopPropagation()}
           >
-            {/* Close button */}
-            <button
-              onClick={closeModal}
-              className="absolute -top-9 right-0 text-white/70 hover:text-white transition-colors"
-              aria-label="Close"
-            >
-              <CloseIcon />
-            </button>
+            {/* Top bar: close + copy link */}
+            <div className="absolute -top-9 right-0 flex items-center gap-3">
+              <button
+                onClick={handleCopyLink}
+                className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-xs"
+                aria-label="Copy link"
+              >
+                <LinkIcon />
+                <span>{copied ? 'Link copied!' : 'Copy Link'}</span>
+              </button>
+              <button
+                onClick={closeModal}
+                className="text-white/70 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
 
             {/* Video player */}
             <div className="aspect-video rounded-xl overflow-hidden bg-black">
@@ -375,6 +432,15 @@ export default function EducationClient({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Error toast ───────────────────────────────────────────────────────── */}
+      {errorToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg"
+          style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid rgba(255,248,240,0.12)' }}
+        >
+          {errorToast}
         </div>
       )}
     </div>

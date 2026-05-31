@@ -2,15 +2,15 @@ import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import UpgradeBanner from '@/components/UpgradeBanner'
-import EducationClient from './EducationClient'
+import EducationClient from '../EducationClient'
 import { hasFeatureAccess } from '@/lib/features'
 import { getLibraryItems } from '@/app/actions/library'
 import { getResources } from '@/app/actions/resources'
 
-export default async function EducationPage({
-  searchParams,
+export default async function CategoryPage({
+  params,
 }: {
-  searchParams?: { error?: string }
+  params: { categorySlug: string }
 }) {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
@@ -52,7 +52,7 @@ export default async function EducationPage({
         <EducationClient
           items={items}
           resources={resources}
-          errorParam={searchParams?.error}
+          initialCategorySlug={params.categorySlug}
         />
       </main>
     </AppShell>

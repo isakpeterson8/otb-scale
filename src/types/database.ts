@@ -33,6 +33,7 @@ export interface EducationLibraryItem {
   cf_uid: string | null
   pdf_url: string | null
   category: string | null
+  slug: string | null
   position: number
   transcript_text: string | null
   is_placeholder: boolean

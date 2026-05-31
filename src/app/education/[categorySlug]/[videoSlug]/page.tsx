@@ -2,15 +2,15 @@ import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import UpgradeBanner from '@/components/UpgradeBanner'
-import EducationClient from './EducationClient'
+import EducationClient from '../../EducationClient'
 import { hasFeatureAccess } from '@/lib/features'
 import { getLibraryItems } from '@/app/actions/library'
 import { getResources } from '@/app/actions/resources'
 
-export default async function EducationPage({
-  searchParams,
+export default async function VideoDeepLinkPage({
+  params,
 }: {
-  searchParams?: { error?: string }
+  params: { categorySlug: string; videoSlug: string }
 }) {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
@@ -28,6 +28,19 @@ export default async function EducationPage({
   const tier = studio?.subscription_tier ?? 'free'
   const hasAccess = isAdmin || hasFeatureAccess(tier, 'education_library')
 
+  const [{ data: items }, { data: resources }] = await Promise.all([
+    getLibraryItems(),
+    getResources(),
+  ])
+
+  const video = (items ?? []).find(
+    i => i.slug === params.videoSlug && i.category === params.categorySlug
+  )
+
+  if (!video) {
+    redirect('/education?error=not-found')
+  }
+
   if (!hasAccess) {
     return (
       <AppShell>
@@ -41,18 +54,14 @@ export default async function EducationPage({
     )
   }
 
-  const [{ data: items }, { data: resources }] = await Promise.all([
-    getLibraryItems(),
-    getResources(),
-  ])
-
   return (
     <AppShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <EducationClient
-          items={items}
+          items={items ?? []}
           resources={resources}
-          errorParam={searchParams?.error}
+          initialVideoId={video.id}
+          initialCategorySlug={params.categorySlug}
         />
       </main>
     </AppShell>

@@ -21,6 +21,29 @@ async function requireAdmin() {
   return user
 }
 
+function titleToSlug(title: string): string {
+  return title
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+}
+
+async function uniqueSlug(base: string): Promise<string> {
+  let slug = base
+  let attempt = 1
+  while (true) {
+    const { data } = await adminClient
+      .from('education_library_items')
+      .select('id')
+      .eq('slug', slug)
+      .maybeSingle()
+    if (!data) return slug
+    attempt++
+    slug = `${base}-${attempt}`
+  }
+}
+
 export async function createLibraryItem(input: {
   title: string
   description: string
@@ -40,6 +63,7 @@ export async function createLibraryItem(input: {
     .maybeSingle()
 
   const position = (existing?.position ?? -1) + 1
+  const slug = await uniqueSlug(titleToSlug(input.title))
 
   const { error } = await adminClient
     .from('education_library_items')
@@ -50,6 +74,7 @@ export async function createLibraryItem(input: {
       cf_uid: input.cf_uid || null,
       pdf_url: input.pdf_url || null,
       category: input.category || null,
+      slug,
       position,
     })
 
