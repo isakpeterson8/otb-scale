@@ -9,6 +9,26 @@ import { getStudioId } from '@/app/actions/_shared'
 import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+async function requireAdmin() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role === 'otb_admin' || profile?.role === 'otb_staff') return user
+
+  // Fallback: profiles table lookup can fail when admin profile id doesn't match auth user id
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
+  if (user.email && adminEmails.includes(user.email.toLowerCase())) return user
+
+  return null
+}
+
 // ── Email helpers ─────────────────────────────────────────────────────────────
 
 function emailShell(bodyContent: string): string {
@@ -208,12 +228,7 @@ export async function rejectUser(userId: string) {
 }
 
 export async function updateStudioTier(studioId: string, tier: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'otb_admin' && caller?.role !== 'otb_staff') return { error: 'Insufficient permissions' }
+  if (!await requireAdmin()) return { error: 'Unauthorized' }
 
   const validTiers = ['free', 'scale', 'graduate', 'lifetime']
   if (!validTiers.includes(tier)) return { error: 'Invalid tier' }
