@@ -68,6 +68,9 @@ export interface Contact {
   phone: string | null
   status: string | null
   source: string | null
+  lead_source: string | null
+  lead_sub_source: string | null
+  source_facebook_group_id: string | null
   notes: string | null
   created_at: string
 }
@@ -156,18 +159,25 @@ export const PIPELINE_STAGES: { value: PipelineStage; label: string; color: stri
 ]
 
 export type LeadSource =
-  | 'facebook_group_third_party'
-  | 'facebook_group_self_promo'
+  | 'facebook_group'
   | 'school_visit'
   | 'inbound_online'
   | 'referral'
+  | 'organic_outreach'
 
 export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
-  { value: 'facebook_group_third_party', label: 'Facebook Group - 3rd Party' },
-  { value: 'facebook_group_self_promo', label: 'Facebook Group - Self Promo' },
+  { value: 'facebook_group', label: 'Facebook Group' },
   { value: 'school_visit', label: 'School Visit' },
   { value: 'inbound_online', label: 'Inbound Online' },
   { value: 'referral', label: 'Referral' },
+  { value: 'organic_outreach', label: 'Organic Outreach' },
+]
+
+export type LeadSubSource = 'self_promo' | 'third_party'
+
+export const LEAD_SUB_SOURCES: { value: LeadSubSource; label: string }[] = [
+  { value: 'self_promo', label: 'Self-Promo' },
+  { value: 'third_party', label: 'Third-Party' },
 ]
 
 export type PostType = 'self_promo' | 'third_party' | 'both'

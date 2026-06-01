@@ -8,6 +8,29 @@ import type { EducationLibraryItem } from '@/types/database'
 import type { WatchStat } from '@/app/actions/library'
 
 type Tab = 'items' | 'stats'
+
+function CopyUrlButton({ item }: { item: EducationLibraryItem }) {
+  const [copied, setCopied] = useState(false)
+  if (!item.slug || !item.category) return null
+
+  function handleCopy() {
+    const url = `${window.location.origin}/education/${item.category}/${item.slug}`
+    navigator.clipboard.writeText(url).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="px-2.5 py-1 rounded-lg text-xs border border-[var(--ink)]/15 hover:border-[var(--accent-text)]/40 transition-colors"
+      style={{ color: copied ? 'var(--green)' : 'var(--ink-3)' }}
+      title="Copy shareable URL"
+    >
+      {copied ? '✓ Copied' : 'Copy URL'}
+    </button>
+  )
+}
 type UploadState = 'idle' | 'getting-url' | 'uploading' | 'done' | 'error'
 
 interface UploadProgress {
@@ -650,6 +673,7 @@ export default function LibraryAdminClient({
                       {/* Actions */}
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <div className="flex items-center gap-2">
+                          <CopyUrlButton item={item} />
                           {/* Placeholder video items get an Upload button instead of Edit */}
                           {item.type === 'video' && item.is_placeholder && !item.cf_uid ? (
                             attachingId === item.id ? (

@@ -184,7 +184,9 @@ export default function EducationClient({
   }
 
   function handleCopyLink() {
-    navigator.clipboard.writeText(window.location.href).catch(() => {})
+    if (!playingVideo?.slug || !playingVideo?.category) return
+    const url = `${window.location.origin}/education/${playingVideo.category}/${playingVideo.slug}`
+    navigator.clipboard.writeText(url).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -207,11 +209,25 @@ export default function EducationClient({
 
   const selectedLabel = CATEGORIES.find(c => c.slug === effectiveCategory)?.label ?? effectiveCategory
 
-  const categoryItems = (byCat.get(effectiveCategory) ?? []).filter(item => {
-    if (!search.trim()) return true
-    const q = search.toLowerCase()
-    return item.title.toLowerCase().includes(q) || (item.description ?? '').toLowerCase().includes(q)
-  })
+  const isSearching = search.trim().length > 0
+  const searchQuery = search.toLowerCase()
+
+  // Normal category items — only used when not searching
+  const categoryItems = isSearching ? [] : (byCat.get(effectiveCategory) ?? [])
+
+  // Cross-category search — includes transcript_text, case-insensitive partial match
+  const searchGroups = isSearching
+    ? CATEGORIES.map(cat => ({
+        cat,
+        items: items.filter(
+          item =>
+            item.category === cat.slug &&
+            (item.title.toLowerCase().includes(searchQuery) ||
+              (item.description ?? '').toLowerCase().includes(searchQuery) ||
+              (item.transcript_text ?? '').toLowerCase().includes(searchQuery)),
+        ),
+      })).filter(g => g.items.length > 0)
+    : []
 
   const toggleBar = (
     <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--surface)' }}>
@@ -343,20 +359,61 @@ export default function EducationClient({
 
           {/* Section title + search row */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h3 className="text-base font-medium text-[var(--ink)]">{selectedLabel}</h3>
+            <h3 className="text-base font-medium text-[var(--ink)]">
+              {isSearching ? (
+                <span>
+                  Search results
+                  {searchGroups.length > 0 && (
+                    <span className="ml-2 text-xs font-normal text-[var(--ink-3)]">
+                      {searchGroups.reduce((n, g) => n + g.items.length, 0)} video
+                      {searchGroups.reduce((n, g) => n + g.items.length, 0) !== 1 ? 's' : ''} found
+                    </span>
+                  )}
+                </span>
+              ) : (
+                selectedLabel
+              )}
+            </h3>
             <input
               type="text"
-              placeholder="Search…"
+              placeholder="Search all videos…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] w-44"
+              className="px-3 py-1.5 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] w-48"
             />
           </div>
 
-          {/* Grid */}
-          {categoryItems.length === 0 ? (
+          {/* Grid — grouped search results or normal category grid */}
+          {isSearching ? (
+            searchGroups.length === 0 ? (
+              <p className="text-sm text-[var(--ink-3)] py-10">
+                No videos match that search.
+              </p>
+            ) : (
+              <div className="space-y-7">
+                {searchGroups.map(({ cat, items: groupItems }) => (
+                  <div key={cat.slug}>
+                    <button
+                      onClick={() => { setSelectedCategory(cat.slug); setSearch('') }}
+                      className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)] hover:text-[var(--accent-text)] transition-colors mb-3 flex items-center gap-1.5"
+                    >
+                      {cat.label}
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                        <path d="M2 5h6M6 3l2 2-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {groupItems.map(item => (
+                        <VideoCard key={item.id} item={item} onPlay={openVideo} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : categoryItems.length === 0 ? (
             <p className="text-sm text-[var(--ink-3)] py-10">
-              {search ? 'No videos match that search.' : 'No videos in this section yet.'}
+              No videos in this section yet.
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -380,14 +437,16 @@ export default function EducationClient({
           >
             {/* Top bar: close + copy link */}
             <div className="absolute -top-9 right-0 flex items-center gap-3">
-              <button
-                onClick={handleCopyLink}
-                className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-xs"
-                aria-label="Copy link"
-              >
-                <LinkIcon />
-                <span>{copied ? 'Link copied!' : 'Copy Link'}</span>
-              </button>
+              {playingVideo.slug && playingVideo.category && (
+                <button
+                  onClick={handleCopyLink}
+                  className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-xs"
+                  aria-label="Copy link"
+                >
+                  <LinkIcon />
+                  <span>{copied ? 'Link copied!' : 'Copy Link'}</span>
+                </button>
+              )}
               <button
                 onClick={closeModal}
                 className="text-white/70 hover:text-white transition-colors"

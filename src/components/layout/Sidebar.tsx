@@ -35,8 +35,8 @@ const NAV_FREE = [
     ),
   },
   {
-    label: 'Contacts',
-    href: '/contacts',
+    label: 'Leads',
+    href: '/leads',
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
         <circle cx="8" cy="5" r="3" fill="currentColor" />
@@ -104,7 +104,7 @@ const NAV_LOCKED = [
 // Full nav for paid tiers (original order)
 const NAV_ALL = [
   NAV_FREE[0], // Dashboard
-  NAV_FREE[1], // Contacts
+  NAV_FREE[1], // Leads
   NAV_LOCKED[0], // Facebook Groups
   NAV_LOCKED[2], // School Outreach
   NAV_FREE[2], // Financials
