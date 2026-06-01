@@ -181,6 +181,9 @@ export const LEAD_SUB_SOURCES: { value: LeadSubSource; label: string }[] = [
 ]
 
 export type PostType = 'self_promo' | 'third_party' | 'both'
+export type PostFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly'
+export type WeekPattern = 'a_week' | 'b_week' | 'both'
+export type QualificationStatus = 'active' | 'disqualified_low_engagement' | 'future_third_party'
 
 export interface FacebookGroup {
   id: string
@@ -196,6 +199,32 @@ export interface FacebookGroup {
   posting_rules: string | null
   post_type: PostType | null
   is_active: boolean
+  post_frequency: PostFrequency | null
+  post_days: string[] | null
+  post_week_pattern: WeekPattern | null
+  qualification_status: QualificationStatus
+  created_at: string
+}
+
+export interface GroupPostCompletion {
+  id: string
+  group_id: string
+  studio_id: string
+  date: string
+  completed_by: string | null
+  last_used_asset_id: string | null
+  likes: number
+  comments: number
+  dms: number
+  created_at: string
+}
+
+export interface GroupPostAsset {
+  id: string
+  group_id: string
+  type: 'copy' | 'image'
+  content: string
+  label: string | null
   created_at: string
 }
 
