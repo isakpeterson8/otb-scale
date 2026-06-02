@@ -1,10 +1,20 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import AppShell from '@/components/layout/AppShell'
 import AdminClient from './AdminClient'
 import type { UserRole } from '@/types/database'
+
+const getCachedAuthUsers = unstable_cache(
+  async () => {
+    const { data } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
+    return data?.users ?? []
+  },
+  ['auth-users'],
+  { revalidate: 60 }
+)
 
 export const metadata: Metadata = { title: 'Admin Overview' }
 
@@ -26,20 +36,15 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: callerProfile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const callerRole = (callerProfile?.role ?? 'studio_owner') as UserRole
-
-  const [profilesRes, settingsRes, studiosRes, authListRes] = await Promise.all([
+  const [callerProfileRes, profilesRes, settingsRes, studiosRes, authUsers] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user.id).single(),
     adminClient.from('profiles').select('id, studio_id, role, email, status, created_at').order('created_at', { ascending: false }),
     adminClient.from('settings').select('user_id, display_name'),
     adminClient.from('studios').select('id, subscription_tier, requested_tier'),
-    adminClient.auth.admin.listUsers({ perPage: 1000 }),
+    getCachedAuthUsers(),
   ])
+
+  const callerRole = (callerProfileRes.data?.role ?? 'studio_owner') as UserRole
 
   const rawProfiles = (profilesRes.data ?? []) as { id: string; studio_id: string | null; role: UserRole; email: string | null; status: string | null; created_at: string }[]
   const rawSettings = (settingsRes.data ?? []) as { user_id: string; display_name: string | null }[]
@@ -49,7 +54,7 @@ export default async function AdminPage() {
   const tierByStudioId = new Map(rawStudios.map(s => [s.id, s.subscription_tier]))
   const requestedTierByStudioId = new Map(rawStudios.map(s => [s.id, s.requested_tier]))
   const lastSignInById = new Map(
-    (authListRes.data?.users ?? []).map(u => [u.id, u.last_sign_in_at ?? null])
+    authUsers.map(u => [u.id, u.last_sign_in_at ?? null])
   )
 
   const adminProfiles: AdminProfile[] = rawProfiles.map(p => ({

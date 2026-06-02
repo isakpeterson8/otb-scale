@@ -53,6 +53,19 @@ export async function generateReminders(): Promise<void> {
   // Only generate for studio owners with a real studio context
   if (isAdmin) return
 
+  const now = new Date()
+  const todayStr = now.toISOString().slice(0, 10)
+
+  // Fast path: if any reminder was already created today, we already ran
+  const { data: ranToday } = await supabase
+    .from('reminders')
+    .select('id')
+    .eq('user_id', userId)
+    .gte('created_at', todayStr)
+    .limit(1)
+    .maybeSingle()
+  if (ranToday) return
+
   const { data: studio } = await supabase
     .from('studios')
     .select('subscription_tier')
@@ -60,8 +73,6 @@ export async function generateReminders(): Promise<void> {
     .single()
 
   const tier = studio?.subscription_tier ?? 'free'
-  const now = new Date()
-  const todayUTC = now.toISOString().slice(0, 10)
 
   // cadence_weekly: only Scale tier, only on Mondays (0=Sun, 1=Mon)
   if (tier === 'scale' && now.getUTCDay() === 1) {
@@ -90,7 +101,7 @@ export async function generateReminders(): Promise<void> {
 
   // data_recap_monthly: all tiers, only on 1st of month
   if (now.getUTCDate() === 1) {
-    const monthStart = todayUTC.slice(0, 7) + '-01'
+    const monthStart = todayStr.slice(0, 7) + '-01'
 
     const { data: existing } = await supabase
       .from('reminders')

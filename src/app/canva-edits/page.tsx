@@ -8,10 +8,8 @@ import CanvaEditsClient from './CanvaEditsClient'
 export const metadata: Metadata = { title: 'Canva Edits' }
 
 export default async function CanvaEditsPage() {
-  const ctx = await getStudioId()
+  const [ctx, requests] = await Promise.all([getStudioId(), getMyCanvaRequests()])
   if (!ctx) redirect('/auth/login')
-
-  const requests = await getMyCanvaRequests()
 
   return (
     <AppShell>
