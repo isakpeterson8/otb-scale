@@ -4,12 +4,22 @@ import Link from 'next/link'
 import { useState, useEffect, useTransition } from 'react'
 import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest, getWatchHistory } from '@/app/actions/admin'
 import type { WatchHistoryEntry } from '@/app/actions/admin'
+import { sendAdminReminder } from '@/app/actions/reminders'
+import { getAdminCanvaRequests, updateCanvaRequest } from '@/app/actions/canva-edits'
+import type { AdminCanvaRequest } from '@/app/actions/canva-edits'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
 import { TIER_LABELS } from '@/lib/features'
 import type { UserRole } from '@/types/database'
 import type { AdminProfile } from './page'
 
-type Tab = 'pending' | 'users' | 'tiers'
+type Tab = 'pending' | 'users' | 'tiers' | 'canva'
+type ReminderType = 'cadence_weekly' | 'data_recap_monthly' | 'admin_manual'
+
+const CANVA_STATUS_BADGE: Record<AdminCanvaRequest['status'], { label: string; bg: string; color: string }> = {
+  pending:     { label: 'Pending',     bg: 'rgba(180,83,9,0.12)',  color: '#b45309' },
+  in_progress: { label: 'In Progress', bg: 'rgba(4,173,239,0.15)', color: '#0284a8' },
+  complete:    { label: 'Complete',    bg: 'rgba(22,163,74,0.12)', color: '#15803d' },
+}
 type TierFilter = 'all' | 'free' | 'pending_upgrade' | 'scale' | 'graduate' | 'lifetime'
 
 const ROLE_BADGE: Record<UserRole, { label: string; bg: string; color: string }> = {
@@ -157,6 +167,91 @@ function WatchHistoryButton({ profile, onOpen }: { profile: AdminProfile; onOpen
   )
 }
 
+function SendReminderButton({ profile, onOpen }: { profile: AdminProfile; onOpen: (p: AdminProfile) => void }) {
+  if (!profile.studio_id) return null
+  return (
+    <button
+      onClick={() => onOpen(profile)}
+      className="px-3 py-1 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+      style={{ background: 'rgba(180,83,9,0.12)', color: '#b45309' }}
+    >
+      Send reminder
+    </button>
+  )
+}
+
+function SendReminderModal({ profile, onClose }: { profile: AdminProfile; onClose: () => void }) {
+  const [type, setType] = useState<ReminderType>('admin_manual')
+  const [message, setMessage] = useState('')
+  const [isPending, startTransition] = useTransition()
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function submit() {
+    if (!profile.studio_id) return
+    startTransition(async () => {
+      const result = await sendAdminReminder(profile.id, profile.studio_id!, type, message)
+      if (result.error) { setError(result.error); return }
+      setSent(true)
+      setTimeout(onClose, 1000)
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+      <div className="bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 w-full max-w-sm p-6 flex flex-col gap-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-medium text-[var(--ink)]">Send Reminder</h3>
+          <button onClick={onClose} className="p-1 text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+        <p className="text-xs text-[var(--ink-3)]">To: {profile.email ?? profile.display_name ?? 'User'}</p>
+
+        {sent ? (
+          <p className="text-sm text-center py-4" style={{ color: 'var(--green)' }}>Reminder sent!</p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-[var(--ink-3)] font-medium">Type</label>
+              <select
+                value={type}
+                onChange={e => setType(e.target.value as ReminderType)}
+                className="px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+              >
+                <option value="cadence_weekly">Weekly Check-In</option>
+                <option value="data_recap_monthly">Monthly Recap</option>
+                <option value="admin_manual">Admin Message</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-[var(--ink-3)] font-medium">Message (optional)</label>
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="e.g. Haven't updated school contacts"
+                rows={3}
+                className="px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] resize-none"
+              />
+            </div>
+            {error && <p className="text-xs" style={{ color: 'var(--red)' }}>{error}</p>}
+            <button
+              onClick={submit}
+              disabled={isPending}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{ background: 'var(--accent-text)', color: 'var(--canvas)' }}
+            >
+              {isPending ? 'Sending…' : 'Send Reminder'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function WatchHistoryModal({ profile, onClose }: { profile: AdminProfile; onClose: () => void }) {
   const [loading, setLoading] = useState(true)
   const [entries, setEntries] = useState<WatchHistoryEntry[] | null>(null)
@@ -237,6 +332,129 @@ function WatchHistoryModal({ profile, onClose }: { profile: AdminProfile; onClos
   )
 }
 
+function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
+  const [assignee, setAssignee] = useState(request.assigned_to ?? '')
+  const [isPending, startTransition] = useTransition()
+  const badge = CANVA_STATUS_BADGE[request.status]
+
+  function saveAssignee() {
+    startTransition(async () => { await updateCanvaRequest(request.id, { assigned_to: assignee }) })
+  }
+
+  function markComplete() {
+    startTransition(async () => { await updateCanvaRequest(request.id, { status: 'complete' }) })
+  }
+
+  return (
+    <tr className="hover:bg-[var(--canvas)] transition-colors">
+      <td className="px-4 py-3 text-sm text-[var(--ink)]">{request.studio_name ?? '—'}</td>
+      <td className="px-4 py-3 text-sm text-[var(--ink-2)] whitespace-nowrap">{request.asset_type}</td>
+      <td className="px-4 py-3 text-sm text-[var(--ink-2)] max-w-[220px]">
+        <p className="truncate">{request.instructions}</p>
+      </td>
+      <td className="px-4 py-3">
+        <a
+          href={request.canva_link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-[var(--accent-text)] hover:underline"
+        >
+          Open link
+        </a>
+      </td>
+      <td className="px-4 py-3">
+        <span
+          className="inline-block px-1.5 py-px rounded text-[10px] font-semibold leading-tight"
+          style={{ background: badge.bg, color: badge.color }}
+        >
+          {badge.label}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-xs text-[var(--ink-3)] whitespace-nowrap">{formatDate(request.created_at)}</td>
+      <td className="px-4 py-3">
+        <input
+          value={assignee}
+          onChange={e => setAssignee(e.target.value)}
+          onBlur={saveAssignee}
+          placeholder="Assign to…"
+          className="px-2 py-1 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] w-28"
+        />
+      </td>
+      <td className="px-4 py-3">
+        {request.status !== 'complete' && (
+          <button
+            disabled={isPending}
+            onClick={markComplete}
+            className="px-3 py-1 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80"
+            style={{ background: '#15803d' }}
+          >
+            {isPending ? '…' : 'Mark complete'}
+          </button>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function CanvaRequestsTab() {
+  const [requests, setRequests] = useState<AdminCanvaRequest[] | null>(null)
+  const [showCompleted, setShowCompleted] = useState(false)
+
+  useEffect(() => {
+    getAdminCanvaRequests().then(setRequests)
+  }, [])
+
+  if (!requests) {
+    return <p className="text-sm text-[var(--ink-3)] py-12 text-center">Loading…</p>
+  }
+
+  const active = requests.filter(r => r.status !== 'complete')
+  const completed = requests.filter(r => r.status === 'complete')
+  const visible = showCompleted ? requests : active
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-xs text-[var(--ink-3)]">{active.length} pending · {completed.length} complete</p>
+        <button
+          onClick={() => setShowCompleted(v => !v)}
+          className="text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
+        >
+          {showCompleted ? 'Hide completed' : 'Show completed'}
+        </button>
+      </div>
+
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
+        {visible.length === 0 ? (
+          <p className="px-4 py-12 text-center text-sm text-[var(--ink-3)]">No requests.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--ink)]/8">
+                  <Th>Studio</Th>
+                  <Th>Asset Type</Th>
+                  <Th>Instructions</Th>
+                  <Th>Canva Link</Th>
+                  <Th>Status</Th>
+                  <Th>Submitted</Th>
+                  <Th>Assign To</Th>
+                  <Th></Th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--ink)]/6">
+                {visible.map(r => (
+                  <CanvaRequestRow key={r.id} request={r} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminClient({
   callerRole,
   profiles,
@@ -250,15 +468,17 @@ export default function AdminClient({
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<TierFilter>('all')
   const [watchHistoryProfile, setWatchHistoryProfile] = useState<AdminProfile | null>(null)
+  const [reminderProfile, setReminderProfile] = useState<AdminProfile | null>(null)
   const isSuperAdmin = callerRole === 'otb_admin'
   const isAdmin = callerRole === 'otb_admin' || callerRole === 'otb_staff'
 
   const pendingUpgradeCount = profiles.filter(p => p.requested_tier).length
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
+  const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: 'pending', label: 'Pending Approval', count: pendingProfiles.length },
     { key: 'users',   label: 'Users',            count: profiles.length },
     { key: 'tiers',   label: 'Tiers',            count: pendingUpgradeCount },
+    { key: 'canva',   label: 'Canva Requests' },
   ]
 
   const filteredProfiles = search.trim()
@@ -275,6 +495,13 @@ export default function AdminClient({
         <WatchHistoryModal
           profile={watchHistoryProfile}
           onClose={() => setWatchHistoryProfile(null)}
+        />
+      )}
+      {/* Send Reminder Modal */}
+      {reminderProfile && (
+        <SendReminderModal
+          profile={reminderProfile}
+          onClose={() => setReminderProfile(null)}
         />
       )}
 
@@ -328,7 +555,7 @@ export default function AdminClient({
                 : 'text-[var(--ink-3)] border-transparent hover:text-[var(--ink-2)]',
             ].join(' ')}
           >
-            {label} <span className="ml-1 text-xs opacity-60">({count})</span>
+            {label}{count !== undefined && <span className="ml-1 text-xs opacity-60">({count})</span>}
           </button>
         ))}
       </div>
@@ -472,6 +699,9 @@ export default function AdminClient({
         )
       })()}
 
+      {/* Canva Requests tab */}
+      {tab === 'canva' && <CanvaRequestsTab />}
+
       {/* Users tab */}
       {tab === 'users' && (
         <div className="space-y-3">
@@ -511,7 +741,10 @@ export default function AdminClient({
                             ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
                             : null}
                         </div>
-                        <WatchHistoryButton profile={p} onOpen={setWatchHistoryProfile} />
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <WatchHistoryButton profile={p} onOpen={setWatchHistoryProfile} />
+                          <SendReminderButton profile={p} onOpen={setReminderProfile} />
+                        </div>
                       </div>
                     )
                   })}
@@ -553,6 +786,7 @@ export default function AdminClient({
                             <Td muted nowrap>{formatRelativeTime(p.last_sign_in_at)}</Td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-2">
+                                <SendReminderButton profile={p} onOpen={setReminderProfile} />
                                 <WatchHistoryButton profile={p} onOpen={setWatchHistoryProfile} />
                                 <ViewAsButton profile={p} />
                               </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Sidebar from './Sidebar'
 import { ViewAsBanner } from './ViewAsBanner'
+import NotificationBell from './NotificationBell'
 
 interface Props {
   children: React.ReactNode
@@ -31,8 +32,7 @@ export default function AppShellClient({ children, displayName, isAdmin, tier, v
           </svg>
         </button>
         <img src="/otb-logo.png" alt="Outside The Bachs" width={60} height={60} style={{ objectFit: 'contain' }} />
-        {/* Right spacer keeps logo centred */}
-        <div className="w-10" />
+        <NotificationBell />
       </header>
 
       <Sidebar

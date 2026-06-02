@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
+import { generateReminders } from '@/app/actions/reminders'
 import AppShell from '@/components/layout/AppShell'
 import DashboardClient from './DashboardClient'
 import type { SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
@@ -12,6 +13,9 @@ export default async function DashboardPage({
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
   const { supabase, studioId, isAdmin, viewOnly } = ctx
+
+  // Fire-and-forget: generate any due reminders for this user (idempotent)
+  void generateReminders()
 
   const { data: studio } = await supabase
     .from('studios')

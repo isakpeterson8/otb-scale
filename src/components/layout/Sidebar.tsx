@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { initials } from '@/lib/utils'
 import { TrendingUp } from 'lucide-react'
+import NotificationBell from './NotificationBell'
 
 const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
 
@@ -101,6 +102,17 @@ const NAV_LOCKED = [
   },
 ]
 
+const CANVA_EDITS_NAV_ITEM = {
+  label: 'Canva Edits',
+  href: '/canva-edits',
+  icon: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M5 8h6M5 5.5h3M5 10.5h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity=".6" />
+    </svg>
+  ),
+}
+
 // Full nav for paid tiers (original order)
 const NAV_ALL = [
   NAV_FREE[0], // Dashboard
@@ -114,6 +126,7 @@ const NAV_ALL = [
     icon: NAV_LOCKED[1].icon,
   },
   NAV_LOCKED[3], // Cadence Check-In
+  CANVA_EDITS_NAV_ITEM,
   SETTINGS_NAV_ITEM,
 ]
 
@@ -335,6 +348,10 @@ export default function Sidebar({ displayName, isAdmin, tier, viewOnly, viewAsTi
         </nav>
 
         <div className="px-3 pt-3 pb-4 border-t border-white/8">
+          {/* Notifications — hidden on mobile (handled by header bell) */}
+          <div className="hidden md:flex items-center justify-end px-3 py-1 mb-1">
+            <NotificationBell />
+          </div>
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">
               <span className="text-[var(--ink)] text-xs font-semibold leading-none">
