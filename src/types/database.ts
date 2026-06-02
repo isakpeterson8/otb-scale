@@ -161,11 +161,11 @@ export type PipelineStage =
   | 'disenrolled'
 
 export const PIPELINE_STAGES: { value: PipelineStage; label: string; color: string }[] = [
-  { value: 'lead', label: 'Lead', color: 'var(--ink-3)' },
-  { value: 'consultation', label: 'Consultation', color: 'var(--amber)' },
-  { value: 'possible_registration', label: 'Possible Registration', color: 'var(--accent-text)' },
-  { value: 'new_enrollment', label: 'New Enrollment', color: 'var(--green)' },
-  { value: 'disenrolled', label: 'Disenrolled', color: 'var(--red)' },
+  { value: 'lead', label: 'New Lead', color: 'var(--ink-3)' },
+  { value: 'consultation', label: 'Consultation Scheduled', color: 'var(--amber)' },
+  { value: 'possible_registration', label: 'Considering Enrollment', color: 'var(--accent-text)' },
+  { value: 'new_enrollment', label: 'Enrolled', color: 'var(--green)' },
+  { value: 'disenrolled', label: 'Inactive', color: 'var(--red)' },
 ]
 
 export type LeadSource =
@@ -295,6 +295,23 @@ export interface CadenceEnrollment {
   removed_at: string | null
   removal_reason: string | null
   gmail_thread_id: string | null
+  created_at: string
+}
+
+export type OutreachType = 'Organization' | 'Independent Teacher' | 'Referral Partner' | 'Other'
+export type OutreachStatus = 'Active' | 'Inactive'
+
+export const OUTREACH_TYPES: OutreachType[] = ['Organization', 'Independent Teacher', 'Referral Partner', 'Other']
+
+export interface OrganicOutreach {
+  id: string
+  studio_id: string
+  name: string
+  type: OutreachType
+  contact_info: string | null
+  last_contacted_date: string | null
+  notes: string | null
+  status: OutreachStatus
   created_at: string
 }
 

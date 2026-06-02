@@ -301,6 +301,41 @@ export async function requestTierUpgrade(requestedTier: string) {
   return { error: null }
 }
 
+export interface WatchHistoryEntry {
+  id: string
+  watch_pct: number
+  completed: boolean
+  last_watched_at: string
+  title: string
+  category: string | null
+}
+
+export async function getWatchHistory(studioId: string): Promise<{ data: WatchHistoryEntry[] | null; error: string | null }> {
+  if (!await requireAdmin()) return { data: null, error: 'Unauthorized' }
+
+  const { data, error } = await adminClient
+    .from('education_watch_progress')
+    .select('id, watch_pct, completed, last_watched_at, education_library_items(title, category)')
+    .eq('studio_id', studioId)
+    .order('last_watched_at', { ascending: false })
+
+  if (error) return { data: null, error: error.message }
+
+  const rows: WatchHistoryEntry[] = (data ?? []).map((row: Record<string, unknown>) => {
+    const item = (row.education_library_items ?? {}) as { title?: string; category?: string | null }
+    return {
+      id: row.id as string,
+      watch_pct: row.watch_pct as number,
+      completed: row.completed as boolean,
+      last_watched_at: row.last_watched_at as string,
+      title: item.title ?? 'Unknown',
+      category: item.category ?? null,
+    }
+  })
+
+  return { data: rows, error: null }
+}
+
 export async function approveTierRequest(studioId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

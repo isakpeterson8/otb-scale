@@ -18,6 +18,7 @@ export interface AdminProfile {
   created_at: string
   subscription_tier: string | null
   requested_tier: string | null
+  last_sign_in_at: string | null
 }
 
 export default async function AdminPage() {
@@ -33,10 +34,11 @@ export default async function AdminPage() {
 
   const callerRole = (callerProfile?.role ?? 'studio_owner') as UserRole
 
-  const [profilesRes, settingsRes, studiosRes] = await Promise.all([
+  const [profilesRes, settingsRes, studiosRes, authListRes] = await Promise.all([
     adminClient.from('profiles').select('id, studio_id, role, email, status, created_at').order('created_at', { ascending: false }),
     adminClient.from('settings').select('user_id, display_name'),
     adminClient.from('studios').select('id, subscription_tier, requested_tier'),
+    adminClient.auth.admin.listUsers({ perPage: 1000 }),
   ])
 
   const rawProfiles = (profilesRes.data ?? []) as { id: string; studio_id: string | null; role: UserRole; email: string | null; status: string | null; created_at: string }[]
@@ -46,6 +48,9 @@ export default async function AdminPage() {
   const displayNameById = new Map(rawSettings.map(s => [s.user_id, s.display_name]))
   const tierByStudioId = new Map(rawStudios.map(s => [s.id, s.subscription_tier]))
   const requestedTierByStudioId = new Map(rawStudios.map(s => [s.id, s.requested_tier]))
+  const lastSignInById = new Map(
+    (authListRes.data?.users ?? []).map(u => [u.id, u.last_sign_in_at ?? null])
+  )
 
   const adminProfiles: AdminProfile[] = rawProfiles.map(p => ({
     id: p.id,
@@ -57,6 +62,7 @@ export default async function AdminPage() {
     created_at: p.created_at,
     subscription_tier: p.studio_id ? (tierByStudioId.get(p.studio_id) ?? 'free') : null,
     requested_tier: p.studio_id ? (requestedTierByStudioId.get(p.studio_id) ?? null) : null,
+    last_sign_in_at: lastSignInById.get(p.id) ?? null,
   }))
 
   const pendingProfiles = adminProfiles.filter(p => p.status === 'pending')

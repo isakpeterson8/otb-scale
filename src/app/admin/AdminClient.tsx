@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useTransition } from 'react'
-import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest } from '@/app/actions/admin'
-import { formatDate } from '@/lib/utils'
+import { useState, useEffect, useTransition } from 'react'
+import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest, getWatchHistory } from '@/app/actions/admin'
+import type { WatchHistoryEntry } from '@/app/actions/admin'
+import { formatDate, formatRelativeTime } from '@/lib/utils'
 import { TIER_LABELS } from '@/lib/features'
 import type { UserRole } from '@/types/database'
 import type { AdminProfile } from './page'
@@ -143,6 +144,99 @@ function ApproveTierButton({ profile }: { profile: AdminProfile }) {
   )
 }
 
+function WatchHistoryButton({ profile, onOpen }: { profile: AdminProfile; onOpen: (p: AdminProfile) => void }) {
+  if (!profile.studio_id) return null
+  return (
+    <button
+      onClick={() => onOpen(profile)}
+      className="px-3 py-1 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+      style={{ background: 'rgba(73,37,47,0.15)', color: 'var(--accent-text)' }}
+    >
+      Watch history
+    </button>
+  )
+}
+
+function WatchHistoryModal({ profile, onClose }: { profile: AdminProfile; onClose: () => void }) {
+  const [loading, setLoading] = useState(true)
+  const [entries, setEntries] = useState<WatchHistoryEntry[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!profile.studio_id) { setLoading(false); return }
+    let cancelled = false
+    getWatchHistory(profile.studio_id).then(result => {
+      if (cancelled) return
+      setLoading(false)
+      if (result.error) setError(result.error)
+      else setEntries(result.data)
+    })
+    return () => { cancelled = true }
+  }, [profile.studio_id])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+      <div className="bg-[var(--surface)] rounded-2xl border border-[var(--ink)]/8 w-full max-w-2xl max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ink)]/8 shrink-0">
+          <div>
+            <h3 className="text-base font-medium text-[var(--ink)]">Watch History</h3>
+            <p className="text-xs text-[var(--ink-3)] mt-0.5">{profile.email ?? profile.display_name ?? 'User'}</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+              <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          {loading && (
+            <p className="text-sm text-[var(--ink-3)] text-center py-8">Loading…</p>
+          )}
+          {error && (
+            <p className="text-sm text-[var(--red)] text-center py-8">{error}</p>
+          )}
+          {!loading && !error && (!entries || entries.length === 0) && (
+            <p className="text-sm text-[var(--ink-3)] text-center py-8">No watch history for this studio.</p>
+          )}
+          {!loading && !error && entries && entries.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--ink)]/8">
+                  <th className="text-left pb-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Video</th>
+                  <th className="text-left pb-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Category</th>
+                  <th className="text-left pb-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide whitespace-nowrap">Watch %</th>
+                  <th className="text-left pb-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide whitespace-nowrap">Last Watched</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--ink)]/6">
+                {entries.map(e => (
+                  <tr key={e.id}>
+                    <td className="py-3 pr-4 text-[var(--ink)] font-medium">{e.title}</td>
+                    <td className="py-3 pr-4 text-[var(--ink-3)] text-xs">{e.category ?? '—'}</td>
+                    <td className="py-3 pr-4">
+                      {e.completed ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--green-l)] text-[var(--green)]">
+                          Completed
+                        </span>
+                      ) : (
+                        <span className="text-[var(--ink-2)]">{e.watch_pct}%</span>
+                      )}
+                    </td>
+                    <td className="py-3 text-[var(--ink-3)] text-xs whitespace-nowrap">{formatRelativeTime(e.last_watched_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminClient({
   callerRole,
   profiles,
@@ -155,6 +249,7 @@ export default function AdminClient({
   const [tab, setTab] = useState<Tab>('pending')
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<TierFilter>('all')
+  const [watchHistoryProfile, setWatchHistoryProfile] = useState<AdminProfile | null>(null)
   const isSuperAdmin = callerRole === 'otb_admin'
   const isAdmin = callerRole === 'otb_admin' || callerRole === 'otb_staff'
 
@@ -175,6 +270,14 @@ export default function AdminClient({
 
   return (
     <div className="space-y-6">
+      {/* Watch History Modal */}
+      {watchHistoryProfile && (
+        <WatchHistoryModal
+          profile={watchHistoryProfile}
+          onClose={() => setWatchHistoryProfile(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -277,7 +380,7 @@ export default function AdminClient({
         </div>
       )}
 
-      {/* Users tab */}
+      {/* Tiers tab */}
       {tab === 'tiers' && (() => {
         const tierFilterOptions: { key: TierFilter; label: string }[] = [
           { key: 'all',            label: 'All' },
@@ -369,6 +472,7 @@ export default function AdminClient({
         )
       })()}
 
+      {/* Users tab */}
       {tab === 'users' && (
         <div className="space-y-3">
           {/* Search */}
@@ -396,6 +500,7 @@ export default function AdminClient({
                             <p className="font-medium text-[var(--ink)] text-sm truncate">{p.email ?? '—'}</p>
                             {p.display_name && <p className="text-xs text-[var(--ink-3)] mt-0.5">{p.display_name}</p>}
                             <p className="text-xs text-[var(--ink-3)]">Joined {formatDate(p.created_at)}</p>
+                            <p className="text-xs text-[var(--ink-3)]">Last login: {formatRelativeTime(p.last_sign_in_at)}</p>
                           </div>
                           <ViewAsButton profile={p} />
                         </div>
@@ -406,6 +511,7 @@ export default function AdminClient({
                             ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: statusBadge.bg, color: statusBadge.color }}>{statusBadge.label}</span>
                             : null}
                         </div>
+                        <WatchHistoryButton profile={p} onOpen={setWatchHistoryProfile} />
                       </div>
                     )
                   })}
@@ -421,6 +527,7 @@ export default function AdminClient({
                         <Th>Status</Th>
                         <Th>Name</Th>
                         <Th>Joined</Th>
+                        <Th>Last Login</Th>
                         <Th></Th>
                       </tr>
                     </thead>
@@ -443,8 +550,12 @@ export default function AdminClient({
                             </td>
                             <Td muted>{p.display_name ?? '—'}</Td>
                             <Td muted nowrap>{formatDate(p.created_at)}</Td>
+                            <Td muted nowrap>{formatRelativeTime(p.last_sign_in_at)}</Td>
                             <td className="px-4 py-3 text-right">
-                              <ViewAsButton profile={p} />
+                              <div className="flex items-center justify-end gap-2">
+                                <WatchHistoryButton profile={p} onOpen={setWatchHistoryProfile} />
+                                <ViewAsButton profile={p} />
+                              </div>
                             </td>
                           </tr>
                         )
