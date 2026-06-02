@@ -4,30 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { upsertWatchProgress } from '@/app/actions/library'
 import type { EducationLibraryItem, Resource } from '@/types/database'
 import ResourcesClient from '@/app/resources/ResourcesClient'
-
-// ── Category definitions (in display order) ───────────────────────────────────
-const CATEGORIES = [
-  { slug: 'orientation',   label: 'Welcome & Orientation' },
-  { slug: 'mindset',       label: 'Mindset & Success' },
-  { slug: 'ideal-student', label: 'Ideal Student' },
-  { slug: 'marketing',                       label: 'Marketing' },
-  { slug: 'facebook-group-self-promotion',   label: 'Facebook Group Self-Promotion' },
-  { slug: 'structure',     label: 'Studio Structure & Policy' },
-  { slug: 'tuition',       label: 'Tuition & Rates' },
-  { slug: 'instruction',   label: 'Instruction Models' },
-  { slug: 'a-la-carte',    label: 'A La Carte' },
-  { slug: 'consultations', label: 'Trials & Consultations' },
-  { slug: 'enrollment',    label: 'Long-Term Enrollment' },
-  { slug: 'efficiency',    label: 'Resources & Efficiency' },
-  { slug: 'summer',        label: 'Summer Retention' },
-  { slug: 'studio-space',  label: 'Finding a Studio' },
-  { slug: 'affiliate',     label: 'Referrals & Affiliates' },
-  { slug: 'llc',           label: 'LLC' },
-  { slug: 'tax',           label: 'Tax' },
-  { slug: 'finance',       label: 'Finance' },
-  { slug: 'ic',            label: 'Independent Contractors' },
-  { slug: 'content',       label: 'Content Creation' },
-] as const
+import { EDUCATION_CATEGORIES as CATEGORIES } from '@/lib/education-categories'
 
 const SAVE_INTERVAL_MS = 10_000
 
@@ -475,6 +452,28 @@ export default function EducationClient({
               )}
             </div>
 
+            {/* Document links */}
+            {(playingVideo.document_links ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4 px-1">
+                {(playingVideo.document_links ?? []).map(link => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-[var(--ink)]/20 hover:border-[var(--accent-text)]/50 transition-colors"
+                    style={{ color: 'var(--accent-text)', background: 'var(--accent-l)' }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
+                      <path d="M4 9l5-5M7 4h2v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M10 7.5V10a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1h2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    </svg>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            )}
+
             {/* Transcript */}
             {playingVideo.transcript_text && (
               <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/10 overflow-hidden">
@@ -483,8 +482,8 @@ export default function EducationClient({
                     Transcript
                   </span>
                 </div>
-                <div className="px-5 py-4 max-h-80 overflow-y-auto">
-                  <p className="text-sm text-[var(--ink-2)] leading-relaxed whitespace-pre-wrap">
+                <div className="px-5 py-4 max-h-80 overflow-y-auto overflow-x-hidden">
+                  <p className="text-sm text-[var(--ink-2)] leading-relaxed whitespace-pre-wrap break-words">
                     {playingVideo.transcript_text}
                   </p>
                 </div>

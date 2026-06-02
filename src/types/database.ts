@@ -25,6 +25,15 @@ export interface WatchProgress {
   updated_at: string
 }
 
+export interface VideoDocumentLink {
+  id: string
+  video_id: string
+  label: string
+  url: string
+  sort_order: number
+  created_at: string
+}
+
 export interface EducationLibraryItem {
   id: string
   title: string
@@ -38,6 +47,7 @@ export interface EducationLibraryItem {
   transcript_text: string | null
   is_placeholder: boolean
   created_at: string
+  document_links?: Pick<VideoDocumentLink, 'id' | 'label' | 'url' | 'sort_order'>[]
 }
 
 export interface Resource {

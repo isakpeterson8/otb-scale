@@ -1,0 +1,27 @@
+export const EDUCATION_CATEGORIES = [
+  { slug: 'orientation',                   label: 'Welcome & Orientation' },
+  { slug: 'mindset',                       label: 'Mindset & Success' },
+  { slug: 'ideal-student',                 label: 'Ideal Student' },
+  { slug: 'marketing',                     label: 'Marketing' },
+  { slug: 'facebook-group-self-promotion', label: 'Facebook Group Self-Promotion' },
+  { slug: 'structure',                     label: 'Studio Structure & Policy' },
+  { slug: 'tuition',                       label: 'Tuition & Rates' },
+  { slug: 'instruction',                   label: 'Instruction Models' },
+  { slug: 'a-la-carte',                    label: 'A La Carte' },
+  { slug: 'consultations',                 label: 'Trials & Consultations' },
+  { slug: 'enrollment',                    label: 'Long-Term Enrollment' },
+  { slug: 'efficiency',                    label: 'Resources & Efficiency' },
+  { slug: 'summer',                        label: 'Summer Retention' },
+  { slug: 'summer-programming',            label: 'Summer Programming & Camps' },
+  { slug: 'summer-scheduling',             label: 'Summer Scheduling' },
+  { slug: 'studio-space',                  label: 'Finding a Studio' },
+  { slug: 'affiliate',                     label: 'Referrals & Affiliates' },
+  { slug: 'squarespace',                   label: 'Squarespace & Website' },
+  { slug: 'llc',                           label: 'LLC' },
+  { slug: 'tax',                           label: 'Tax' },
+  { slug: 'finance',                       label: 'Finance' },
+  { slug: 'ic',                            label: 'Independent Contractors' },
+  { slug: 'content',                       label: 'Content Creation' },
+] as const
+
+export type EducationCategorySlug = typeof EDUCATION_CATEGORIES[number]['slug']

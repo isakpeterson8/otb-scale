@@ -6,6 +6,7 @@ import { createLibraryItem, deleteLibraryItem, updateLibraryItem, attachVideoToI
 import { formatDate } from '@/lib/utils'
 import type { EducationLibraryItem } from '@/types/database'
 import type { WatchStat } from '@/app/actions/library'
+import { EDUCATION_CATEGORIES } from '@/lib/education-categories'
 
 type Tab = 'items' | 'stats'
 
@@ -39,6 +40,11 @@ interface UploadProgress {
   error?: string
 }
 
+interface DocLink {
+  label: string
+  url: string
+}
+
 interface FormState {
   type: 'video' | 'pdf'
   title: string
@@ -46,6 +52,7 @@ interface FormState {
   category: string
   cf_uid: string
   pdf_url: string
+  docLinks: DocLink[]
 }
 
 const emptyForm = (): FormState => ({
@@ -55,6 +62,7 @@ const emptyForm = (): FormState => ({
   category: '',
   cf_uid: '',
   pdf_url: '',
+  docLinks: [],
 })
 
 const inputClass = 'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
@@ -254,7 +262,7 @@ export default function LibraryAdminClient({
   const [saving, startSave] = useTransition()
   const [deleting, startDelete] = useTransition()
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<{ title: string; description: string; category: string }>({ title: '', description: '', category: '' })
+  const [editForm, setEditForm] = useState<{ title: string; description: string; category: string; docLinks: DocLink[] }>({ title: '', description: '', category: '', docLinks: [] })
   const [formError, setFormError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -413,6 +421,7 @@ export default function LibraryAdminClient({
         cf_uid: form.cf_uid || undefined,
         pdf_url: form.pdf_url || undefined,
         category: form.category || undefined,
+        docLinks: form.docLinks,
       })
       if (result.error) {
         setFormError(result.error)
@@ -427,7 +436,12 @@ export default function LibraryAdminClient({
 
   function startEdit(item: EducationLibraryItem) {
     setEditingId(item.id)
-    setEditForm({ title: item.title, description: item.description ?? '', category: item.category ?? '' })
+    setEditForm({
+      title: item.title,
+      description: item.description ?? '',
+      category: item.category ?? '',
+      docLinks: (item.document_links ?? []).map(l => ({ label: l.label, url: l.url })),
+    })
   }
 
   function handleDelete(id: string) {
@@ -442,8 +456,7 @@ export default function LibraryAdminClient({
     startSave(async () => {
       const result = await updateLibraryItem(id, editForm)
       if (!result.error) {
-        setItems(prev => prev.map(i => i.id === id ? { ...i, ...editForm, description: editForm.description || null, category: editForm.category || null } : i))
-        setEditingId(null)
+        window.location.reload()
       }
     })
   }
@@ -587,8 +600,56 @@ export default function LibraryAdminClient({
                 <textarea value={form.description} onChange={e => handleFormChange('description', e.target.value)} placeholder="What will studio owners learn from this?" rows={2} className={inputClass + ' resize-none'} />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: 'var(--ink-3)' }}>Category (optional tag)</label>
-                <input type="text" value={form.category} onChange={e => handleFormChange('category', e.target.value)} placeholder="e.g. Marketing, Operations, Finance" className={inputClass} />
+                <label className="block text-xs mb-1" style={{ color: 'var(--ink-3)' }}>Category</label>
+                <select value={form.category} onChange={e => handleFormChange('category', e.target.value)} className={inputClass}>
+                  <option value="">— None —</option>
+                  {EDUCATION_CATEGORIES.map(c => (
+                    <option key={c.slug} value={c.slug}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Document Links */}
+              <div>
+                <label className="block text-xs mb-2" style={{ color: 'var(--ink-3)' }}>Document Links (max 5)</label>
+                <div className="space-y-2">
+                  {form.docLinks.map((link, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Label (e.g. Download Workbook)"
+                        value={link.label}
+                        onChange={e => setForm(f => ({ ...f, docLinks: f.docLinks.map((l, j) => j === i ? { ...l, label: e.target.value } : l) }))}
+                        className={inputClass + ' flex-1 min-w-0'}
+                      />
+                      <input
+                        type="url"
+                        placeholder="https://…"
+                        value={link.url}
+                        onChange={e => setForm(f => ({ ...f, docLinks: f.docLinks.map((l, j) => j === i ? { ...l, url: e.target.value } : l) }))}
+                        className={inputClass + ' flex-[2] min-w-0'}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, docLinks: f.docLinks.filter((_, j) => j !== i) }))}
+                        className="shrink-0 px-2 py-1.5 rounded-lg text-xs border border-[var(--ink)]/15 hover:border-[var(--red)]/40 transition-colors"
+                        style={{ color: 'var(--red)' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {form.docLinks.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, docLinks: [...f.docLinks, { label: '', url: '' }] }))}
+                    className="mt-2 text-xs px-3 py-1.5 rounded-lg border border-[var(--ink)]/15 hover:border-[var(--ink)]/30 transition-colors"
+                    style={{ color: 'var(--ink-3)' }}
+                  >
+                    + Add link
+                  </button>
+                )}
               </div>
 
               {formError && (
@@ -633,7 +694,56 @@ export default function LibraryAdminClient({
                     <div className="p-4 space-y-3">
                       <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} className={inputClass} />
                       <textarea value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputClass + ' resize-none'} />
-                      <input type="text" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} placeholder="Category" className={inputClass} />
+                      <select value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} className={inputClass}>
+                        <option value="">— None —</option>
+                        {EDUCATION_CATEGORIES.map(c => (
+                          <option key={c.slug} value={c.slug}>{c.label}</option>
+                        ))}
+                      </select>
+
+                      {/* Document Links */}
+                      <div>
+                        <p className="text-xs mb-2" style={{ color: 'var(--ink-3)' }}>Document Links (max 5)</p>
+                        <div className="space-y-2">
+                          {editForm.docLinks.map((link, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="Label"
+                                value={link.label}
+                                onChange={e => setEditForm(f => ({ ...f, docLinks: f.docLinks.map((l, j) => j === i ? { ...l, label: e.target.value } : l) }))}
+                                className={inputClass + ' flex-1 min-w-0'}
+                              />
+                              <input
+                                type="url"
+                                placeholder="https://…"
+                                value={link.url}
+                                onChange={e => setEditForm(f => ({ ...f, docLinks: f.docLinks.map((l, j) => j === i ? { ...l, url: e.target.value } : l) }))}
+                                className={inputClass + ' flex-[2] min-w-0'}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setEditForm(f => ({ ...f, docLinks: f.docLinks.filter((_, j) => j !== i) }))}
+                                className="shrink-0 px-2 py-1.5 rounded-lg text-xs border border-[var(--ink)]/15 hover:border-[var(--red)]/40 transition-colors"
+                                style={{ color: 'var(--red)' }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        {editForm.docLinks.length < 5 && (
+                          <button
+                            type="button"
+                            onClick={() => setEditForm(f => ({ ...f, docLinks: [...f.docLinks, { label: '', url: '' }] }))}
+                            className="mt-2 text-xs px-3 py-1.5 rounded-lg border border-[var(--ink)]/15 hover:border-[var(--ink)]/30 transition-colors"
+                            style={{ color: 'var(--ink-3)' }}
+                          >
+                            + Add link
+                          </button>
+                        )}
+                      </div>
+
                       <div className="flex gap-2">
                         <button onClick={() => handleUpdate(item.id)} disabled={saving} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50" style={{ background: 'var(--accent-text)' }}>
                           {saving ? 'Saving…' : 'Save'}

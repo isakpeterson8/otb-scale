@@ -51,6 +51,7 @@ export async function createLibraryItem(input: {
   cf_uid?: string
   pdf_url?: string
   category?: string
+  docLinks?: { label: string; url: string }[]
 }) {
   if (!await requireAdmin()) return { error: 'Unauthorized' }
 
@@ -65,7 +66,7 @@ export async function createLibraryItem(input: {
   const position = (existing?.position ?? -1) + 1
   const slug = await uniqueSlug(titleToSlug(input.title))
 
-  const { error } = await adminClient
+  const { data: newItem, error } = await adminClient
     .from('education_library_items')
     .insert({
       title: input.title,
@@ -77,8 +78,20 @@ export async function createLibraryItem(input: {
       slug,
       position,
     })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
+
+  if (newItem?.id && input.docLinks && input.docLinks.length > 0) {
+    await adminClient
+      .from('video_document_links')
+      .insert(
+        input.docLinks
+          .filter(l => l.label.trim() && l.url.trim())
+          .map((l, idx) => ({ video_id: newItem.id, label: l.label.trim(), url: l.url.trim(), sort_order: idx }))
+      )
+  }
 
   revalidatePath('/admin/library')
   revalidatePath('/education')
@@ -89,6 +102,7 @@ export async function updateLibraryItem(id: string, input: {
   title: string
   description: string
   category?: string
+  docLinks?: { label: string; url: string }[]
 }) {
   if (!await requireAdmin()) return { error: 'Unauthorized' }
 
@@ -102,6 +116,17 @@ export async function updateLibraryItem(id: string, input: {
     .eq('id', id)
 
   if (error) return { error: error.message }
+
+  // Replace document links
+  await adminClient.from('video_document_links').delete().eq('video_id', id)
+  if (input.docLinks && input.docLinks.length > 0) {
+    const validLinks = input.docLinks.filter(l => l.label.trim() && l.url.trim())
+    if (validLinks.length > 0) {
+      await adminClient
+        .from('video_document_links')
+        .insert(validLinks.map((l, idx) => ({ video_id: id, label: l.label.trim(), url: l.url.trim(), sort_order: idx })))
+    }
+  }
 
   revalidatePath('/admin/library')
   revalidatePath('/education')
@@ -240,9 +265,15 @@ export async function getWatchStats(): Promise<{ data: WatchStat[]; error: strin
 export async function getLibraryItems(): Promise<{ data: EducationLibraryItem[]; error: string | null }> {
   const { data, error } = await adminClient
     .from('education_library_items')
-    .select('*')
+    .select('*, document_links:video_document_links(id, label, url, sort_order)')
     .order('position', { ascending: true })
 
   if (error) return { data: [], error: error.message }
-  return { data: (data ?? []) as EducationLibraryItem[], error: null }
+
+  const items = (data ?? []).map((item: EducationLibraryItem & { document_links?: { id: string; label: string; url: string; sort_order: number }[] }) => ({
+    ...item,
+    document_links: (item.document_links ?? []).sort((a, b) => a.sort_order - b.sort_order),
+  }))
+
+  return { data: items as EducationLibraryItem[], error: null }
 }
