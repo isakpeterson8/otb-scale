@@ -73,7 +73,7 @@ function approvalEmailHtml(): string {
   return emailShell(`
     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#111827;">Hi,</p>
     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#111827;">
-      Great news — your OTB Scale account has been approved!
+      Great news, your OTB Scale account has been approved!
     </p>
     <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#111827;">
       You can now log in and start using the platform.
@@ -95,7 +95,7 @@ function approvalEmailHtml(): string {
 function approvalEmailText(): string {
   return `Hi,
 
-Great news — your OTB Scale account has been approved!
+Great news, your OTB Scale account has been approved!
 
 You can now log in at: https://studio.outsidethebachs.com
 

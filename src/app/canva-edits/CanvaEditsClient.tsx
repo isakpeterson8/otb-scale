@@ -6,13 +6,12 @@ import type { CanvaRequest } from '@/app/actions/canva-edits'
 import { formatDate } from '@/lib/utils'
 
 const ASSET_TYPES = [
-  'Flyer',
-  'Social Media Post',
-  'Story Graphic',
-  'Email Header',
+  'General Studio Flyer',
+  'Summer Offer Flyer',
+  'Back-to-School Offer Flyer',
+  'Holiday Gift Cards Offer Flyer',
   'Business Card',
-  'Logo Update',
-  'Other',
+  'Special Request',
 ] as const
 
 const STATUS_BADGE: Record<CanvaRequest['status'], { label: string; bg: string; color: string }> = {
@@ -30,6 +29,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
   const [instructions, setInstructions] = useState('')
   const [canvaLink, setCanvaLink] = useState('')
   const [referenceUrl, setReferenceUrl] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +51,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
       setCanvaLink('')
       setReferenceUrl('')
       setAssetType(ASSET_TYPES[0])
+      setConfirmed(false)
       setTimeout(() => setSubmitted(false), 4000)
     })
   }
@@ -89,12 +90,12 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[var(--ink-3)]">Edit instructions</label>
+          <label className="text-xs font-medium text-[var(--ink-3)]">Notes</label>
           <textarea
             required
             value={instructions}
             onChange={e => setInstructions(e.target.value)}
-            placeholder="Describe exactly what you'd like changed…"
+            placeholder="Describe what you need edited."
             rows={4}
             className="px-3 py-2.5 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] resize-none"
           />
@@ -125,6 +126,18 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
           />
         </div>
 
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={e => setConfirmed(e.target.checked)}
+            className="mt-0.5 shrink-0 accent-[var(--accent-text)]"
+          />
+          <span className="text-xs text-[var(--ink-3)] leading-relaxed">
+            I have all essential flyer info ready (studio name, contact info, colors, any specific text or images needed)
+          </span>
+        </label>
+
         {error && <p className="text-xs" style={{ color: 'var(--red)' }}>{error}</p>}
         {submitted && (
           <p className="text-xs font-medium" style={{ color: 'var(--green)' }}>
@@ -134,7 +147,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
 
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || !confirmed}
           className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
           style={{ background: 'var(--accent-text)', color: 'var(--canvas)' }}
         >
