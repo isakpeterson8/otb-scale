@@ -11,7 +11,7 @@ export const EDUCATION_CATEGORIES = [
   { slug: 'consultations',                 label: 'Trials & Consultations' },
   { slug: 'enrollment',                    label: 'Long-Term Enrollment' },
   { slug: 'efficiency',                    label: 'Resources & Efficiency' },
-  { slug: 'summer',                        label: 'Summer Retention' },
+  { slug: 'summer',                        label: 'Summer' },
   { slug: 'summer-programming',            label: 'Summer Programming & Camps' },
   { slug: 'summer-scheduling',             label: 'Summer Scheduling' },
   { slug: 'studio-space',                  label: 'Finding a Studio' },
