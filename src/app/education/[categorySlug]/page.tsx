@@ -10,8 +10,9 @@ import { getResources } from '@/app/actions/resources'
 export default async function CategoryPage({
   params,
 }: {
-  params: { categorySlug: string }
+  params: Promise<{ categorySlug: string }>
 }) {
+  const { categorySlug } = await params
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
   const { supabase, studioId, userEmail } = ctx
@@ -52,7 +53,7 @@ export default async function CategoryPage({
         <EducationClient
           items={items}
           resources={resources}
-          initialCategorySlug={params.categorySlug}
+          initialCategorySlug={categorySlug}
         />
       </main>
     </AppShell>

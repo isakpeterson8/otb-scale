@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useDeferredValue } from 'react'
 import { upsertWatchProgress } from '@/app/actions/library'
 import type { EducationLibraryItem, Resource } from '@/types/database'
 import ResourcesClient from '@/app/resources/ResourcesClient'
@@ -157,7 +157,7 @@ export default function EducationClient({
       upsertWatchProgress(item.id, pct, Math.round(currentTime.current), Math.round(duration.current)).catch(() => {})
     }
     setPlayingVideo(null)
-    window.history.replaceState(null, '', '/education')
+    window.history.replaceState(null, '', effectiveCategory ? `/education/${effectiveCategory}` : '/education')
   }
 
   function handleCopyLink() {
@@ -186,8 +186,9 @@ export default function EducationClient({
 
   const selectedLabel = CATEGORIES.find(c => c.slug === effectiveCategory)?.label ?? effectiveCategory
 
-  const isSearching = search.trim().length > 0
-  const searchQuery = search.toLowerCase()
+  const deferredSearch = useDeferredValue(search)
+  const isSearching = deferredSearch.trim().length > 0
+  const searchQuery = deferredSearch.toLowerCase()
 
   // Normal category items — only used when not searching
   const categoryItems = isSearching ? [] : (byCat.get(effectiveCategory) ?? [])
@@ -196,13 +197,21 @@ export default function EducationClient({
   const searchGroups = isSearching
     ? CATEGORIES.map(cat => ({
         cat,
-        items: items.filter(
-          item =>
-            item.category === cat.slug &&
-            (item.title.toLowerCase().includes(searchQuery) ||
-              (item.description ?? '').toLowerCase().includes(searchQuery) ||
-              (item.transcript_text ?? '').toLowerCase().includes(searchQuery)),
-        ),
+        items: items
+          .filter(
+            item =>
+              item.category === cat.slug &&
+              (item.title.toLowerCase().includes(searchQuery) ||
+                (item.description ?? '').toLowerCase().includes(searchQuery) ||
+                (item.transcript_text ?? '').toLowerCase().includes(searchQuery)),
+          )
+          .map(item => ({
+            item,
+            transcriptMatch:
+              !(item.title.toLowerCase().includes(searchQuery) ||
+                (item.description ?? '').toLowerCase().includes(searchQuery)) &&
+              (item.transcript_text ?? '').toLowerCase().includes(searchQuery),
+          })),
       })).filter(g => g.items.length > 0)
     : []
 
@@ -284,7 +293,7 @@ export default function EducationClient({
               return (
                 <button
                   key={cat.slug}
-                  onClick={() => { setSelectedCategory(cat.slug); setSearch('') }}
+                  onClick={() => { setSelectedCategory(cat.slug); setSearch(''); window.history.replaceState(null, '', `/education/${cat.slug}`) }}
                   className={[
                     'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between gap-2',
                     isActive
@@ -318,7 +327,7 @@ export default function EducationClient({
                   {activeCats.map(cat => (
                     <button
                       key={cat.slug}
-                      onClick={() => { setSelectedCategory(cat.slug); setSearch(''); setMobileNavOpen(false) }}
+                      onClick={() => { setSelectedCategory(cat.slug); setSearch(''); setMobileNavOpen(false); window.history.replaceState(null, '', `/education/${cat.slug}`) }}
                       className={[
                         'w-full text-left px-4 py-2.5 text-sm transition-colors border-b border-[var(--ink)]/6 last:border-0',
                         cat.slug === effectiveCategory
@@ -346,6 +355,9 @@ export default function EducationClient({
                       {searchGroups.reduce((n, g) => n + g.items.length, 0) !== 1 ? 's' : ''} found
                     </span>
                   )}
+                  {search !== deferredSearch && (
+                    <span className="ml-2 text-xs font-normal text-[var(--ink-3)]">Searching…</span>
+                  )}
                 </span>
               ) : (
                 selectedLabel
@@ -371,7 +383,7 @@ export default function EducationClient({
                 {searchGroups.map(({ cat, items: groupItems }) => (
                   <div key={cat.slug}>
                     <button
-                      onClick={() => { setSelectedCategory(cat.slug); setSearch('') }}
+                      onClick={() => { setSelectedCategory(cat.slug); setSearch(''); window.history.replaceState(null, '', `/education/${cat.slug}`) }}
                       className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)] hover:text-[var(--accent-text)] transition-colors mb-3 flex items-center gap-1.5"
                     >
                       {cat.label}
@@ -380,8 +392,8 @@ export default function EducationClient({
                       </svg>
                     </button>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {groupItems.map(item => (
-                        <VideoCard key={item.id} item={item} onPlay={openVideo} />
+                      {groupItems.map(({ item, transcriptMatch }) => (
+                        <VideoCard key={item.id} item={item} onPlay={openVideo} transcriptMatch={transcriptMatch} />
                       ))}
                     </div>
                   </div>
@@ -509,9 +521,11 @@ export default function EducationClient({
 function VideoCard({
   item,
   onPlay,
+  transcriptMatch = false,
 }: {
   item: EducationLibraryItem
   onPlay: (item: EducationLibraryItem) => void
+  transcriptMatch?: boolean
 }) {
   const isPlaceholder = item.is_placeholder || (!item.cf_uid && item.type === 'video')
 
@@ -564,7 +578,13 @@ function VideoCard({
             {item.description}
           </p>
         )}
-        {item.transcript_text && !isPlaceholder && (
+        {transcriptMatch && !isPlaceholder && (
+          <p className="text-xs text-[var(--ink-3)] mt-2 flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent-text)] opacity-70 shrink-0" />
+            matches transcript
+          </p>
+        )}
+        {!transcriptMatch && item.transcript_text && !isPlaceholder && (
           <p className="text-xs text-[var(--ink-3)] mt-2 flex items-center gap-1.5">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent-text)] opacity-50 shrink-0" />
             Transcript included

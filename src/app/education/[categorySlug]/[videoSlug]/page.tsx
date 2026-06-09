@@ -10,8 +10,9 @@ import { getResources } from '@/app/actions/resources'
 export default async function VideoDeepLinkPage({
   params,
 }: {
-  params: { categorySlug: string; videoSlug: string }
+  params: Promise<{ categorySlug: string; videoSlug: string }>
 }) {
+  const { categorySlug, videoSlug } = await params
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
   const { supabase, studioId, userEmail } = ctx
@@ -34,7 +35,7 @@ export default async function VideoDeepLinkPage({
   ])
 
   const video = (items ?? []).find(
-    i => i.slug === params.videoSlug && i.category === params.categorySlug
+    i => i.slug === videoSlug && i.category === categorySlug
   )
 
   if (!video) {
@@ -61,7 +62,7 @@ export default async function VideoDeepLinkPage({
           items={items ?? []}
           resources={resources}
           initialVideoId={video.id}
-          initialCategorySlug={params.categorySlug}
+          initialCategorySlug={categorySlug}
         />
       </main>
     </AppShell>
