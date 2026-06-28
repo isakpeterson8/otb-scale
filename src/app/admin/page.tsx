@@ -9,8 +9,16 @@ import type { UserRole } from '@/types/database'
 
 const getCachedAuthUsers = unstable_cache(
   async () => {
-    const { data } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
-    return data?.users ?? []
+    const all: { id: string; last_sign_in_at?: string | null }[] = []
+    let page = 1
+    while (true) {
+      const { data } = await adminClient.auth.admin.listUsers({ perPage: 1000, page })
+      const users = data?.users ?? []
+      all.push(...users)
+      if (users.length < 1000) break
+      page++
+    }
+    return all
   },
   ['auth-users'],
   { revalidate: 60 }
@@ -57,18 +65,27 @@ export default async function AdminPage() {
     authUsers.map(u => [u.id, u.last_sign_in_at ?? null])
   )
 
-  const adminProfiles: AdminProfile[] = rawProfiles.map(p => ({
-    id: p.id,
-    studio_id: p.studio_id,
-    email: p.email,
-    role: p.role,
-    display_name: displayNameById.get(p.id) ?? null,
-    status: (p.status ?? null) as AdminProfile['status'],
-    created_at: p.created_at,
-    subscription_tier: p.studio_id ? (tierByStudioId.get(p.studio_id) ?? 'free') : null,
-    requested_tier: p.studio_id ? (requestedTierByStudioId.get(p.studio_id) ?? null) : null,
-    last_sign_in_at: lastSignInById.get(p.id) ?? null,
-  }))
+  const adminProfiles: AdminProfile[] = rawProfiles.map(p => {
+    let subscription_tier: string | null = null
+    if (p.studio_id) {
+      // 'unknown' = studio_id set on profile but no matching row in studios table
+      subscription_tier = tierByStudioId.has(p.studio_id)
+        ? (tierByStudioId.get(p.studio_id) ?? 'free')
+        : 'unknown'
+    }
+    return {
+      id: p.id,
+      studio_id: p.studio_id,
+      email: p.email,
+      role: p.role,
+      display_name: displayNameById.get(p.id) ?? null,
+      status: (p.status ?? null) as AdminProfile['status'],
+      created_at: p.created_at,
+      subscription_tier,
+      requested_tier: p.studio_id ? (requestedTierByStudioId.get(p.studio_id) ?? null) : null,
+      last_sign_in_at: lastSignInById.get(p.id) ?? null,
+    }
+  })
 
   const pendingProfiles = adminProfiles.filter(p => p.status === 'pending')
 

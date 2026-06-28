@@ -72,6 +72,18 @@ function TierCell({ profile }: { profile: AdminProfile }) {
     return <span className="text-[var(--ink-3)] text-xs">—</span>
   }
 
+  if (profile.subscription_tier === 'unknown') {
+    return (
+      <span
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+        style={{ background: 'rgba(220,38,38,0.1)', color: '#b91c1c' }}
+        title={`studio_id ${profile.studio_id} has no matching row in the studios table`}
+      >
+        ⚠ no studio row
+      </span>
+    )
+  }
+
   const tier = profile.subscription_tier ?? 'free'
   const badge = TIER_BADGE[tier] ?? TIER_BADGE.free
 
