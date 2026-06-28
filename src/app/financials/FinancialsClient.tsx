@@ -167,13 +167,12 @@ function SnapshotModal({
       <div>
         <label className={labelCls}>{label}</label>
         <input
-          type="number"
-          step="any"
-          min="0"
+          type="text"
+          inputMode="decimal"
           value={form[field]}
           onChange={e => set(field, e.target.value)}
           placeholder={placeholder}
-          className={`${inputCls} no-spinner`}
+          className={inputCls}
         />
       </div>
     )
