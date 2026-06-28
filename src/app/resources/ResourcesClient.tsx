@@ -207,8 +207,20 @@ export default function ResourcesClient({ resources }: { resources: Resource[] }
             .map(cat => (
               <section key={cat || '__uncategorized__'} id={cat ? categoryToId(cat) : undefined} className="scroll-mt-4">
                 {cat && (
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-3)] mb-3">
-                    {cat}
+                  <h3 className="mb-3">
+                    <a
+                      href={`#${categoryToId(cat)}`}
+                      className="group/h inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
+                    >
+                      {cat}
+                      <svg
+                        width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden
+                        className="opacity-0 group-hover/h:opacity-60 transition-opacity"
+                      >
+                        <path d="M4 7l3-3M6 4h1.5v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M7 7.5V9a1 1 0 01-1 1H2a1 1 0 01-1-1V5a1 1 0 011-1h1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                      </svg>
+                    </a>
                   </h3>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
