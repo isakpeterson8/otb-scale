@@ -24,6 +24,7 @@ const getCachedAuthUsers = unstable_cache(
   { revalidate: 60 }
 )
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Admin Overview' }
 
 export interface AdminProfile {
