@@ -173,7 +173,7 @@ function SnapshotModal({
           value={form[field]}
           onChange={e => set(field, e.target.value)}
           placeholder={placeholder}
-          className={inputCls}
+          className={`${inputCls} no-spinner`}
         />
       </div>
     )
