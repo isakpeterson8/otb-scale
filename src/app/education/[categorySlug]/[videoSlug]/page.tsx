@@ -5,7 +5,6 @@ import UpgradeBanner from '@/components/UpgradeBanner'
 import EducationClient from '../../EducationClient'
 import { hasFeatureAccess } from '@/lib/features'
 import { getLibraryItems } from '@/app/actions/library'
-import { getResources } from '@/app/actions/resources'
 
 export default async function VideoDeepLinkPage({
   params,
@@ -29,17 +28,14 @@ export default async function VideoDeepLinkPage({
   const tier = studio?.subscription_tier ?? 'free'
   const hasAccess = isAdmin || hasFeatureAccess(tier, 'education_library')
 
-  const [{ data: items }, { data: resources }] = await Promise.all([
-    getLibraryItems(),
-    getResources(),
-  ])
+  const { data: items } = await getLibraryItems()
 
   const video = (items ?? []).find(
     i => i.slug === videoSlug && i.category === categorySlug
   )
 
   if (!video) {
-    redirect('/education?error=not-found')
+    redirect('/education/videos?error=not-found')
   }
 
   if (!hasAccess) {
@@ -60,7 +56,6 @@ export default async function VideoDeepLinkPage({
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <EducationClient
           items={items ?? []}
-          resources={resources}
           initialVideoId={video.id}
           initialCategorySlug={categorySlug}
         />

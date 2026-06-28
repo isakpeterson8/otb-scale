@@ -6,12 +6,11 @@ import EducationClient from '../EducationClient'
 import { hasFeatureAccess } from '@/lib/features'
 import { getLibraryItems } from '@/app/actions/library'
 
-export default async function CategoryPage({
-  params,
+export default async function EducationVideosPage({
+  searchParams,
 }: {
-  params: Promise<{ categorySlug: string }>
+  searchParams?: Promise<{ error?: string }>
 }) {
-  const { categorySlug } = await params
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
   const { supabase, studioId, userEmail } = ctx
@@ -42,13 +41,14 @@ export default async function CategoryPage({
   }
 
   const { data: items } = await getLibraryItems()
+  const params = await searchParams
 
   return (
     <AppShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <EducationClient
           items={items}
-          initialCategorySlug={categorySlug}
+          errorParam={params?.error}
         />
       </main>
     </AppShell>

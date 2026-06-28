@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useDeferredValue } from 'react'
 import { upsertWatchProgress } from '@/app/actions/library'
-import type { EducationLibraryItem, Resource } from '@/types/database'
-import ResourcesClient from '@/app/resources/ResourcesClient'
+import type { EducationLibraryItem } from '@/types/database'
 import { EDUCATION_CATEGORIES as CATEGORIES } from '@/lib/education-categories'
+import EducationTabBar from './TabBar'
 
 const SAVE_INTERVAL_MS = 10_000
 
@@ -62,18 +62,15 @@ function LinkIcon() {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function EducationClient({
   items,
-  resources = [],
   initialVideoId,
   initialCategorySlug,
   errorParam,
 }: {
   items: EducationLibraryItem[]
-  resources?: Resource[]
   initialVideoId?: string
   initialCategorySlug?: string
   errorParam?: string
 }) {
-  const [tab, setTab]                           = useState<'videos' | 'resources'>('videos')
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategorySlug ?? '')
   const [playingVideo, setPlayingVideo]         = useState<EducationLibraryItem | null>(null)
   const [mobileNavOpen, setMobileNavOpen]       = useState(false)
@@ -157,7 +154,7 @@ export default function EducationClient({
       upsertWatchProgress(item.id, pct, Math.round(currentTime.current), Math.round(duration.current)).catch(() => {})
     }
     setPlayingVideo(null)
-    window.history.replaceState(null, '', effectiveCategory ? `/education/${effectiveCategory}` : '/education')
+    window.history.replaceState(null, '', effectiveCategory ? `/education/${effectiveCategory}` : '/education/videos')
   }
 
   function handleCopyLink() {
@@ -215,59 +212,17 @@ export default function EducationClient({
       })).filter(g => g.items.length > 0)
     : []
 
-  const toggleBar = (
-    <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--surface)' }}>
-      <button
-        onClick={() => setTab('videos')}
-        className={[
-          'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
-          tab === 'videos'
-            ? 'bg-[var(--accent-l)] text-[var(--accent-text)]'
-            : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
-        ].join(' ')}
-      >
-        Videos
-      </button>
-      <button
-        onClick={() => setTab('resources')}
-        className={[
-          'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
-          tab === 'resources'
-            ? 'bg-[var(--accent-l)] text-[var(--accent-text)]'
-            : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
-        ].join(' ')}
-      >
-        Resources
-      </button>
-    </div>
-  )
-
-  if (items.length === 0 && tab === 'videos') {
+  if (items.length === 0) {
     return (
       <div className="space-y-4">
         <div>
           <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>Education Library</h2>
           <p className="text-sm text-[var(--ink-3)] mt-0.5">Videos and shared resources from OTB</p>
         </div>
-        {toggleBar}
+        <EducationTabBar />
         <div className="flex items-center justify-center py-24">
           <p className="text-sm text-[var(--ink-3)]">No videos available yet — check back soon!</p>
         </div>
-      </div>
-    )
-  }
-
-  if (tab === 'resources') {
-    return (
-      <div className="space-y-5">
-        <div>
-          <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
-            Education Library
-          </h2>
-          <p className="text-sm text-[var(--ink-3)] mt-0.5">Videos and shared resources from OTB</p>
-        </div>
-        {toggleBar}
-        <ResourcesClient resources={resources} />
       </div>
     )
   }
@@ -281,7 +236,7 @@ export default function EducationClient({
         </h2>
         <p className="text-sm text-[var(--ink-3)] mt-0.5">Videos and shared resources from OTB</p>
       </div>
-      {toggleBar}
+      <EducationTabBar />
 
       <div className="flex gap-7">
         {/* ── Sidebar (desktop ≥ lg) ─────────────────────────────────────────── */}

@@ -2,16 +2,12 @@ import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import UpgradeBanner from '@/components/UpgradeBanner'
-import EducationClient from '../EducationClient'
+import EducationTabBar from '../TabBar'
 import { hasFeatureAccess } from '@/lib/features'
-import { getLibraryItems } from '@/app/actions/library'
+import { getResources } from '@/app/actions/resources'
+import ResourcesClient from '@/app/resources/ResourcesClient'
 
-export default async function CategoryPage({
-  params,
-}: {
-  params: Promise<{ categorySlug: string }>
-}) {
-  const { categorySlug } = await params
+export default async function EducationResourcesPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
   const { supabase, studioId, userEmail } = ctx
@@ -41,15 +37,21 @@ export default async function CategoryPage({
     )
   }
 
-  const { data: items } = await getLibraryItems()
+  const { data: resources } = await getResources()
 
   return (
     <AppShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
-        <EducationClient
-          items={items}
-          initialCategorySlug={categorySlug}
-        />
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
+              Education Library
+            </h2>
+            <p className="text-sm text-[var(--ink-3)] mt-0.5">Videos and shared resources from OTB</p>
+          </div>
+          <EducationTabBar />
+          <ResourcesClient resources={resources ?? []} />
+        </div>
       </main>
     </AppShell>
   )
