@@ -1,7 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Resource } from '@/types/database'
+
+function categoryToId(cat: string): string {
+  return cat.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
 
 // ── Icon type definitions ─────────────────────────────────────────────────────
 
@@ -128,6 +132,15 @@ function ResourceCard({ resource }: { resource: Resource }) {
 export default function ResourcesClient({ resources }: { resources: Resource[] }) {
   const [search, setSearch] = useState('')
 
+  useEffect(() => {
+    const hash = window.location.hash.slice(1)
+    if (!hash) return
+    const t = setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 120)
+    return () => clearTimeout(t)
+  }, [])
+
   // Collect unique categories in position order
   const categoriesOrdered: string[] = []
   const seen = new Set<string>()
@@ -192,7 +205,7 @@ export default function ResourcesClient({ resources }: { resources: Resource[] }
           {categoriesOrdered
             .filter(cat => grouped.has(cat))
             .map(cat => (
-              <section key={cat || '__uncategorized__'}>
+              <section key={cat || '__uncategorized__'} id={cat ? categoryToId(cat) : undefined} className="scroll-mt-4">
                 {cat && (
                   <h3 className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-3)] mb-3">
                     {cat}
