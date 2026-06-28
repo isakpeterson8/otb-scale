@@ -115,6 +115,37 @@ function parseForm(f: FormState): Omit<StudioSnapshot, 'id' | 'studio_id' | 'cre
   }
 }
 
+// ─── Shared styles + Field ────────────────────────────────────────────────────
+
+const inputCls = 'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
+const labelCls = 'block text-xs text-[var(--ink-3)] mb-1'
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder = '',
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  return (
+    <div>
+      <label className={labelCls}>{label}</label>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={inputCls}
+      />
+    </div>
+  )
+}
+
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 function SnapshotModal({
@@ -156,27 +187,7 @@ function SnapshotModal({
     })
   }
 
-  const inputCls = 'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
   const selectCls = inputCls
-  const labelCls = 'block text-xs text-[var(--ink-3)] mb-1'
-
-  function Field({ label, field, placeholder = '' }: {
-    label: string; field: keyof FormState; placeholder?: string
-  }) {
-    return (
-      <div>
-        <label className={labelCls}>{label}</label>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={form[field]}
-          onChange={e => set(field, e.target.value)}
-          placeholder={placeholder}
-          className={inputCls}
-        />
-      </div>
-    )
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
@@ -232,10 +243,10 @@ function SnapshotModal({
               Enrollment
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Current Enrollment (number of students)" field="enrollment" placeholder="—" />
-              <Field label="Booked Hours" field="booked_hrs" placeholder="—" />
-              <Field label="Goal Hours" field="goal_hrs" placeholder="—" />
-              <Field label="Available Hours" field="avail_hrs" placeholder="—" />
+              <Field label="Current Enrollment (number of students)" value={form.enrollment} onChange={v => set('enrollment', v)} placeholder="—" />
+              <Field label="Booked Hours" value={form.booked_hrs} onChange={v => set('booked_hrs', v)} placeholder="—" />
+              <Field label="Goal Hours" value={form.goal_hrs} onChange={v => set('goal_hrs', v)} placeholder="—" />
+              <Field label="Available Hours" value={form.avail_hrs} onChange={v => set('avail_hrs', v)} placeholder="—" />
             </div>
           </div>
 
@@ -244,11 +255,11 @@ function SnapshotModal({
               Pipeline
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Leads" field="leads" placeholder="—" />
-              <Field label="Consults" field="consults" placeholder="—" />
-              <Field label="Possible Registrations" field="poss_reg" placeholder="—" />
-              <Field label="New Enrollments" field="new_enrollments" placeholder="—" />
-              <Field label="Disenrollments" field="disenrollments" placeholder="—" />
+              <Field label="Leads" value={form.leads} onChange={v => set('leads', v)} placeholder="—" />
+              <Field label="Consults" value={form.consults} onChange={v => set('consults', v)} placeholder="—" />
+              <Field label="Possible Registrations" value={form.poss_reg} onChange={v => set('poss_reg', v)} placeholder="—" />
+              <Field label="New Enrollments" value={form.new_enrollments} onChange={v => set('new_enrollments', v)} placeholder="—" />
+              <Field label="Disenrollments" value={form.disenrollments} onChange={v => set('disenrollments', v)} placeholder="—" />
             </div>
           </div>
 
@@ -257,8 +268,8 @@ function SnapshotModal({
               Revenue
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Collected Revenue ($)" field="collected_revenue" placeholder="—" />
-              <Field label="Expenses ($)" field="expenses" placeholder="—" />
+              <Field label="Collected Revenue ($)" value={form.collected_revenue} onChange={v => set('collected_revenue', v)} placeholder="—" />
+              <Field label="Expenses ($)" value={form.expenses} onChange={v => set('expenses', v)} placeholder="—" />
             </div>
           </div>
 
