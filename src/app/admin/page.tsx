@@ -49,7 +49,7 @@ export default async function AdminPage() {
     supabase.from('profiles').select('role').eq('id', user.id).single(),
     adminClient.from('profiles').select('id, studio_id, role, email, status, created_at').order('created_at', { ascending: false }),
     adminClient.from('settings').select('user_id, display_name'),
-    adminClient.from('studios').select('id, subscription_tier, requested_tier'),
+    adminClient.from('studios').select('id, subscription_tier'),
     getCachedAuthUsers(),
   ])
 
@@ -57,11 +57,16 @@ export default async function AdminPage() {
 
   const rawProfiles = (profilesRes.data ?? []) as { id: string; studio_id: string | null; role: UserRole; email: string | null; status: string | null; created_at: string }[]
   const rawSettings = (settingsRes.data ?? []) as { user_id: string; display_name: string | null }[]
+  // Log any studios query error to Vercel function logs
+  if ((studiosRes as { error?: unknown }).error) {
+    console.error('[admin] studios query error:', JSON.stringify((studiosRes as { error?: unknown }).error))
+  }
   const rawStudios = (studiosRes.data ?? []) as { id: string; subscription_tier: string; requested_tier: string | null }[]
 
   const displayNameById = new Map(rawSettings.map(s => [s.user_id, s.display_name]))
   const tierByStudioId = new Map(rawStudios.map(s => [s.id, s.subscription_tier]))
-  const requestedTierByStudioId = new Map(rawStudios.map(s => [s.id, s.requested_tier]))
+  // requested_tier fetched separately below
+  const requestedTierByStudioId = new Map<string, string | null>()
   const lastSignInById = new Map(
     authUsers.map(u => [u.id, u.last_sign_in_at ?? null])
   )
