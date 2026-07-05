@@ -824,7 +824,7 @@ export default function LibraryAdminClient({
                               </div>
                             ) : (
                               <button
-                                onClick={() => { setAttachingId(item.id); setAttachUpload({ state: 'idle', percent: 0 }); setAttachError(null); setTimeout(() => attachFileRef.current?.click(), 50) }}
+                                onClick={() => { setAttachingId(item.id); setAttachUpload({ state: 'idle', percent: 0 }); setAttachError(null); attachFileRef.current?.click() }}
                                 className="px-2.5 py-1 rounded-lg text-xs border border-[var(--accent-text)]/25 hover:border-[var(--accent-text)]/60 transition-colors"
                                 style={{ color: 'var(--accent-text)' }}
                               >
