@@ -298,10 +298,15 @@ export interface CadenceEnrollment {
   created_at: string
 }
 
-export type OutreachType = 'Organization' | 'Independent Teacher' | 'Referral Partner' | 'Other'
-export type OutreachStatus = 'Active' | 'Inactive'
+export type OutreachType = 'organization' | 'independent_teacher' | 'referral_partner' | 'other'
+export type OutreachStatus = 'active' | 'inactive'
 
-export const OUTREACH_TYPES: OutreachType[] = ['Organization', 'Independent Teacher', 'Referral Partner', 'Other']
+export const OUTREACH_TYPES: { value: OutreachType; label: string }[] = [
+  { value: 'organization',       label: 'Organization' },
+  { value: 'independent_teacher', label: 'Independent Teacher' },
+  { value: 'referral_partner',   label: 'Referral Partner' },
+  { value: 'other',              label: 'Other' },
+]
 
 export interface OrganicOutreach {
   id: string

@@ -286,11 +286,11 @@ function OutreachForm({
           <select
             name="type"
             required
-            defaultValue={entry?.type ?? 'Organization'}
+            defaultValue={entry?.type ?? 'organization'}
             className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
           >
-            {OUTREACH_TYPES.map(t => (
-              <option key={t} value={t} className="bg-[var(--surface)]">{t}</option>
+            {OUTREACH_TYPES.map(({ value, label }) => (
+              <option key={value} value={value} className="bg-[var(--surface)]">{label}</option>
             ))}
           </select>
         </div>
@@ -298,11 +298,11 @@ function OutreachForm({
           <label className="block text-xs text-[var(--ink-3)] mb-1">Status</label>
           <select
             name="status"
-            defaultValue={entry?.status ?? 'Active'}
+            defaultValue={entry?.status ?? 'active'}
             className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
           >
-            <option value="Active" className="bg-[var(--surface)]">Active</option>
-            <option value="Inactive" className="bg-[var(--surface)]">Inactive</option>
+            <option value="active" className="bg-[var(--surface)]">Active</option>
+            <option value="inactive" className="bg-[var(--surface)]">Inactive</option>
           </select>
         </div>
       </div>
@@ -564,10 +564,17 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
 // ── Organic Outreach Tab ──────────────────────────────────────────────────────
 
 const TYPE_BADGE: Record<OutreachType, { bg: string; color: string }> = {
-  'Organization':        { bg: 'rgba(4,173,239,0.12)',    color: '#0284a8' },
-  'Independent Teacher': { bg: 'rgba(109,40,217,0.1)',    color: '#6d28d9' },
-  'Referral Partner':    { bg: 'rgba(22,163,74,0.12)',    color: '#15803d' },
-  'Other':               { bg: 'rgba(0,0,0,0.06)',        color: '#6b7280' },
+  'organization':        { bg: 'rgba(4,173,239,0.12)',    color: '#0284a8' },
+  'independent_teacher': { bg: 'rgba(109,40,217,0.1)',    color: '#6d28d9' },
+  'referral_partner':    { bg: 'rgba(22,163,74,0.12)',    color: '#15803d' },
+  'other':               { bg: 'rgba(0,0,0,0.06)',        color: '#6b7280' },
+}
+
+const TYPE_LABEL: Record<OutreachType, string> = {
+  'organization':        'Organization',
+  'independent_teacher': 'Independent Teacher',
+  'referral_partner':    'Referral Partner',
+  'other':               'Other',
 }
 
 function OutreachTab({ entries: initial }: { entries: OrganicOutreach[] }) {
@@ -643,8 +650,8 @@ function OutreachTab({ entries: initial }: { entries: OrganicOutreach[] }) {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium text-[var(--ink)] text-sm">{entry.name}</p>
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0" style={{ background: typeBadge.bg, color: typeBadge.color }}>{entry.type}</span>
-                          {entry.status === 'Inactive' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0" style={{ background: typeBadge.bg, color: typeBadge.color }}>{TYPE_LABEL[entry.type] ?? entry.type}</span>
+                          {entry.status === 'inactive' && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-white/8 text-[var(--ink-3)] shrink-0">Inactive</span>
                           )}
                         </div>
@@ -715,8 +722,8 @@ function OutreachTab({ entries: initial }: { entries: OrganicOutreach[] }) {
                         </td>
                         <td className="px-5 py-3">
                           <span className={['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                            entry.status === 'Active' ? 'bg-[var(--green-l)] text-[var(--green)]' : 'bg-white/8 text-[var(--ink-3)]',
-                          ].join(' ')}>{entry.status}</span>
+                            entry.status === 'active' ? 'bg-[var(--green-l)] text-[var(--green)]' : 'bg-white/8 text-[var(--ink-3)]',
+                          ].join(' ')}>{entry.status === 'active' ? 'Active' : 'Inactive'}</span>
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

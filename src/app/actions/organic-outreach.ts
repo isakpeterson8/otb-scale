@@ -16,7 +16,7 @@ export async function createOrganicOutreach(formData: FormData) {
     contact_info: (formData.get('contact_info') as string) || null,
     last_contacted_date: (formData.get('last_contacted_date') as string) || null,
     notes: (formData.get('notes') as string) || null,
-    status: (formData.get('status') as string) || 'Active',
+    status: (formData.get('status') as string) || 'active',
   })
 
   if (error) return { error: error.message }
@@ -39,7 +39,7 @@ export async function updateOrganicOutreach(id: string, formData: FormData) {
       contact_info: (formData.get('contact_info') as string) || null,
       last_contacted_date: (formData.get('last_contacted_date') as string) || null,
       notes: (formData.get('notes') as string) || null,
-      status: (formData.get('status') as string) || 'Active',
+      status: (formData.get('status') as string) || 'active',
     })
     .eq('id', id)
 
