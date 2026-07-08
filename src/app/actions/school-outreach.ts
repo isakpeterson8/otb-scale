@@ -9,9 +9,6 @@ export async function createSchoolOutreach(formData: FormData) {
   if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
-  const probRaw = formData.get('probability') as string
-  const progRaw = formData.get('progress') as string
-
   const { error } = await supabase.from('school_outreach').insert({
     studio_id: studioId,
     school_name: formData.get('school_name') as string,
@@ -23,8 +20,6 @@ export async function createSchoolOutreach(formData: FormData) {
     last_interacted_date: (formData.get('last_interacted_date') as string) || null,
     next_step: (formData.get('next_step') as string) || null,
     next_step_due_date: (formData.get('next_step_due_date') as string) || null,
-    probability: probRaw ? parseInt(probRaw, 10) : null,
-    progress: progRaw ? parseInt(progRaw, 10) : null,
     notes: (formData.get('notes') as string) || null,
   })
 
@@ -39,9 +34,6 @@ export async function updateSchoolOutreach(id: string, formData: FormData) {
   if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
-  const probRaw = formData.get('probability') as string
-  const progRaw = formData.get('progress') as string
-
   const { error } = await supabase
     .from('school_outreach')
     .update({
@@ -54,8 +46,6 @@ export async function updateSchoolOutreach(id: string, formData: FormData) {
       last_interacted_date: (formData.get('last_interacted_date') as string) || null,
       next_step: (formData.get('next_step') as string) || null,
       next_step_due_date: (formData.get('next_step_due_date') as string) || null,
-      probability: probRaw ? parseInt(probRaw, 10) : null,
-      progress: progRaw ? parseInt(progRaw, 10) : null,
       notes: (formData.get('notes') as string) || null,
     })
     .eq('id', id)

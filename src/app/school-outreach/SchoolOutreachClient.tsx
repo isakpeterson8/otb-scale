@@ -169,10 +169,6 @@ function SchoolForm({ school, onClose }: { school?: SchoolOutreach; onClose: () 
         </select>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {textField('Probability (%)', 'probability', 'number', '50')}
-        {textField('Progress (%)', 'progress', 'number', '25')}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
         {textField('First Contact Date', 'first_contact_date', 'date')}
         {textField('Last Interacted', 'last_interacted_date', 'date')}
       </div>
@@ -542,11 +538,6 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
   const totalSchools = schools.length
   const activeOutreach = schools.filter((s) => activeStages.includes(s.stage)).length
   const visitsCompleted = schools.filter((s) => s.stage === 'visit_completed').length
-  const probValues = schools.map((s) => s.probability).filter((p): p is number => p != null)
-  const avgProbability = probValues.length > 0
-    ? Math.round(probValues.reduce((a, b) => a + b, 0) / probValues.length)
-    : null
-
   const filtered = filterStage === 'all' ? schools : schools.filter((s) => s.stage === filterStage)
 
   return (
@@ -589,12 +580,11 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Total Schools', value: String(totalSchools) },
           { label: 'Active Outreach', value: String(activeOutreach) },
           { label: 'Visits Completed', value: String(visitsCompleted) },
-          { label: 'Avg Probability', value: avgProbability != null ? `${avgProbability}%` : '—' },
         ].map(({ label, value }) => (
           <div key={label} className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 px-5 py-4">
             <p className="text-xs text-[var(--ink-3)] mb-2 uppercase tracking-wide font-medium">{label}</p>
