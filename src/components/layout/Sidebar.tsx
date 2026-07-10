@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { initials } from '@/lib/utils'
 import { TrendingUp } from 'lucide-react'
-import NotificationBell from './NotificationBell'
 
 const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
 
@@ -348,10 +347,6 @@ export default function Sidebar({ displayName, isAdmin, tier, viewOnly, viewAsTi
         </nav>
 
         <div className="px-3 pt-3 pb-4 border-t border-white/8">
-          {/* Notifications — hidden on mobile (handled by header bell) */}
-          <div className="hidden md:flex items-center justify-end px-3 py-1 mb-1">
-            <NotificationBell />
-          </div>
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">
               <span className="text-[var(--ink)] text-xs font-semibold leading-none">
