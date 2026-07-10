@@ -643,7 +643,7 @@ function OutreachTab({ entries: initial }: { entries: OrganicOutreach[] }) {
             <div className="md:hidden divide-y divide-[var(--ink)]/6">
               {initial.map(entry => {
                 const days = daysAgo(entry.last_contacted_date)
-                const typeBadge = TYPE_BADGE[entry.type as OutreachType] ?? TYPE_BADGE['Other']
+                const typeBadge = TYPE_BADGE[entry.type as OutreachType] ?? TYPE_BADGE['other']
                 return (
                   <div key={entry.id} className="px-4 py-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
@@ -697,7 +697,7 @@ function OutreachTab({ entries: initial }: { entries: OrganicOutreach[] }) {
                 <tbody className="divide-y divide-[var(--ink)]/6">
                   {initial.map(entry => {
                     const days = daysAgo(entry.last_contacted_date)
-                    const typeBadge = TYPE_BADGE[entry.type as OutreachType] ?? TYPE_BADGE['Other']
+                    const typeBadge = TYPE_BADGE[entry.type as OutreachType] ?? TYPE_BADGE['other']
                     return (
                       <tr key={entry.id} className="hover:bg-[var(--canvas)] transition-colors group">
                         <td className="px-5 py-3 font-medium text-[var(--ink)]">{entry.name}</td>
