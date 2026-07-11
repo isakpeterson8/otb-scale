@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
+import GettingStartedCard from '@/components/dashboard/GettingStartedCard'
 
 const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
 
@@ -198,6 +199,8 @@ export default function DashboardClient({ isFreeTier, toastMessage, latestSnapsh
 
   return (
     <div className="space-y-8">
+      <GettingStartedCard />
+
       {/* Toast */}
       {toast && (
         <div
