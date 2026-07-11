@@ -7,12 +7,12 @@ import { Check, X, ChevronRight } from 'lucide-react'
 const STORAGE_KEY = 'otb_gs_v1'
 
 const STEPS = [
-  { label: 'Watch the Welcome & Orientation videos', desc: 'How it works, who we are, and how to get support',                            href: '/education/orientation' },
-  { label: 'Explore the education library',          desc: 'Watch videos. For document resources, toggle over to Resources.',              href: '/education' },
-  { label: 'Complete your first cadence check-in',  desc: 'Five weekly questions that keep your growth on track',                         href: '/cadence' },
-  { label: 'Add your monthly recap in Financials',  desc: 'Log enrollment and revenue so your dashboard shows real numbers',               href: '/financials' },
-  { label: 'Add your students and contacts',        desc: 'Your pipeline and history live here',                                           href: '/contacts' },
-  { label: 'Add a school to your outreach pipeline',desc: 'Start building your path to more students',                                    href: '/school-outreach' },
+  { label: 'Watch the Welcome & Orientation videos', desc: 'How it works, who we are, and how to get support',                 href: '/education/orientation' },
+  { label: 'Explore the education library',          desc: 'Watch videos. For document resources, toggle over to Resources.',   href: '/education' },
+  { label: 'Complete your first cadence check-in',  desc: 'Five weekly questions that keep your growth on track',              href: '/cadence' },
+  { label: 'Add your monthly recap in Financials',  desc: 'Log enrollment and revenue so your dashboard shows real numbers',    href: '/financials' },
+  { label: 'Add your students and contacts',        desc: 'Your pipeline and history live here',                               href: '/contacts' },
+  { label: 'Add a school to your outreach pipeline',desc: 'Start building your path to more students',                         href: '/school-outreach' },
 ] as const
 
 interface StoredState {
@@ -76,26 +76,21 @@ export default function GettingStartedCard() {
   }
 
   return (
-    <div
-      className="rounded-2xl border mb-6 p-5"
-      style={{ background: 'var(--surface)', borderColor: 'var(--border-strong)' }}
-    >
+    <div className="bg-white rounded-2xl border mb-6 p-5" style={{ borderColor: 'var(--border-s)' }}>
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-          Getting started
-        </p>
-        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>Getting started</p>
+        <div className="flex items-center gap-2">
           <span
             className="text-xs rounded-full px-2.5 py-0.5 font-medium"
-            style={{ background: 'rgba(73,37,47,0.35)', color: 'var(--accent-text)' }}
+            style={{ background: 'var(--accent-l)', color: 'var(--accent-text)' }}
           >
             {n} of {total}
           </span>
           {n >= 2 && (
             <button
               onClick={dismiss}
-              className="flex items-center justify-center w-6 h-6 rounded transition-colors hover:bg-white/10"
+              className="flex items-center justify-center w-6 h-6 rounded transition-colors hover:bg-black/5"
               style={{ color: 'var(--ink-3)' }}
               aria-label="Dismiss getting started checklist"
             >
@@ -106,12 +101,12 @@ export default function GettingStartedCard() {
       </div>
 
       {/* Progress bar */}
-      <div className="h-0.5 rounded-full mb-4 overflow-hidden" style={{ background: 'var(--border)' }}>
+      <div className="h-1 rounded-full mb-4 overflow-hidden" style={{ background: 'var(--border)' }}>
         <div
           className="h-full rounded-full"
           style={{
             width: `${pct}%`,
-            background: 'var(--accent-text)',
+            background: 'var(--accent)',
             transition: 'width 0.4s cubic-bezier(.4,0,.2,1)',
           }}
         />
@@ -122,7 +117,7 @@ export default function GettingStartedCard() {
         <div className="text-center py-2">
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center mx-auto mb-2"
-            style={{ background: 'rgba(45,90,61,0.3)', color: '#5aad7e' }}
+            style={{ background: 'var(--green-l)', color: 'var(--green)' }}
           >
             <Check size={18} />
           </div>
@@ -132,7 +127,6 @@ export default function GettingStartedCard() {
           </p>
         </div>
       ) : (
-        /* Step list */
         <div className="space-y-0.5">
           {STEPS.map(({ label, desc, href }, i) => {
             const isDone = checked.has(i)
@@ -140,19 +134,19 @@ export default function GettingStartedCard() {
               <Link
                 key={i}
                 href={href}
-                className="flex items-center gap-3 px-2 py-2 rounded-lg group transition-colors hover:bg-white/[0.04]"
+                className="flex items-center gap-3 px-2 py-2 rounded-lg group transition-colors hover:bg-black/[0.03]"
               >
                 {/* Checkbox */}
                 <button
                   onClick={(e) => toggle(i, e)}
                   className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-all"
                   style={{
-                    border: isDone ? 'none' : '1.5px solid rgba(255,248,240,0.4)',
-                    background: isDone ? 'var(--accent-text)' : 'transparent',
+                    border: isDone ? 'none' : '1.5px solid var(--ink-3)',
+                    background: isDone ? 'var(--accent)' : 'transparent',
                   }}
                   aria-label={isDone ? `Unmark: ${label}` : `Mark as done: ${label}`}
                 >
-                  {isDone && <Check size={11} strokeWidth={3} color="var(--canvas)" />}
+                  {isDone && <Check size={11} strokeWidth={3} color="#ffffff" />}
                 </button>
 
                 {/* Text */}
@@ -160,17 +154,13 @@ export default function GettingStartedCard() {
                   <p
                     className="text-[13px] font-medium leading-tight"
                     style={{
-                      color: isDone ? 'rgba(255,248,240,0.3)' : 'var(--ink)',
+                      color: isDone ? 'var(--ink-3)' : 'var(--ink)',
                       textDecoration: isDone ? 'line-through' : 'none',
-                      textDecorationColor: 'rgba(255,248,240,0.2)',
                     }}
                   >
                     {label}
                   </p>
-                  <p
-                    className="text-[11px] mt-0.5 leading-snug"
-                    style={{ color: isDone ? 'rgba(255,248,240,0.2)' : 'var(--ink-3)' }}
-                  >
+                  <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'var(--ink-3)' }}>
                     {desc}
                   </p>
                 </div>
@@ -179,7 +169,7 @@ export default function GettingStartedCard() {
                 {!isDone && (
                   <ChevronRight
                     size={14}
-                    className="flex-shrink-0 opacity-0 group-hover:opacity-50 transition-opacity"
+                    className="flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
                     style={{ color: 'var(--ink)' }}
                   />
                 )}
