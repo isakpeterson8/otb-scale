@@ -7,12 +7,12 @@ import { Check, X, ChevronRight } from 'lucide-react'
 const STORAGE_KEY = 'otb_gs_v1'
 
 const STEPS = [
-  { label: 'Watch the Welcome & Orientation videos', desc: 'How it works, who we are, and how to get support',                 href: '/education/orientation' },
-  { label: 'Explore the education library',          desc: 'Watch videos. For document resources, toggle over to Resources.',   href: '/education' },
-  { label: 'Complete your first cadence check-in',  desc: 'Five weekly questions that keep your growth on track',              href: '/cadence' },
-  { label: 'Add your monthly recap in Financials',  desc: 'Log enrollment and revenue so your dashboard shows real numbers',    href: '/financials' },
-  { label: 'Add your students and contacts',        desc: 'Your pipeline and history live here',                               href: '/contacts' },
-  { label: 'Add a school to your outreach pipeline',desc: 'Start building your path to more students',                         href: '/school-outreach' },
+  { label: 'Watch the welcome & orientation videos', desc: 'How it works, who we are, and how to get support',               href: '/education/orientation' },
+  { label: 'Explore the education library',          desc: 'Watch videos. For document resources, toggle over to Resources.', href: '/education' },
+  { label: 'Add your students and contacts',         desc: 'Your pipeline and history live here',                             href: '/contacts' },
+  { label: 'Add a school to your outreach pipeline', desc: 'Start building your path to more students',                      href: '/school-outreach' },
+  { label: 'Complete your first cadence check-in',   desc: 'Five weekly questions that keep your growth on track',           href: '/cadence' },
+  { label: 'Add your monthly recap in financials',   desc: 'Log enrollment and revenue so your dashboard shows real numbers', href: '/financials' },
 ] as const
 
 interface StoredState {
