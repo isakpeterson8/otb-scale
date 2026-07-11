@@ -2,50 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import {
-  Play, BookOpen, ClipboardList, BarChart2, Users, Building2,
-  Check, X, ChevronRight,
-} from 'lucide-react'
+import { Check, X, ChevronRight } from 'lucide-react'
 
 const STORAGE_KEY = 'otb_gs_v1'
 
 const STEPS = [
-  {
-    Icon: Play,
-    label: 'Watch the Welcome & Orientation videos',
-    desc: 'How it works, who we are, and how to get support',
-    href: '/education/orientation',
-  },
-  {
-    Icon: BookOpen,
-    label: 'Explore the education library',
-    desc: 'Watch videos. For document resources, toggle over to Resources.',
-    href: '/education',
-  },
-  {
-    Icon: ClipboardList,
-    label: 'Complete your first cadence check-in',
-    desc: 'Five weekly questions that keep your growth on track',
-    href: '/cadence',
-  },
-  {
-    Icon: BarChart2,
-    label: 'Add your monthly recap in Financials',
-    desc: 'Log enrollment and revenue so your dashboard shows real numbers',
-    href: '/financials',
-  },
-  {
-    Icon: Users,
-    label: 'Add your students and contacts',
-    desc: 'Your pipeline and history live here',
-    href: '/contacts',
-  },
-  {
-    Icon: Building2,
-    label: 'Add a school to your outreach pipeline',
-    desc: 'Start building your path to more students',
-    href: '/school-outreach',
-  },
+  { label: 'Watch the Welcome & Orientation videos', desc: 'How it works, who we are, and how to get support',                            href: '/education/orientation' },
+  { label: 'Explore the education library',          desc: 'Watch videos. For document resources, toggle over to Resources.',              href: '/education' },
+  { label: 'Complete your first cadence check-in',  desc: 'Five weekly questions that keep your growth on track',                         href: '/cadence' },
+  { label: 'Add your monthly recap in Financials',  desc: 'Log enrollment and revenue so your dashboard shows real numbers',               href: '/financials' },
+  { label: 'Add your students and contacts',        desc: 'Your pipeline and history live here',                                           href: '/contacts' },
+  { label: 'Add a school to your outreach pipeline',desc: 'Start building your path to more students',                                    href: '/school-outreach' },
 ] as const
 
 interface StoredState {
@@ -115,14 +82,9 @@ export default function GettingStartedCard() {
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-            Getting started
-          </p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--ink-3)' }}>
-            Six steps to make the most of OTB Scale
-          </p>
-        </div>
+        <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+          Getting started
+        </p>
         <div className="flex items-center gap-2 ml-3 flex-shrink-0">
           <span
             className="text-xs rounded-full px-2.5 py-0.5 font-medium"
@@ -172,37 +134,26 @@ export default function GettingStartedCard() {
       ) : (
         /* Step list */
         <div className="space-y-0.5">
-          {STEPS.map(({ Icon, label, desc, href }, i) => {
+          {STEPS.map(({ label, desc, href }, i) => {
             const isDone = checked.has(i)
             return (
               <Link
                 key={i}
                 href={href}
-                className="flex items-center gap-2.5 px-2 py-2 rounded-lg group transition-colors hover:bg-white/[0.04]"
+                className="flex items-center gap-3 px-2 py-2 rounded-lg group transition-colors hover:bg-white/[0.04]"
               >
-                {/* Circle toggle */}
+                {/* Checkbox */}
                 <button
                   onClick={(e) => toggle(i, e)}
-                  className="flex-shrink-0 flex items-center justify-center w-[18px] h-[18px] rounded-full transition-all"
+                  className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-all"
                   style={{
-                    border: isDone ? 'none' : '1.5px solid rgba(255,248,240,0.2)',
+                    border: isDone ? 'none' : '1.5px solid rgba(255,248,240,0.4)',
                     background: isDone ? 'var(--accent-text)' : 'transparent',
                   }}
                   aria-label={isDone ? `Unmark: ${label}` : `Mark as done: ${label}`}
                 >
-                  {isDone && <Check size={9} strokeWidth={3} color="var(--canvas)" />}
+                  {isDone && <Check size={11} strokeWidth={3} color="var(--canvas)" />}
                 </button>
-
-                {/* Icon chip */}
-                <div
-                  className="flex-shrink-0 flex items-center justify-center w-[26px] h-[26px] rounded-md"
-                  style={{ background: isDone ? 'rgba(255,248,240,0.05)' : 'rgba(73,37,47,0.3)' }}
-                >
-                  <Icon
-                    size={13}
-                    style={{ color: isDone ? 'rgba(255,248,240,0.25)' : 'var(--accent-text)' }}
-                  />
-                </div>
 
                 {/* Text */}
                 <div className="flex-1 min-w-0">
