@@ -69,7 +69,6 @@ export async function getStudioId(): Promise<StudioContext | null> {
         .select('tier')
         .eq('email', user.email.toLowerCase())
         .is('revoked_at', null)
-        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .order('granted_at', { ascending: false })
         .limit(1)
         .maybeSingle()
