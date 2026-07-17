@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
+import { getCachedClient, getCachedUser, getCachedProfile } from '@/lib/supabase/cached'
 
 type StudioContext = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,20 +16,16 @@ export async function getStudioId(): Promise<StudioContext | null> {
   const cookieStore = await cookies()
   const viewAsStudioId = cookieStore.get('view_as_studio_id')?.value
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
   if (!user) return null
+  const supabase = await getCachedClient()
 
   // Admin is viewing as another studio — use service-role client to bypass RLS
   if (viewAsStudioId) {
     return { supabase: adminClient, studioId: viewAsStudioId, userId: user.id, userEmail: user.email ?? null, viewOnly: true, isAdmin: true }
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('studio_id, display_name, role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getCachedProfile(user.id)
 
   // Three-way admin check: profiles table role, AND ADMIN_EMAILS env var as fallback
   // (admin profiles may have been manually inserted with a UUID that doesn't match auth user ID)
