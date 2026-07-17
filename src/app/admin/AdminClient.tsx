@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useTransition } from 'react'
-import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest, getWatchHistory } from '@/app/actions/admin'
-import type { WatchHistoryEntry } from '@/app/actions/admin'
+import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest, getWatchHistory, createAccessGrant, revokeAccessGrant, listAccessGrants } from '@/app/actions/admin'
+import type { WatchHistoryEntry, AccessGrant } from '@/app/actions/admin'
 import { sendAdminReminder } from '@/app/actions/reminders'
 import { getAdminCanvaRequests, updateCanvaRequest } from '@/app/actions/canva-edits'
 import type { AdminCanvaRequest } from '@/app/actions/canva-edits'
@@ -12,7 +12,7 @@ import { TIER_LABELS } from '@/lib/features'
 import type { UserRole } from '@/types/database'
 import type { AdminProfile } from './page'
 
-type Tab = 'pending' | 'users' | 'tiers' | 'canva'
+type Tab = 'pending' | 'users' | 'tiers' | 'canva' | 'grants'
 type ReminderType = 'cadence_weekly' | 'data_recap_monthly' | 'admin_manual'
 
 const CANVA_STATUS_BADGE: Record<AdminCanvaRequest['status'], { label: string; bg: string; color: string }> = {
@@ -467,6 +467,201 @@ function CanvaRequestsTab() {
   )
 }
 
+const GRANT_STATUS_BADGE: Record<'active' | 'expired' | 'revoked', { label: string; bg: string; color: string }> = {
+  active:  { label: 'Active',  bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
+  expired: { label: 'Expired', bg: 'rgba(0,0,0,0.06)',      color: '#6b7280' },
+  revoked: { label: 'Revoked', bg: 'rgba(220,38,38,0.1)',   color: '#b91c1c' },
+}
+
+function grantStatus(grant: AccessGrant): 'active' | 'expired' | 'revoked' {
+  if (grant.revoked_at) return 'revoked'
+  if (grant.expires_at && new Date(grant.expires_at) < new Date()) return 'expired'
+  return 'active'
+}
+
+function AccessGrantsTab() {
+  const [grants, setGrants] = useState<AccessGrant[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [tier, setTier] = useState<string>('scale')
+  const [expiresAt, setExpiresAt] = useState('')
+  const [reason, setReason] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function reload() {
+    listAccessGrants().then(result => {
+      if (result.error) setLoadError(result.error)
+      else setGrants(result.data)
+    })
+  }
+
+  useEffect(() => { reload() }, [])
+
+  function submit() {
+    setFormError(null)
+    startTransition(async () => {
+      const result = await createAccessGrant(
+        email,
+        tier,
+        expiresAt || null,
+        reason || null,
+      )
+      if (result.error) { setFormError(result.error); return }
+      setEmail('')
+      setTier('scale')
+      setExpiresAt('')
+      setReason('')
+      reload()
+    })
+  }
+
+  function revoke(grantId: string) {
+    startTransition(async () => {
+      const result = await revokeAccessGrant(grantId)
+      if (result.error) { setFormError(result.error); return }
+      reload()
+    })
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Grant form */}
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 p-5 space-y-4 max-w-lg">
+        <p className="text-sm font-medium text-[var(--ink)]">Grant access</p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 flex flex-col gap-1">
+            <label className="text-xs text-[var(--ink-3)] font-medium">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              className="px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[var(--ink-3)] font-medium">Tier</label>
+            <select
+              value={tier}
+              onChange={e => setTier(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+            >
+              {TIER_OPTIONS.map(t => (
+                <option key={t} value={t}>{TIER_LABELS[t]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[var(--ink-3)] font-medium">Expires (optional)</label>
+            <input
+              type="date"
+              value={expiresAt}
+              onChange={e => setExpiresAt(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+            />
+          </div>
+
+          <div className="col-span-2 flex flex-col gap-1">
+            <label className="text-xs text-[var(--ink-3)] font-medium">Reason (optional)</label>
+            <input
+              type="text"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="e.g. Beta tester, partner, etc."
+              className="px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+            />
+          </div>
+        </div>
+
+        {formError && <p className="text-xs" style={{ color: 'var(--red)' }}>{formError}</p>}
+
+        <button
+          onClick={submit}
+          disabled={isPending || !email.trim()}
+          className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-90"
+          style={{ background: 'var(--accent-text)' }}
+        >
+          {isPending ? 'Granting…' : 'Grant access'}
+        </button>
+      </div>
+
+      {/* Grants list */}
+      <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
+        {grants === null ? (
+          <p className="px-4 py-12 text-center text-sm text-[var(--ink-3)]">
+            {loadError ? loadError : 'Loading…'}
+          </p>
+        ) : grants.length === 0 ? (
+          <p className="px-4 py-12 text-center text-sm text-[var(--ink-3)]">No grants yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--ink)]/8">
+                  <Th>Email</Th>
+                  <Th>Tier</Th>
+                  <Th>Status</Th>
+                  <Th>Granted</Th>
+                  <Th>Expires</Th>
+                  <Th>Reason</Th>
+                  <Th></Th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--ink)]/6">
+                {grants.map(g => {
+                  const status = grantStatus(g)
+                  const tierBadge = TIER_BADGE[g.tier] ?? TIER_BADGE.free
+                  const statusBadge = GRANT_STATUS_BADGE[status]
+                  return (
+                    <tr key={g.id} className="hover:bg-[var(--canvas)] transition-colors">
+                      <td className="px-4 py-3 font-medium text-[var(--ink)] whitespace-nowrap">{g.email}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{ background: tierBadge.bg, color: tierBadge.color }}
+                        >
+                          {(TIER_LABELS as Record<string, string>)[g.tier] ?? g.tier}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{ background: statusBadge.bg, color: statusBadge.color }}
+                        >
+                          {statusBadge.label}
+                        </span>
+                      </td>
+                      <Td muted nowrap>{formatDate(g.granted_at)}</Td>
+                      <Td muted nowrap>{g.expires_at ? formatDate(g.expires_at) : 'Never'}</Td>
+                      <Td muted>{g.reason ?? '—'}</Td>
+                      <td className="px-4 py-3 text-right">
+                        {status === 'active' && (
+                          <button
+                            disabled={isPending}
+                            onClick={() => revoke(g.id)}
+                            className="px-3 py-1 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80"
+                            style={{ background: '#dc2626' }}
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminClient({
   callerRole,
   profiles,
@@ -491,6 +686,7 @@ export default function AdminClient({
     { key: 'users',   label: 'Users',            count: profiles.length },
     { key: 'tiers',   label: 'Tiers',            count: pendingUpgradeCount },
     { key: 'canva',   label: 'Canva Requests' },
+    { key: 'grants',  label: 'Access Grants' },
   ]
 
   const filteredProfiles = search.trim()
@@ -713,6 +909,9 @@ export default function AdminClient({
 
       {/* Canva Requests tab */}
       {tab === 'canva' && <CanvaRequestsTab />}
+
+      {/* Access Grants tab */}
+      {tab === 'grants' && <AccessGrantsTab />}
 
       {/* Users tab */}
       {tab === 'users' && (
