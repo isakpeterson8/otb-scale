@@ -336,6 +336,112 @@ export async function getWatchHistory(studioId: string): Promise<{ data: WatchHi
   return { data: rows, error: null }
 }
 
+// ── Admin access grants ───────────────────────────────────────────────────────
+
+export interface AccessGrant {
+  id: string
+  email: string
+  tier: string
+  granted_by: string | null
+  granted_at: string
+  expires_at: string | null
+  reason: string | null
+  revoked_at: string | null
+  revoked_by: string | null
+}
+
+async function applyGrantToExistingUser(email: string, tier: string) {
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('studio_id')
+    .eq('email', email)
+    .maybeSingle()
+  if (!profile?.studio_id) return
+  await adminClient
+    .from('studios')
+    .update({ subscription_tier: tier })
+    .eq('id', profile.studio_id)
+}
+
+export async function createAccessGrant(
+  email: string,
+  tier: string,
+  expiresAt: string | null,
+  reason: string | null,
+) {
+  const admin = await requireAdmin()
+  if (!admin) return { error: 'Unauthorized' }
+
+  const validTiers = ['free', 'scale', 'graduate', 'lifetime']
+  if (!validTiers.includes(tier)) return { error: 'Invalid tier' }
+
+  const normalizedEmail = email.toLowerCase().trim()
+  if (!normalizedEmail) return { error: 'Email is required' }
+
+  const { error: insertError } = await adminClient
+    .from('admin_access_grants')
+    .insert({
+      email: normalizedEmail,
+      tier,
+      granted_by: admin.id,
+      expires_at: expiresAt || null,
+      reason: reason?.trim() || null,
+    })
+
+  if (insertError) return { error: insertError.message }
+
+  await applyGrantToExistingUser(normalizedEmail, tier)
+
+  revalidatePath('/admin')
+  return { error: null }
+}
+
+export async function revokeAccessGrant(grantId: string) {
+  const admin = await requireAdmin()
+  if (!admin) return { error: 'Unauthorized' }
+
+  const { data: grant } = await adminClient
+    .from('admin_access_grants')
+    .select('email')
+    .eq('id', grantId)
+    .single()
+  if (!grant) return { error: 'Grant not found' }
+
+  const { error } = await adminClient
+    .from('admin_access_grants')
+    .update({ revoked_at: new Date().toISOString(), revoked_by: admin.id })
+    .eq('id', grantId)
+  if (error) return { error: error.message }
+
+  // Find the next active grant for this email (if any), otherwise revert to 'free'
+  const { data: remaining } = await adminClient
+    .from('admin_access_grants')
+    .select('tier')
+    .eq('email', grant.email)
+    .is('revoked_at', null)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    .order('granted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  await applyGrantToExistingUser(grant.email, remaining?.tier ?? 'free')
+
+  revalidatePath('/admin')
+  return { error: null }
+}
+
+export async function listAccessGrants(): Promise<{ data: AccessGrant[] | null; error: string | null }> {
+  if (!await requireAdmin()) return { data: null, error: 'Unauthorized' }
+
+  const { data, error } = await adminClient
+    .from('admin_access_grants')
+    .select('*')
+    .order('granted_at', { ascending: false })
+
+  if (error) return { data: null, error: error.message }
+  return { data: data as AccessGrant[], error: null }
+}
+
 export async function approveTierRequest(studioId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

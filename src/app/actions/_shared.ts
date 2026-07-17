@@ -60,9 +60,25 @@ export async function getStudioId(): Promise<StudioContext | null> {
     // Create one on-demand
     const studioName =
       (profile?.display_name?.trim() || user.email?.split('@')[0] || 'My') + "'s Studio"
+
+    // Check for a pre-existing admin access grant for this email
+    let initialTier = 'free'
+    if (user.email) {
+      const { data: grant } = await adminClient
+        .from('admin_access_grants')
+        .select('tier')
+        .eq('email', user.email.toLowerCase())
+        .is('revoked_at', null)
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+        .order('granted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (grant?.tier) initialTier = grant.tier
+    }
+
     const { data: created, error } = await supabase
       .from('studios')
-      .insert({ owner_user_id: user.id, name: studioName })
+      .insert({ owner_user_id: user.id, name: studioName, subscription_tier: initialTier })
       .select('id')
       .single()
     if (error || !created) {
