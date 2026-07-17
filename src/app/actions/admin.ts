@@ -344,8 +344,6 @@ export interface AccessGrant {
   tier: string
   granted_by: string | null
   granted_at: string
-  expires_at: string | null
-  reason: string | null
   revoked_at: string | null
   revoked_by: string | null
 }
@@ -366,8 +364,6 @@ async function applyGrantToExistingUser(email: string, tier: string) {
 export async function createAccessGrant(
   email: string,
   tier: string,
-  expiresAt: string | null,
-  reason: string | null,
 ) {
   const admin = await requireAdmin()
   if (!admin) return { error: 'Unauthorized' }
@@ -384,8 +380,6 @@ export async function createAccessGrant(
       email: normalizedEmail,
       tier,
       granted_by: admin.id,
-      expires_at: expiresAt || null,
-      reason: reason?.trim() || null,
     })
 
   if (insertError) return { error: insertError.message }
@@ -419,7 +413,6 @@ export async function revokeAccessGrant(grantId: string) {
     .select('tier')
     .eq('email', grant.email)
     .is('revoked_at', null)
-    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     .order('granted_at', { ascending: false })
     .limit(1)
     .maybeSingle()

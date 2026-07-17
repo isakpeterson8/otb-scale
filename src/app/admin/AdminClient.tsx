@@ -467,15 +467,13 @@ function CanvaRequestsTab() {
   )
 }
 
-const GRANT_STATUS_BADGE: Record<'active' | 'expired' | 'revoked', { label: string; bg: string; color: string }> = {
+const GRANT_STATUS_BADGE: Record<'active' | 'revoked', { label: string; bg: string; color: string }> = {
   active:  { label: 'Active',  bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
-  expired: { label: 'Expired', bg: 'rgba(0,0,0,0.06)',      color: '#6b7280' },
   revoked: { label: 'Revoked', bg: 'rgba(220,38,38,0.1)',   color: '#b91c1c' },
 }
 
-function grantStatus(grant: AccessGrant): 'active' | 'expired' | 'revoked' {
+function grantStatus(grant: AccessGrant): 'active' | 'revoked' {
   if (grant.revoked_at) return 'revoked'
-  if (grant.expires_at && new Date(grant.expires_at) < new Date()) return 'expired'
   return 'active'
 }
 
@@ -484,8 +482,6 @@ function AccessGrantsTab() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [tier, setTier] = useState<string>('scale')
-  const [expiresAt, setExpiresAt] = useState('')
-  const [reason, setReason] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -501,17 +497,10 @@ function AccessGrantsTab() {
   function submit() {
     setFormError(null)
     startTransition(async () => {
-      const result = await createAccessGrant(
-        email,
-        tier,
-        expiresAt || null,
-        reason || null,
-      )
+      const result = await createAccessGrant(email, tier)
       if (result.error) { setFormError(result.error); return }
       setEmail('')
       setTier('scale')
-      setExpiresAt('')
-      setReason('')
       reload()
     })
   }
@@ -555,26 +544,6 @@ function AccessGrantsTab() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-[var(--ink-3)] font-medium">Expires (optional)</label>
-            <input
-              type="date"
-              value={expiresAt}
-              onChange={e => setExpiresAt(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
-            />
-          </div>
-
-          <div className="col-span-2 flex flex-col gap-1">
-            <label className="text-xs text-[var(--ink-3)] font-medium">Reason (optional)</label>
-            <input
-              type="text"
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              placeholder="e.g. Beta tester, partner, etc."
-              className="px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
-            />
-          </div>
         </div>
 
         {formError && <p className="text-xs" style={{ color: 'var(--red)' }}>{formError}</p>}
@@ -606,8 +575,6 @@ function AccessGrantsTab() {
                   <Th>Tier</Th>
                   <Th>Status</Th>
                   <Th>Granted</Th>
-                  <Th>Expires</Th>
-                  <Th>Reason</Th>
                   <Th></Th>
                 </tr>
               </thead>
@@ -636,8 +603,6 @@ function AccessGrantsTab() {
                         </span>
                       </td>
                       <Td muted nowrap>{formatDate(g.granted_at)}</Td>
-                      <Td muted nowrap>{g.expires_at ? formatDate(g.expires_at) : 'Never'}</Td>
-                      <Td muted>{g.reason ?? '—'}</Td>
                       <td className="px-4 py-3 text-right">
                         {status === 'active' && (
                           <button
