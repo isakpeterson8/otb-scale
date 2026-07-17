@@ -1,21 +1,15 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
+import { getCachedClient, getCachedUser, getCachedProfile } from '@/lib/supabase/cached'
 import AppShellClient from './AppShellClient'
-import type { Profile } from '@/types/database'
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
+  const user = await getCachedUser()
   if (!user) redirect('/auth/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, studio_id, role, email, status')
-    .eq('id', user.id)
-    .single<Profile>()
+  const profile = await getCachedProfile(user.id)
+  const supabase = await getCachedClient()
 
   const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
 
