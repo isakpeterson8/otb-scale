@@ -3,19 +3,14 @@ import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import UpgradeBanner from '@/components/UpgradeBanner'
 import { hasFeatureAccess } from '@/lib/features'
+import { getCachedStudioTier } from '@/lib/supabase/cached'
 
 export default async function CadencePage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, isAdmin } = ctx
+  const { isAdmin } = ctx
 
-  const { data: studio } = await supabase
-    .from('studios')
-    .select('subscription_tier')
-    .eq('id', studioId)
-    .single()
-
-  const tier = studio?.subscription_tier ?? 'free'
+  const tier = await getCachedStudioTier(ctx.studioId)
   const hasAccess = isAdmin || hasFeatureAccess(tier, 'cadence_form')
 
   return (

@@ -3,6 +3,11 @@ import { createServerClient } from '@supabase/ssr'
 
 const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
 
+// Cached tier cookie: set after the first DB query on a blocked route, valid for 5 minutes.
+// Value format: `${userId}:${tier}` — scoped to user so a shared browser can't reuse stale data.
+const TIER_COOKIE = '_tier'
+const TIER_COOKIE_MAX_AGE = 60 * 5
+
 // Routes that free-tier users cannot access — redirect to /dashboard with a toast
 const FREE_TIER_BLOCKED: { path: string; toast: string }[] = [
   { path: '/facebook-groups', toast: 'Facebook Groups is available on the Scale plan.' },
@@ -63,6 +68,24 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
+      // Fast path: cached tier from a previous DB query (5-minute window, user-scoped)
+      const cachedTierValue = request.cookies.get(TIER_COOKIE)?.value
+      if (cachedTierValue) {
+        const colonIdx = cachedTierValue.indexOf(':')
+        const cachedUserId = cachedTierValue.slice(0, colonIdx)
+        const cachedTier = cachedTierValue.slice(colonIdx + 1)
+        if (cachedUserId === user.id && cachedTier) {
+          if (cachedTier === 'free') {
+            const url = request.nextUrl.clone()
+            url.pathname = '/dashboard'
+            url.searchParams.delete('toast')
+            if (blocked.toast) url.searchParams.set('toast', blocked.toast)
+            return NextResponse.redirect(url)
+          }
+          return supabaseResponse
+        }
+      }
+
       // Regular check: fetch profile role + studio tier (2 small queries, only on these specific routes)
       const { data: profile } = await supabase
         .from('profiles')
@@ -71,21 +94,28 @@ export async function proxy(request: NextRequest) {
         .single()
 
       const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
+      const cookieOpts = { httpOnly: true, path: '/', sameSite: 'lax' as const, maxAge: TIER_COOKIE_MAX_AGE }
 
-      if (!isAdmin && profile?.studio_id) {
+      if (isAdmin) {
+        supabaseResponse.cookies.set(TIER_COOKIE, `${user.id}:admin`, cookieOpts)
+      } else if (profile?.studio_id) {
         const { data: studio } = await supabase
           .from('studios')
           .select('subscription_tier')
           .eq('id', profile.studio_id)
           .single()
 
-        if (studio?.subscription_tier === 'free') {
+        const tier = studio?.subscription_tier ?? 'free'
+        if (tier === 'free') {
           const url = request.nextUrl.clone()
           url.pathname = '/dashboard'
           url.searchParams.delete('toast')
           if (blocked.toast) url.searchParams.set('toast', blocked.toast)
-          return NextResponse.redirect(url)
+          const redirectResponse = NextResponse.redirect(url)
+          redirectResponse.cookies.set(TIER_COOKIE, `${user.id}:free`, cookieOpts)
+          return redirectResponse
         }
+        supabaseResponse.cookies.set(TIER_COOKIE, `${user.id}:${tier}`, cookieOpts)
       }
     }
   }

@@ -6,20 +6,16 @@ import ResourcesClient from './ResourcesClient'
 import UpgradeBanner from '@/components/UpgradeBanner'
 import { getResources } from '@/app/actions/resources'
 import { hasFeatureAccess } from '@/lib/features'
+import { getCachedStudioTier } from '@/lib/supabase/cached'
 
 export const metadata: Metadata = { title: 'Resources' }
 
 export default async function ResourcesPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, isAdmin, viewOnly } = ctx
+  const { studioId, isAdmin, viewOnly } = ctx
 
-  const { data: studio } = await supabase
-    .from('studios')
-    .select('subscription_tier')
-    .eq('id', studioId)
-    .single()
-  const tier = studio?.subscription_tier ?? 'free'
+  const tier = await getCachedStudioTier(studioId)
 
   if (viewOnly ? !hasFeatureAccess(tier, 'resources') : (!isAdmin && !hasFeatureAccess(tier, 'resources'))) {
     return (
