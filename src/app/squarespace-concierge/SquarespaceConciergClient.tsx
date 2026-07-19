@@ -197,7 +197,7 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {([
               ['new_build', 'New website build',    'I need a brand-new site built from scratch'],
-              ['refresh',   'Refresh existing site', 'Update or redesign an OTB-built site'],
+              ['refresh',   'Refresh existing site', 'Update an already live site'],
               ['support',   'Support / fix',         'Something on my site needs fixing'],
             ] as const).map(([val, label, desc]) => (
               <button
@@ -282,11 +282,11 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className={fieldClass}>
                 <label className={labelClass}>Existing domain + registrar</label>
-                <input className={inputClass} value={existingDomain} onChange={e => setExistingDomain(e.target.value)} placeholder="kellypiano.com (GoDaddy)" />
+                <input className={inputClass} value={existingDomain} onChange={e => setExistingDomain(e.target.value)} placeholder="outsidethebachs.com (GoDaddy)" />
               </div>
               <div className={fieldClass}>
                 <label className={labelClass}>Current site URL</label>
-                <input className={inputClass} value={currentSiteUrl} onChange={e => setCurrentSiteUrl(e.target.value)} placeholder="https://kellypiano.com" />
+                <input className={inputClass} value={currentSiteUrl} onChange={e => setCurrentSiteUrl(e.target.value)} placeholder="https://outsidethebachs.com" />
               </div>
               <div className={fieldClass}>
                 <label className={labelClass}>Google Business Profile link</label>
@@ -331,14 +331,6 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
                 <label className={labelClass}>Testimonials / Google reviews link</label>
                 <input className={inputClass} value={testimonialsLink} onChange={e => setTestimonialsLink(e.target.value)} placeholder="https://g.page/r/…/review" />
               </div>
-              <div className={fieldClass}>
-                <label className={labelClass}>Display pricing on site?</label>
-                <select className={inputClass} value={showPricing} onChange={e => setShowPricing(e.target.value as '' | 'yes' | 'no')}>
-                  <option value="">Select…</option>
-                  <option value="yes">Yes — show prices</option>
-                  <option value="no">No — contact for pricing</option>
-                </select>
-              </div>
               <div className={`${fieldClass} sm:col-span-2`}>
                 <label className={labelClass}>Primary goal for visitors <span style={{ color: 'var(--red)' }}>*</span></label>
                 <select className={inputClass} value={primaryCta} onChange={e => setPrimaryCta(e.target.value)}>
@@ -377,7 +369,7 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
                   className={inputClass}
                   value={siteReference}
                   onChange={e => setSiteReference(e.target.value)}
-                  placeholder="kellypiano.squarespace.com or kellypiano.com"
+                  placeholder="outsidethebachs.com or outsidethebachs.squarespace.com"
                 />
               </div>
             )}
