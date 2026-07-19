@@ -652,14 +652,6 @@ export default function AdminClient({
 
   const pendingUpgradeCount = profiles.filter(p => p.requested_tier).length
 
-  const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: 'pending', label: 'Pending Approval', count: pendingProfiles.length },
-    { key: 'users',   label: 'Users',            count: profiles.length },
-    { key: 'tiers',   label: 'Tiers',            count: pendingUpgradeCount },
-    { key: 'canva',   label: 'Canva Requests' },
-    { key: 'grants',  label: 'Access Grants' },
-  ]
-
   function handleTabChange(newTab: Tab) {
     setTab(newTab)
     router.replace(`/admin?tab=${newTab}`, { scroll: false })
@@ -688,24 +680,6 @@ export default function AdminClient({
           onClose={() => setReminderProfile(null)}
         />
       )}
-
-      {/* Tab bar — sub-tab navigation now handled by AdminNav */}
-      <div className="flex items-center gap-1 border-b border-[var(--ink)]/8">
-        {tabs.map(({ key, label, count }) => (
-          <button
-            key={key}
-            onClick={() => handleTabChange(key)}
-            className={[
-              'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
-              tab === key
-                ? 'text-[var(--ink)] border-[var(--accent-text)]'
-                : 'text-[var(--ink-3)] border-transparent hover:text-[var(--ink-2)]',
-            ].join(' ')}
-          >
-            {label}{count !== undefined && <span className="ml-1 text-xs opacity-60">({count})</span>}
-          </button>
-        ))}
-      </div>
 
       {/* Pending Approval tab */}
       {tab === 'pending' && (

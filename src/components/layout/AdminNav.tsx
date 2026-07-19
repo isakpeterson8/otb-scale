@@ -9,8 +9,7 @@ interface Props {
 }
 
 const TOP_NAV = [
-  { key: 'overview',  label: 'Overview',  href: '/admin' },
-  { key: 'members',   label: 'Members',   href: '/admin?tab=pending' },
+  { key: 'members',   label: 'Members',   href: '/admin' },
   { key: 'requests',  label: 'Requests',  href: '/admin/concierge' },
   { key: 'sites',     label: 'Sites',     href: '/admin/squarespace' },
   { key: 'content',   label: 'Content',   href: '/admin/library' },
@@ -38,16 +37,15 @@ const SUB_NAV: Partial<Record<SectionKey, Array<{ key: string; label: string; hr
 
 function getActiveSection(pathname: string, tab: string | null): SectionKey {
   if (pathname === '/admin') {
-    if (!tab) return 'overview'
-    if (['pending', 'users', 'tiers', 'grants'].includes(tab)) return 'members'
     if (tab === 'canva') return 'requests'
+    return 'members'
   }
   if (pathname.startsWith('/admin/concierge'))  return 'requests'
   if (pathname.startsWith('/admin/squarespace')) return 'sites'
   if (pathname.startsWith('/admin/library'))    return 'content'
   if (pathname.startsWith('/admin/resources'))  return 'content'
   if (pathname.startsWith('/admin/cadence'))    return 'insights'
-  return 'overview'
+  return 'members'
 }
 
 function getActiveSubKey(pathname: string, tab: string | null, section: SectionKey): string | null {
