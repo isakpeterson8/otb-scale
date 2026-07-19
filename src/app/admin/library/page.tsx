@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import AppShell from '@/components/layout/AppShell'
+import AdminShell from '../AdminShell'
 import LibraryAdminClient from './LibraryAdminClient'
 import { getLibraryItems, getWatchStats } from '@/app/actions/library'
 
@@ -25,10 +25,10 @@ export default async function AdminLibraryPage() {
   ])
 
   return (
-    <AppShell>
+    <AdminShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <LibraryAdminClient items={items} watchStats={watchStats} />
       </main>
-    </AppShell>
+    </AdminShell>
   )
 }

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
-import AppShell from '@/components/layout/AppShell'
+import AdminShell from './AdminShell'
 import AdminClient from './AdminClient'
 import type { UserRole } from '@/types/database'
 
@@ -96,7 +96,7 @@ export default async function AdminPage() {
   const pendingProfiles = adminProfiles.filter(p => p.status === 'pending')
 
   return (
-    <AppShell>
+    <AdminShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <AdminClient
           callerRole={callerRole}
@@ -104,6 +104,6 @@ export default async function AdminPage() {
           pendingProfiles={pendingProfiles}
         />
       </main>
-    </AppShell>
+    </AdminShell>
   )
 }

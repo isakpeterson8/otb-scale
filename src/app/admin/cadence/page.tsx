@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import AppShell from '@/components/layout/AppShell'
+import AdminShell from '../AdminShell'
 import CadenceAdminClient from './CadenceAdminClient'
 import { getLatestAnalysis } from './actions'
 
@@ -26,7 +26,7 @@ export default async function AdminCadencePage() {
   const { analysis, rowCount, createdAt } = await getLatestAnalysis()
 
   return (
-    <AppShell>
+    <AdminShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7 max-w-5xl">
         <CadenceAdminClient
           initialAnalysis={analysis}
@@ -34,6 +34,6 @@ export default async function AdminCadencePage() {
           initialCreatedAt={createdAt}
         />
       </main>
-    </AppShell>
+    </AdminShell>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, useEffect, useTransition } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest, getWatchHistory, createAccessGrant, revokeAccessGrant, listAccessGrants } from '@/app/actions/admin'
 import type { WatchHistoryEntry, AccessGrant } from '@/app/actions/admin'
 import { sendAdminReminder } from '@/app/actions/reminders'
@@ -636,7 +636,13 @@ export default function AdminClient({
   profiles: AdminProfile[]
   pendingProfiles: AdminProfile[]
 }) {
-  const [tab, setTab] = useState<Tab>('pending')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlTab = searchParams.get('tab') as Tab | null
+  const validTabs: Tab[] = ['pending', 'users', 'tiers', 'canva', 'grants']
+  const [tab, setTab] = useState<Tab>(
+    urlTab && validTabs.includes(urlTab) ? urlTab : 'pending'
+  )
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<TierFilter>('all')
   const [watchHistoryProfile, setWatchHistoryProfile] = useState<AdminProfile | null>(null)
@@ -653,6 +659,11 @@ export default function AdminClient({
     { key: 'canva',   label: 'Canva Requests' },
     { key: 'grants',  label: 'Access Grants' },
   ]
+
+  function handleTabChange(newTab: Tab) {
+    setTab(newTab)
+    router.replace(`/admin?tab=${newTab}`, { scroll: false })
+  }
 
   const filteredProfiles = search.trim()
     ? profiles.filter(p =>
@@ -678,63 +689,12 @@ export default function AdminClient({
         />
       )}
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
-            Admin
-          </h2>
-          <p className="text-sm text-[var(--ink-3)] mt-0.5">
-            Platform overview · {isSuperAdmin ? 'Super Admin' : 'Staff'}
-          </p>
-        </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2">
-            <Link
-              href="/admin/library"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
-              style={{ background: 'rgba(4,173,239,0.12)', color: '#0284a8' }}
-            >
-              Education Library
-            </Link>
-            <Link
-              href="/admin/resources"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
-              style={{ background: 'rgba(73,37,47,0.15)', color: 'var(--accent-text)' }}
-            >
-              Resources
-            </Link>
-            <Link
-              href="/admin/cadence"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
-              style={{ background: 'rgba(109,40,217,0.1)', color: '#6d28d9' }}
-            >
-              Cadence Analysis
-            </Link>
-            <Link
-              href="/admin/squarespace"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
-              style={{ background: 'rgba(22,163,74,0.1)', color: '#15803d' }}
-            >
-              SS Sites
-            </Link>
-            <Link
-              href="/admin/concierge"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
-              style={{ background: 'rgba(180,83,9,0.1)', color: '#b45309' }}
-            >
-              Concierge
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Tab bar */}
+      {/* Tab bar — sub-tab navigation now handled by AdminNav */}
       <div className="flex items-center gap-1 border-b border-[var(--ink)]/8">
         {tabs.map(({ key, label, count }) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => handleTabChange(key)}
             className={[
               'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
               tab === key
