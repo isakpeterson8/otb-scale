@@ -4,24 +4,19 @@ import AppShell from '@/components/layout/AppShell'
 import UpgradeBanner from '@/components/UpgradeBanner'
 import EducationTabBar from '../TabBar'
 import { hasFeatureAccess } from '@/lib/features'
+import { getCachedStudioTier } from '@/lib/supabase/cached'
 import { getResources } from '@/app/actions/resources'
 import ResourcesClient from '@/app/resources/ResourcesClient'
 
 export default async function EducationResourcesPage() {
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
-  const { supabase, studioId, userEmail } = ctx
+  const { userEmail } = ctx
 
   const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
   const isAdmin = !!(userEmail && adminEmails.includes(userEmail.toLowerCase()))
 
-  const { data: studio } = await supabase
-    .from('studios')
-    .select('subscription_tier')
-    .eq('id', studioId)
-    .single()
-
-  const tier = studio?.subscription_tier ?? 'free'
+  const tier = await getCachedStudioTier(ctx.studioId)
   const hasAccess = isAdmin || hasFeatureAccess(tier, 'education_library')
 
   if (!hasAccess) {

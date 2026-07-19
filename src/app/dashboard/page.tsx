@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import { generateReminders } from '@/app/actions/reminders'
+import { getCachedStudioTier } from '@/lib/supabase/cached'
 import AppShell from '@/components/layout/AppShell'
 import DashboardClient from './DashboardClient'
 import type { SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
@@ -17,12 +18,7 @@ export default async function DashboardPage({
   // Fire-and-forget: generate any due reminders for this user (idempotent)
   void generateReminders()
 
-  const { data: studio } = await supabase
-    .from('studios')
-    .select('subscription_tier')
-    .eq('id', studioId)
-    .single()
-  const tier = studio?.subscription_tier ?? 'free'
+  const tier = await getCachedStudioTier(studioId)
   // In View As mode mirror the viewed studio's tier; real admins are never gated
   const isFreeTier = viewOnly ? tier === 'free' : (!isAdmin && tier === 'free')
 

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { adminClient } from '@/lib/supabase/admin'
-import { getCachedClient, getCachedUser, getCachedProfile } from '@/lib/supabase/cached'
+import { getCachedUser, getCachedProfile, getCachedStudioTier } from '@/lib/supabase/cached'
 import AppShellClient from './AppShellClient'
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
@@ -9,7 +9,6 @@ export default async function AppShell({ children }: { children: React.ReactNode
   if (!user) redirect('/auth/login')
 
   const profile = await getCachedProfile(user.id)
-  const supabase = await getCachedClient()
 
   const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
 
@@ -18,15 +17,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
     if (profile?.status !== 'approved') redirect('/pending')
   }
 
-  // Fetch studio tier for sidebar badge (only for studio owners with a linked studio)
+  // Fetch studio tier for sidebar badge — primes the cache for the page component too
   let studioTier: string | null = null
   if (!isAdmin && profile?.studio_id) {
-    const { data: studio } = await supabase
-      .from('studios')
-      .select('subscription_tier')
-      .eq('id', profile.studio_id)
-      .single()
-    studioTier = studio?.subscription_tier ?? 'free'
+    studioTier = await getCachedStudioTier(profile.studio_id)
   }
 
   const displayName =

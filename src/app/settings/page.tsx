@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getStudioId } from '@/app/actions/_shared'
+import { getCachedStudioTier } from '@/lib/supabase/cached'
 import AppShell from '@/components/layout/AppShell'
 import SettingsClient from './SettingsClient'
 import type { Profile, UserSettings } from '@/types/database'
@@ -18,18 +19,18 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const [{ data: profile }, { data: settings }, { data: studio }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user.id).single<Profile>(),
-    supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle(),
-    // ctx.supabase is the admin client in View As mode — reads the viewed studio's tier
-    ctx.supabase.from('studios').select('subscription_tier').eq('id', ctx.studioId).single(),
+  const [[{ data: profile }, { data: settings }], subscriptionTier] = await Promise.all([
+    Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single<Profile>(),
+      supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle(),
+    ]),
+    getCachedStudioTier(ctx.studioId),
   ])
 
   const fullSettings = (settings ?? null) as UserSettings | null
 
   // Derive connection status server-side — never send raw tokens to the client
   const gmailConnected = !!(fullSettings?.gmail_access_token)
-  const subscriptionTier = studio?.subscription_tier ?? 'free'
 
   // Strip token fields before passing to client component
   const clientSettings = fullSettings

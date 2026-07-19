@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { createClient } from './server'
+import { adminClient } from './admin'
 import type { UserRole } from '@/types/database'
 
 // These are memoized per request within the RSC render tree.
@@ -33,4 +34,13 @@ export const getCachedProfile = cache(async (userId: string): Promise<CachedProf
     .eq('id', userId)
     .single()
   return (data as CachedProfile | null) ?? null
+})
+
+export const getCachedStudioTier = cache(async (studioId: string): Promise<string> => {
+  const { data } = await adminClient
+    .from('studios')
+    .select('subscription_tier')
+    .eq('id', studioId)
+    .single()
+  return data?.subscription_tier ?? 'free'
 })

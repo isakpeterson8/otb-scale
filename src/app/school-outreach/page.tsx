@@ -6,6 +6,7 @@ import UpgradeBanner from '@/components/UpgradeBanner'
 import SchoolOutreachClient from './SchoolOutreachClient'
 import { checkGmailReplies } from '@/app/actions/cadence'
 import { hasFeatureAccess } from '@/lib/features'
+import { getCachedStudioTier } from '@/lib/supabase/cached'
 import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/database'
 
 export const metadata: Metadata = { title: 'School Outreach' }
@@ -18,13 +19,7 @@ export default async function SchoolOutreachPage() {
   const adminEmails = (process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase())
   const isAdmin = ctxIsAdmin || !!(userEmail && adminEmails.includes(userEmail.toLowerCase()))
 
-  const { data: studio } = await supabase
-    .from('studios')
-    .select('subscription_tier')
-    .eq('id', studioId)
-    .single()
-
-  const tier = studio?.subscription_tier ?? 'free'
+  const tier = await getCachedStudioTier(studioId)
   const hasAccess = isAdmin || hasFeatureAccess(tier, 'school_outreach')
 
   if (!hasAccess) {
