@@ -711,6 +711,20 @@ export default function AdminClient({
             >
               Cadence Analysis
             </Link>
+            <Link
+              href="/admin/squarespace"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'rgba(22,163,74,0.1)', color: '#15803d' }}
+            >
+              SS Sites
+            </Link>
+            <Link
+              href="/admin/concierge"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'rgba(180,83,9,0.1)', color: '#b45309' }}
+            >
+              Concierge
+            </Link>
           </div>
         )}
       </div>

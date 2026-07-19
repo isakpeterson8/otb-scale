@@ -126,6 +126,18 @@ const NAV_ALL = [
   },
   NAV_LOCKED[3], // Cadence Check-In
   CANVA_EDITS_NAV_ITEM,
+  {
+    label: 'Squarespace Concierge',
+    href: '/squarespace-concierge',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M1.5 6h13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity=".5" />
+        <path d="M5 9.5h4M5 11.5h2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity=".5" />
+        <circle cx="11.5" cy="10.5" r="1.5" fill="currentColor" opacity=".6" />
+      </svg>
+    ),
+  },
   SETTINGS_NAV_ITEM,
 ]
 

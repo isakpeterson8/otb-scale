@@ -337,3 +337,80 @@ export interface UserSettings {
   created_at: string
   updated_at: string
 }
+
+// ── Squarespace Concierge ─────────────────────────────────────────────────────
+
+export type SiteStatus = 'active_paid' | 'active_trial' | 'trial_expired' | 'expired_paid'
+export type SiteDateType = 'renewal' | 'expiry' | 'trial_expiry' | 'none'
+export type RequestType = 'new_build' | 'refresh' | 'support' | 'billing_transfer'
+export type RequestStatus =
+  | 'requested'
+  | 'intake_complete'
+  | 'in_build'
+  | 'contributor_sent'
+  | 'client_editing'
+  | 'billing_transferred'
+  | 'live'
+  | 'closed'
+
+export interface SquaresspaceSite {
+  id: string
+  site_name: string
+  primary_url: string | null
+  is_custom_domain: boolean
+  status: SiteStatus
+  key_date: string | null
+  date_type: SiteDateType
+  circle_tags: string | null
+  plan_tier: string | null
+  scheduling_stack: string | null
+  template_version: string | null
+  member_name: string | null
+  user_id: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SquarespaceRequest {
+  id: string
+  site_id: string | null
+  studio_id: string | null
+  user_id: string
+  request_type: RequestType
+  status: RequestStatus
+  // new_build intake
+  studio_name: string | null
+  owner_name: string | null
+  city_state: string | null
+  instruments: string | null
+  ages_served: string | null
+  teaching_format: string | null
+  booking_platform: string | null
+  booking_url: string | null
+  existing_domain: string | null
+  current_site_url: string | null
+  gbp_url: string | null
+  logo_asset_link: string | null
+  brand_colors: string | null
+  example_sites: string | null
+  bio: string | null
+  testimonials_link: string | null
+  show_pricing: boolean | null
+  primary_cta: string | null
+  // refresh/support/billing_transfer intake
+  site_reference: string | null
+  details: string | null
+  copy_pack: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SquaresspaceSyncLog {
+  id: string
+  synced_at: string
+  new_sites: number
+  updated_sites: number
+  raw_input_chars: number | null
+  notes: string | null
+}
