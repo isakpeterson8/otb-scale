@@ -102,7 +102,7 @@ const NAV_LOCKED = [
 ]
 
 const CANVA_EDITS_NAV_ITEM = {
-  label: 'Canva Edits',
+  label: 'Canva',
   href: '/canva-edits',
   icon: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -127,7 +127,7 @@ const NAV_ALL = [
   NAV_LOCKED[3], // Cadence Check-In
   CANVA_EDITS_NAV_ITEM,
   {
-    label: 'Squarespace Concierge',
+    label: 'Squarespace',
     href: '/squarespace-concierge',
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
