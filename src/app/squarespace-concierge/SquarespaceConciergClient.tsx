@@ -22,7 +22,7 @@ const TYPE_LABELS: Record<RequestType, string> = {
   new_build:        'New website build',
   refresh:          'Refresh existing site',
   support:          'Support / fix',
-  billing_transfer: 'Billing transfer',
+  billing_transfer: 'Billing transfer', // kept for displaying existing requests
 }
 
 const inputClass =
@@ -68,7 +68,7 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
   const [details, setDetails]         = useState('')
 
   const isNewBuild = requestType === 'new_build'
-  const isShortForm = requestType === 'refresh' || requestType === 'support' || requestType === 'billing_transfer'
+  const isShortForm = requestType === 'refresh' || requestType === 'support'
 
   function validate(): string | null {
     if (!requestType) return 'Please select a request type.'
@@ -196,10 +196,9 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
           <label className={labelClass}>Request type <span style={{ color: 'var(--red)' }}>*</span></label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {([
-              ['new_build',        'New website build',     'I need a brand-new site built from scratch'],
-              ['refresh',          'Refresh existing site',  'Update or redesign an OTB-built site'],
-              ['support',          'Support / fix',         'Something on my site needs fixing'],
-              ['billing_transfer', 'Billing transfer',      'Transfer my site billing to me'],
+              ['new_build', 'New website build',    'I need a brand-new site built from scratch'],
+              ['refresh',   'Refresh existing site', 'Update or redesign an OTB-built site'],
+              ['support',   'Support / fix',         'Something on my site needs fixing'],
             ] as const).map(([val, label, desc]) => (
               <button
                 key={val}
@@ -390,11 +389,7 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
                 rows={5}
                 value={details}
                 onChange={e => setDetails(e.target.value)}
-                placeholder={
-                  requestType === 'billing_transfer'
-                    ? "Confirm you'd like the billing transferred to you. Include your Squarespace account email if different from your OTB login."
-                    : 'Describe what needs to change or be fixed…'
-                }
+                placeholder="Describe what needs to change or be fixed…"
               />
             </div>
           </>
