@@ -26,8 +26,8 @@ const SUB_NAV: Partial<Record<SectionKey, Array<{ key: string; label: string; hr
     { key: 'grants',  label: 'Access Grants',    href: '/admin?tab=grants' },
   ],
   requests: [
-    { key: 'concierge', label: 'Concierge', href: '/admin/concierge' },
-    { key: 'canva',     label: 'Canva',     href: '/admin?tab=canva' },
+    { key: 'concierge', label: 'Squarespace', href: '/admin/concierge' },
+    { key: 'canva',     label: 'Canva',        href: '/admin?tab=canva' },
   ],
   content: [
     { key: 'library',   label: 'Education Library', href: '/admin/library' },
