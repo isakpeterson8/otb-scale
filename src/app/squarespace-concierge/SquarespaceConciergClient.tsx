@@ -227,11 +227,11 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className={fieldClass}>
                 <label className={labelClass}>Studio name <span style={{ color: 'var(--red)' }}>*</span></label>
-                <input className={inputClass} value={studioName} onChange={e => setStudioName(e.target.value)} placeholder="Kelly's Piano Studio" />
+                <input className={inputClass} value={studioName} onChange={e => setStudioName(e.target.value)} placeholder="Johan's Piano Studio" />
               </div>
               <div className={fieldClass}>
                 <label className={labelClass}>Your name <span style={{ color: 'var(--red)' }}>*</span></label>
-                <input className={inputClass} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Kelly Riordan" />
+                <input className={inputClass} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Johan SB" />
               </div>
               <div className={fieldClass}>
                 <label className={labelClass}>City &amp; state <span style={{ color: 'var(--red)' }}>*</span></label>
