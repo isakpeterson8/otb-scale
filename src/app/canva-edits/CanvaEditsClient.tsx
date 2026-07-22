@@ -30,6 +30,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
   const [canvaLink, setCanvaLink] = useState('')
   const [referenceUrl, setReferenceUrl] = useState('')
   const [confirmed, setConfirmed] = useState(false)
+  const [sharedAccess, setSharedAccess] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,6 +53,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
       setReferenceUrl('')
       setAssetType(ASSET_TYPES[0])
       setConfirmed(false)
+      setSharedAccess(false)
       setTimeout(() => setSubmitted(false), 4000)
     })
   }
@@ -138,6 +140,18 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
           </span>
         </label>
 
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={sharedAccess}
+            onChange={e => setSharedAccess(e.target.checked)}
+            className="mt-0.5 shrink-0 accent-[var(--accent-text)]"
+          />
+          <span className="text-xs text-[var(--ink-3)] leading-relaxed">
+            I have shared edit access with design@outsidethebachs.com
+          </span>
+        </label>
+
         {error && <p className="text-xs" style={{ color: 'var(--red)' }}>{error}</p>}
         {submitted && (
           <p className="text-xs font-medium" style={{ color: 'var(--green)' }}>
@@ -147,7 +161,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
 
         <button
           type="submit"
-          disabled={isPending || !confirmed}
+          disabled={isPending || !confirmed || !sharedAccess}
           className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
           style={{ background: 'var(--accent-text)', color: 'var(--canvas)' }}
         >

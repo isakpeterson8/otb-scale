@@ -23,12 +23,12 @@ async function getBadgeCounts() {
   }
 }
 
-export default async function AdminShell({ children }: { children: React.ReactNode }) {
+export default async function AdminShell({ children, canvaOnly }: { children: React.ReactNode; canvaOnly?: boolean }) {
   const { pendingCount, requestsCount } = await getBadgeCounts()
 
   return (
     <AppShell>
-      <AdminNav pendingCount={pendingCount} requestsCount={requestsCount} />
+      <AdminNav pendingCount={pendingCount} requestsCount={requestsCount} canvaOnly={canvaOnly} />
       {children}
     </AppShell>
   )

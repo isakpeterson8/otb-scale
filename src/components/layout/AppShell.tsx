@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { adminClient } from '@/lib/supabase/admin'
 import { getCachedUser, getCachedProfile, getCachedStudioTier } from '@/lib/supabase/cached'
+import { isDesignerEmail } from '@/lib/designer'
 import AppShellClient from './AppShellClient'
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
@@ -48,6 +49,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
     <AppShellClient
       displayName={displayName}
       isAdmin={isAdmin}
+      showAdminLink={isAdmin || isDesignerEmail(user.email)}
       tier={studioTier}
       viewOnly={!!viewAsStudioId}
       viewAsStudioName={viewAsStudioName}

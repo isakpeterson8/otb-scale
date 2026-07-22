@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import AdminShell from './AdminShell'
 import AdminClient from './AdminClient'
+import CanvaRequestsTab from './CanvaRequestsTab'
+import { isDesignerEmail } from '@/lib/designer'
 import type { UserRole } from '@/types/database'
 
 const getCachedAuthUsers = unstable_cache(
@@ -45,15 +47,33 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const [callerProfileRes, profilesRes, settingsRes, studiosRes, authUsers] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).single(),
+  const { data: callerProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const callerRole = (callerProfile?.role ?? 'studio_owner') as UserRole
+  const callerIsAdmin = callerRole === 'otb_admin' || callerRole === 'otb_staff'
+
+  // Designers get ONLY the Canva requests view — no member data is fetched
+  if (!callerIsAdmin) {
+    if (!isDesignerEmail(user.email)) redirect('/dashboard')
+    return (
+      <AdminShell canvaOnly>
+        <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
+          <CanvaRequestsTab />
+        </main>
+      </AdminShell>
+    )
+  }
+
+  const [profilesRes, settingsRes, studiosRes, authUsers] = await Promise.all([
     adminClient.from('profiles').select('id, studio_id, role, email, status, created_at').order('created_at', { ascending: false }),
     adminClient.from('settings').select('user_id, display_name'),
     adminClient.from('studios').select('id, subscription_tier'),
     getCachedAuthUsers(),
   ])
-
-  const callerRole = (callerProfileRes.data?.role ?? 'studio_owner') as UserRole
 
   const rawProfiles = (profilesRes.data ?? []) as { id: string; studio_id: string | null; role: UserRole; email: string | null; status: string | null; created_at: string }[]
   const rawSettings = (settingsRes.data ?? []) as { user_id: string; display_name: string | null }[]

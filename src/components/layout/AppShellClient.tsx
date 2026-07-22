@@ -8,13 +8,14 @@ interface Props {
   children: React.ReactNode
   displayName: string
   isAdmin: boolean
+  showAdminLink?: boolean
   tier: string | null
   viewOnly: boolean
   viewAsStudioName: string | null
   viewAsTier: string | null
 }
 
-export default function AppShellClient({ children, displayName, isAdmin, tier, viewOnly, viewAsStudioName, viewAsTier }: Props) {
+export default function AppShellClient({ children, displayName, isAdmin, showAdminLink, tier, viewOnly, viewAsStudioName, viewAsTier }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -37,6 +38,7 @@ export default function AppShellClient({ children, displayName, isAdmin, tier, v
       <Sidebar
         displayName={displayName}
         isAdmin={isAdmin}
+        showAdminLink={showAdminLink}
         tier={tier}
         viewOnly={viewOnly}
         viewAsTier={viewAsTier}

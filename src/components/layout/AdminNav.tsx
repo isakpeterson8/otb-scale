@@ -6,6 +6,8 @@ import { usePathname, useSearchParams } from 'next/navigation'
 interface Props {
   pendingCount: number
   requestsCount: number
+  /** Designer mode: show only the Requests > Canva navigation */
+  canvaOnly?: boolean
 }
 
 const TOP_NAV = [
@@ -61,14 +63,19 @@ function getActiveSubKey(pathname: string, tab: string | null, section: SectionK
   return null
 }
 
-export default function AdminNav({ pendingCount, requestsCount }: Props) {
+export default function AdminNav({ pendingCount, requestsCount, canvaOnly }: Props) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const tab = searchParams.get('tab')
 
-  const activeSection = getActiveSection(pathname, tab)
-  const activeSubKey  = getActiveSubKey(pathname, tab, activeSection)
-  const subItems = SUB_NAV[activeSection]
+  const activeSection = canvaOnly ? 'requests' : getActiveSection(pathname, tab)
+  const activeSubKey  = canvaOnly ? 'canva' : getActiveSubKey(pathname, tab, activeSection)
+  const topNav = canvaOnly
+    ? [{ key: 'requests', label: 'Requests', href: '/admin?tab=canva' } as const]
+    : TOP_NAV
+  const subItems = canvaOnly
+    ? [{ key: 'canva', label: 'Canva', href: '/admin?tab=canva' }]
+    : SUB_NAV[activeSection]
 
   const badges: Partial<Record<SectionKey, number>> = {
     members:  pendingCount,
@@ -80,7 +87,7 @@ export default function AdminNav({ pendingCount, requestsCount }: Props) {
       {/* Top-level nav */}
       <div className="overflow-x-auto scrollbar-none">
         <div className="flex items-center gap-1 px-4 md:px-8 pt-3" style={{ minWidth: 'max-content' }}>
-          {TOP_NAV.map(({ key, label, href }) => {
+          {topNav.map(({ key, label, href }) => {
             const isActive = activeSection === key
             const badge = badges[key]
             return (

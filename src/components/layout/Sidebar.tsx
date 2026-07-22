@@ -158,6 +158,8 @@ const TIER_BADGE: Record<string, { label: string; bg: string; color: string }> =
 interface SidebarProps {
   displayName: string
   isAdmin: boolean
+  /** Show the Admin nav link — true for admins and for designer emails (Canva-only access) */
+  showAdminLink?: boolean
   tier?: string | null
   viewOnly?: boolean
   viewAsTier?: string | null
@@ -165,7 +167,7 @@ interface SidebarProps {
   onClose?: () => void
 }
 
-export default function Sidebar({ displayName, isAdmin, tier, viewOnly, viewAsTier, isOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ displayName, isAdmin, showAdminLink, tier, viewOnly, viewAsTier, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [lockedModal, setLockedModal] = useState<string | null>(null) // feature label
@@ -341,8 +343,8 @@ export default function Sidebar({ displayName, isAdmin, tier, viewOnly, viewAsTi
             </>
           )}
 
-          {/* Admin link — shown for admins, hidden when mirroring a studio in View As mode */}
-          {isAdmin && !viewOnly && (
+          {/* Admin link — shown for admins and designer emails, hidden when mirroring a studio in View As mode */}
+          {(showAdminLink ?? isAdmin) && !viewOnly && (
             <Link
               href="/admin"
               onClick={onClose}
