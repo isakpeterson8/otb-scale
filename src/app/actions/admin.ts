@@ -351,10 +351,27 @@ export interface AccessGrant {
 async function applyGrantToExistingUser(email: string, tier: string) {
   const { data: profile } = await adminClient
     .from('profiles')
-    .select('studio_id')
+    .select('id, studio_id, status')
     .eq('email', email)
     .maybeSingle()
-  if (!profile?.studio_id) return
+  if (!profile) return
+
+  // Auto-approve users who are still pending (grant created after their signup)
+  if (profile.status === 'pending') {
+    await adminClient
+      .from('profiles')
+      .update({ status: 'approved' })
+      .eq('id', profile.id)
+
+    await sendAdminEmail(
+      email,
+      "You're approved! Welcome to OTB Scale",
+      approvalEmailHtml(),
+      approvalEmailText(),
+    )
+  }
+
+  if (!profile.studio_id) return
   await adminClient
     .from('studios')
     .update({ subscription_tier: tier })
