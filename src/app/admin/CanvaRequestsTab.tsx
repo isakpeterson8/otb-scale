@@ -20,6 +20,7 @@ function Th({ children }: { children?: React.ReactNode }) {
 }
 
 function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
+  const [expanded, setExpanded] = useState(false)
   const [isPending, startTransition] = useTransition()
   const badge = CANVA_STATUS_BADGE[request.status]
 
@@ -28,44 +29,80 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
   }
 
   return (
-    <tr className="hover:bg-[var(--canvas)] transition-colors">
-      <td className="px-4 py-3 text-sm text-[var(--ink)]">{request.studio_name ?? '—'}</td>
-      <td className="px-4 py-3 text-sm text-[var(--ink-2)] whitespace-nowrap">{request.asset_type}</td>
-      <td className="px-4 py-3 text-sm text-[var(--ink-2)] max-w-[220px]">
-        <p className="truncate">{request.instructions}</p>
-      </td>
-      <td className="px-4 py-3">
-        <a
-          href={request.canva_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-[var(--accent-text)] hover:underline"
-        >
-          Open link
-        </a>
-      </td>
-      <td className="px-4 py-3">
-        <span
-          className="inline-block px-1.5 py-px rounded text-[10px] font-semibold leading-tight"
-          style={{ background: badge.bg, color: badge.color }}
-        >
-          {badge.label}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-xs text-[var(--ink-3)] whitespace-nowrap">{formatDate(request.created_at)}</td>
-      <td className="px-4 py-3">
-        {request.status !== 'complete' && (
-          <button
-            disabled={isPending}
-            onClick={markComplete}
-            className="px-3 py-1 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80"
-            style={{ background: '#15803d' }}
+    <>
+      <tr
+        onClick={() => setExpanded(v => !v)}
+        title={expanded ? undefined : 'Click to read full instructions'}
+        className="hover:bg-[var(--canvas)] transition-colors cursor-pointer"
+      >
+        <td className="px-4 py-3 text-sm text-[var(--ink)]">{request.studio_name ?? '—'}</td>
+        <td className="px-4 py-3 text-sm text-[var(--ink-2)] whitespace-nowrap">{request.asset_type}</td>
+        <td className="px-4 py-3 text-sm text-[var(--ink-2)] max-w-[220px]">
+          <span className="flex items-center gap-1.5">
+            <p className="truncate">{request.instructions}</p>
+            <svg
+              width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden
+              className={`shrink-0 text-[var(--ink-3)] transition-transform ${expanded ? 'rotate-180' : ''}`}
+            >
+              <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <a
+            href={request.canva_link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="text-xs text-[var(--accent-text)] hover:underline"
           >
-            {isPending ? '…' : 'Mark complete'}
-          </button>
-        )}
-      </td>
-    </tr>
+            Open link
+          </a>
+        </td>
+        <td className="px-4 py-3">
+          <span
+            className="inline-block px-1.5 py-px rounded text-[10px] font-semibold leading-tight"
+            style={{ background: badge.bg, color: badge.color }}
+          >
+            {badge.label}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-xs text-[var(--ink-3)] whitespace-nowrap">{formatDate(request.created_at)}</td>
+        <td className="px-4 py-3">
+          {request.status !== 'complete' && (
+            <button
+              disabled={isPending}
+              onClick={e => { e.stopPropagation(); markComplete() }}
+              className="px-3 py-1 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-80"
+              style={{ background: '#15803d' }}
+            >
+              {isPending ? '…' : 'Mark complete'}
+            </button>
+          )}
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="bg-[var(--canvas)]">
+          <td colSpan={7} className="px-4 py-3">
+            <p className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide mb-1">Full instructions</p>
+            <p className="text-sm text-[var(--ink-2)] whitespace-pre-wrap leading-relaxed">{request.instructions}</p>
+            {request.reference_url && (
+              <p className="text-xs mt-2">
+                <span className="text-[var(--ink-3)]">Reference: </span>
+                <a
+                  href={request.reference_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--accent-text)] hover:underline break-all"
+                >
+                  {request.reference_url}
+                </a>
+              </p>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
