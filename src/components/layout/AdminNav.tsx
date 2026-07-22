@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 
@@ -66,7 +67,14 @@ function getActiveSubKey(pathname: string, tab: string | null, section: SectionK
 export default function AdminNav({ pendingCount, requestsCount, canvaOnly }: Props) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const tab = searchParams.get('tab')
+  const searchParamsTab = searchParams.get('tab')
+
+  // Track locally so client-side tab switches (window.history.replaceState) update
+  // the active indicator without triggering a server round-trip.
+  const [localTab, setLocalTab] = useState<string | null>(searchParamsTab)
+  useEffect(() => { setLocalTab(searchParamsTab) }, [searchParamsTab])
+
+  const tab = canvaOnly ? 'canva' : localTab
 
   const activeSection = canvaOnly ? 'requests' : getActiveSection(pathname, tab)
   const activeSubKey  = canvaOnly ? 'canva' : getActiveSubKey(pathname, tab, activeSection)
@@ -125,10 +133,19 @@ export default function AdminNav({ pendingCount, requestsCount, canvaOnly }: Pro
           <div className="flex items-center gap-0 px-4 md:px-8" style={{ minWidth: 'max-content' }}>
             {subItems.map(({ key, label, href }) => {
               const isActive = activeSubKey === key
+              const isTabLink = href.startsWith('/admin?tab=')
               return (
                 <Link
                   key={key}
                   href={href}
+                  onClick={isTabLink ? e => {
+                    e.preventDefault()
+                    const newTab = new URLSearchParams(href.split('?')[1] ?? '').get('tab')
+                    if (!newTab) return
+                    setLocalTab(newTab)
+                    window.history.replaceState(null, '', href)
+                    window.dispatchEvent(new CustomEvent('admin-tab-change', { detail: newTab }))
+                  } : undefined}
                   className={[
                     'px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
                     isActive

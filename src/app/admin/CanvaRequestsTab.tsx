@@ -25,7 +25,10 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
   const badge = CANVA_STATUS_BADGE[request.status]
 
   function markComplete() {
-    startTransition(async () => { await updateCanvaRequest(request.id, { status: 'complete' }) })
+    startTransition(async () => {
+      await updateCanvaRequest(request.id, { status: 'complete' })
+      bustCanvaCache()
+    })
   }
 
   return (
@@ -106,12 +109,21 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
   )
 }
 
+// Module-level: survives tab switches within the same page session
+let _canvaCache: AdminCanvaRequest[] | null = null
+
+export function bustCanvaCache() { _canvaCache = null }
+
 export default function CanvaRequestsTab() {
-  const [requests, setRequests] = useState<AdminCanvaRequest[] | null>(null)
+  const [requests, setRequests] = useState<AdminCanvaRequest[] | null>(_canvaCache)
   const [showCompleted, setShowCompleted] = useState(false)
 
   useEffect(() => {
-    getAdminCanvaRequests().then(setRequests)
+    if (_canvaCache) return  // already loaded this session
+    getAdminCanvaRequests().then(data => {
+      _canvaCache = data
+      setRequests(data)
+    })
   }, [])
 
   if (!requests) {

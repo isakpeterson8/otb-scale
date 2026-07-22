@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest, getWatchHistory, createAccessGrant, revokeAccessGrant, listAccessGrants } from '@/app/actions/admin'
 import type { WatchHistoryEntry, AccessGrant } from '@/app/actions/admin'
 import { sendAdminReminder } from '@/app/actions/reminders'
@@ -11,7 +11,6 @@ import { TIER_LABELS } from '@/lib/features'
 import type { UserRole } from '@/types/database'
 import type { AdminProfile } from './page'
 
-type Tab = 'pending' | 'users' | 'tiers' | 'canva' | 'grants'
 type ReminderType = 'cadence_weekly' | 'data_recap_monthly' | 'admin_manual'
 
 type TierFilter = 'all' | 'free' | 'pending_upgrade' | 'scale' | 'graduate' | 'lifetime'
@@ -338,6 +337,12 @@ function WatchHistoryModal({ profile, onClose }: { profile: AdminProfile; onClos
   )
 }
 
+const VALID_TABS = ['pending', 'users', 'tiers', 'canva', 'grants'] as const
+type Tab = (typeof VALID_TABS)[number]
+
+// Module-level: survives tab switches within the same page session
+let _grantsCache: AccessGrant[] | null = null
+
 const GRANT_STATUS_BADGE: Record<'active' | 'revoked', { label: string; bg: string; color: string }> = {
   active:  { label: 'Active',  bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
   revoked: { label: 'Revoked', bg: 'rgba(220,38,38,0.1)',   color: '#b91c1c' },
@@ -349,7 +354,7 @@ function grantStatus(grant: AccessGrant): 'active' | 'revoked' {
 }
 
 function AccessGrantsTab() {
-  const [grants, setGrants] = useState<AccessGrant[] | null>(null)
+  const [grants, setGrants] = useState<AccessGrant[] | null>(_grantsCache)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [tier, setTier] = useState<string>('scale')
@@ -358,12 +363,17 @@ function AccessGrantsTab() {
 
   function reload() {
     listAccessGrants().then(result => {
-      if (result.error) setLoadError(result.error)
-      else setGrants(result.data)
+      if (result.error) { setLoadError(result.error); return }
+      _grantsCache = result.data
+      setGrants(result.data)
     })
   }
 
-  useEffect(() => { reload() }, [])
+  useEffect(() => {
+    if (_grantsCache) return  // already loaded this session
+    reload()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function submit() {
     setFormError(null)
@@ -372,6 +382,7 @@ function AccessGrantsTab() {
       if (result.error) { setFormError(result.error); return }
       setEmail('')
       setTier('scale')
+      _grantsCache = null  // bust so next load is fresh
       reload()
     })
   }
@@ -380,6 +391,7 @@ function AccessGrantsTab() {
     startTransition(async () => {
       const result = await revokeAccessGrant(grantId)
       if (result.error) { setFormError(result.error); return }
+      _grantsCache = null  // bust so next load is fresh
       reload()
     })
   }
@@ -507,12 +519,10 @@ export default function AdminClient({
   profiles: AdminProfile[]
   pendingProfiles: AdminProfile[]
 }) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const urlTab = searchParams.get('tab') as Tab | null
-  const validTabs: Tab[] = ['pending', 'users', 'tiers', 'canva', 'grants']
   const [tab, setTab] = useState<Tab>(
-    urlTab && validTabs.includes(urlTab) ? urlTab : 'pending'
+    urlTab && (VALID_TABS as readonly string[]).includes(urlTab) ? urlTab : 'pending'
   )
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<TierFilter>('all')
@@ -523,10 +533,15 @@ export default function AdminClient({
 
   const pendingUpgradeCount = profiles.filter(p => p.requested_tier).length
 
-  function handleTabChange(newTab: Tab) {
-    setTab(newTab)
-    router.replace(`/admin?tab=${newTab}`, { scroll: false })
-  }
+  // Listen for client-side tab changes dispatched by AdminNav (no server round-trip)
+  useEffect(() => {
+    function onAdminTabChange(e: Event) {
+      const key = (e as CustomEvent<string>).detail as Tab
+      if ((VALID_TABS as readonly string[]).includes(key)) setTab(key)
+    }
+    window.addEventListener('admin-tab-change', onAdminTabChange)
+    return () => window.removeEventListener('admin-tab-change', onAdminTabChange)
+  }, [])
 
   const filteredProfiles = search.trim()
     ? profiles.filter(p =>
