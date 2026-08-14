@@ -4,6 +4,7 @@ export const EDUCATION_CATEGORIES = [
   { slug: 'ideal-student',                 label: 'Ideal Student' },
   { slug: 'marketing',                     label: 'Marketing' },
   { slug: 'facebook-group-self-promotion', label: 'Facebook Group Self-Promotion' },
+  { slug: 'schools-orgs',                  label: 'Schools & Orgs' },
   { slug: 'structure',                     label: 'Studio Structure & Policy' },
   { slug: 'tuition',                       label: 'Tuition & Rates' },
   { slug: 'instruction',                   label: 'Instruction Models' },
