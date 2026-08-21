@@ -50,7 +50,7 @@ const POST_TYPE_BADGE: Record<PostType, { label: string; bg: string; color: stri
 const QUAL_BADGE: Record<QualificationStatus, { label: string; shortLabel: string; bg: string; color: string; tooltip?: string }> = {
   active:                     { label: 'Active',        shortLabel: 'Active',      bg: 'rgba(22,163,74,0.12)',   color: '#15803d' },
   disqualified_low_engagement:{ label: 'Disqualified',  shortLabel: 'Disqualified',bg: 'rgba(220,38,38,0.1)',    color: '#b91c1c' },
-  future_third_party:         { label: 'Future 3P',     shortLabel: 'Future 3P',   bg: 'rgba(180,83,9,0.12)',    color: '#b45309', tooltip: 'No self-promo rules — potential third-party posting fit' },
+  future_third_party:         { label: 'Future',       shortLabel: 'Future',      bg: 'rgba(180,83,9,0.12)',    color: '#b45309', tooltip: 'No self-promo rules — potential third-party posting fit' },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -594,8 +594,8 @@ function GroupForm({
           className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
         >
           <option value="active">Active</option>
-          <option value="disqualified_low_engagement">Disqualified (Low Engagement)</option>
-          <option value="future_third_party">Future Third Party</option>
+          <option value="disqualified_low_engagement">Disqualified</option>
+          <option value="future_third_party">Future</option>
         </select>
       </div>
 
