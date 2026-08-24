@@ -7,7 +7,10 @@ import {
   markPostCompletion,
   createPostAsset,
   deletePostAsset,
+  deleteFacebookGroup,
 } from '@/app/actions/facebook-groups'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Toast, { useToast } from '@/components/ui/Toast'
 import type {
   FacebookGroup,
   GroupPostCompletion,
@@ -642,6 +645,9 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
   const [filter, setFilter] = useState<FilterTab>('all')
   const [showForm, setShowForm] = useState(false)
   const [editGroup, setEditGroup] = useState<FacebookGroup | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<FacebookGroup | null>(null)
+  const [isDeleting, startDelete] = useTransition()
+  const { toast, showToast } = useToast()
 
   const weekAgo  = new Date(Date.now() - 7  * 86_400_000).toISOString().slice(0, 10)
   const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)
@@ -659,6 +665,42 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
   const editGroupFresh = editGroup
     ? (groups.find(g => g.id === editGroup.id) ?? editGroup)
     : null
+
+  // What a delete would cascade away — group_post_completions and group_post_assets
+  // are both ON DELETE CASCADE, so name them explicitly before confirming.
+  function deleteConsequences(group: FacebookGroup): string[] {
+    const postCount  = allCompletions.filter(c => c.group_id === group.id).length
+    const assetCount = assets.filter(a => a.group_id === group.id).length
+    const eng        = engagement[group.id]
+    const out: string[] = []
+
+    if (postCount > 0) {
+      const totals = eng
+        ? ` (${eng.likes} likes, ${eng.comments} comments, ${eng.dms} DMs)`
+        : ''
+      out.push(`${postCount} logged post${postCount === 1 ? '' : 's'} and all engagement history${totals}`)
+    }
+    if (assetCount > 0) {
+      out.push(`${assetCount} saved post asset${assetCount === 1 ? '' : 's'} (copy and images)`)
+    }
+    return out
+  }
+
+  function handleDeleteGroup() {
+    if (!deleteTarget) return
+    const name = deleteTarget.group_name
+    startDelete(async () => {
+      const result = await deleteFacebookGroup(deleteTarget.id)
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else {
+        showToast(`“${name}” deleted`, 'success')
+        setDeleteTarget(null)
+        // The edit modal may be open on the row we just removed
+        setEditGroup(null)
+      }
+    })
+  }
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: 'all',         label: `All (${groups.length})` },
@@ -830,6 +872,17 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
                         </svg>
                         Edit
                       </button>
+                      <button
+                        onClick={() => setDeleteTarget(group)}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium min-h-[40px]"
+                        style={{ background: 'var(--red-l)', color: 'var(--red)' }}
+                        title="Delete group"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                          <path d="M2.5 3.5h7M5 3.5V2.5h2v1M3.5 3.5l.4 6h4.2l.4-6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Delete
+                      </button>
                     </div>
                   </div>
                 )
@@ -904,6 +957,17 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
                           </svg>
                           Edit
                         </button>
+                        <button
+                          onClick={() => setDeleteTarget(group)}
+                          className="flex items-center justify-center p-1.5 rounded-lg transition-colors"
+                          style={{ color: 'var(--red)' }}
+                          title="Delete group"
+                          aria-label={`Delete ${group.group_name}`}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                            <path d="M2.5 3.5h7M5 3.5V2.5h2v1M3.5 3.5l.4 6h4.2l.4-6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   )
@@ -913,6 +977,21 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
           </>
         )}
       </div>
+
+      {/* Delete confirmation */}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete this group?"
+          message={`“${deleteTarget.group_name}” will be permanently removed.`}
+          consequences={deleteConsequences(deleteTarget)}
+          confirmLabel="Delete group"
+          isPending={isDeleting}
+          onConfirm={handleDeleteGroup}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      <Toast toast={toast} />
     </div>
   )
 }

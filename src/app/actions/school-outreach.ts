@@ -59,10 +59,23 @@ export async function deleteSchoolOutreach(id: string) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
   if (ctx.viewOnly) return { error: 'View only mode' }
-  const { supabase } = ctx
+  const { supabase, studioId } = ctx
 
-  const { error } = await supabase.from('school_outreach').delete().eq('id', id)
+  // Cascades to cadence_enrollments (ON DELETE CASCADE).
+  // .select() lets us detect a delete that matched no rows — without it an RLS
+  // policy that blocks DELETE returns success while silently changing nothing.
+  const { data, error } = await supabase
+    .from('school_outreach')
+    .delete()
+    .eq('id', id)
+    .eq('studio_id', studioId)
+    .select('id')
+
   if (error) return { error: error.message }
+  if (!data || data.length === 0) {
+    return { error: 'School not found, or you do not have permission to delete it.' }
+  }
+
   revalidatePath('/school-outreach')
   return { error: null }
 }

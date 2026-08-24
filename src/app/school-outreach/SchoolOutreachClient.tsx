@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import { createSchoolOutreach, updateSchoolOutreach } from '@/app/actions/school-outreach'
+import { createSchoolOutreach, updateSchoolOutreach, deleteSchoolOutreach } from '@/app/actions/school-outreach'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Toast, { useToast } from '@/components/ui/Toast'
 import {
   enrollInCadence,
   markEmailSent,
@@ -495,6 +497,9 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
   const [templateViewer, setTemplateViewer] = useState<{ school: SchoolOutreach; enrollment: CadenceEnrollment } | null>(null)
   const [showPhoneScript, setShowPhoneScript] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [deleteTarget, setDeleteTarget] = useState<SchoolOutreach | null>(null)
+  const [isDeleting, startDelete] = useTransition()
+  const { toast, showToast } = useToast()
 
   const today = new Date()
   const todayStr = today.toISOString().slice(0, 10)
@@ -509,6 +514,49 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
 
   function getEnrollment(schoolId: string): CadenceEnrollment | null {
     return enrollments.find(e => e.school_id === schoolId) ?? null
+  }
+
+  // What a delete would cascade away — cadence_enrollments is ON DELETE CASCADE,
+  // so name the email history explicitly before confirming.
+  function deleteConsequences(school: SchoolOutreach): string[] {
+    const related = enrollments.filter(e => e.school_id === school.id)
+    if (related.length === 0) return []
+
+    const sentCount = related.reduce((n, e) => {
+      return n +
+        (e.email_1_sent_at ? 1 : 0) +
+        (e.email_2_sent_at ? 1 : 0) +
+        (e.email_3_sent_at ? 1 : 0) +
+        (e.email_4_sent_at ? 1 : 0)
+    }, 0)
+
+    const out = [
+      `${related.length} email cadence${related.length === 1 ? '' : 's'}` +
+      (sentCount > 0 ? ` — including the record of ${sentCount} email${sentCount === 1 ? '' : 's'} already sent` : ''),
+    ]
+
+    if (related.some(e => e.status === 'replied')) {
+      out.push('A "replied" status — re-adding this school later would allow re-emailing this contact')
+    }
+    return out
+  }
+
+  function handleDeleteSchool() {
+    if (!deleteTarget) return
+    const name = deleteTarget.school_name
+    startDelete(async () => {
+      const result = await deleteSchoolOutreach(deleteTarget.id)
+      if (result.error) {
+        showToast(result.error, 'error')
+      } else {
+        showToast(`“${name}” deleted`, 'success')
+        setDeleteTarget(null)
+        // Any modal may be open on the row we just removed
+        setEditSchool(null)
+        setEnrollModal(null)
+        setTemplateViewer(null)
+      }
+    })
   }
 
   function handleEnroll(school: SchoolOutreach, template: OpeningTemplateKey) {
@@ -742,16 +790,29 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                         </p>
                         {school.phone && <p className="text-xs text-[var(--ink-3)]">{school.phone}</p>}
                       </div>
-                      <button
-                        onClick={() => setEditSchool(school)}
-                        className="p-1.5 rounded-lg shrink-0 transition-colors"
-                        style={{ color: '#04ADEF' }}
-                        title="Edit"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                          <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          onClick={() => setEditSchool(school)}
+                          className="p-1.5 rounded-lg transition-colors"
+                          style={{ color: '#04ADEF' }}
+                          title="Edit"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                            <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(school)}
+                          className="p-1.5 rounded-lg transition-colors"
+                          style={{ color: 'var(--red)' }}
+                          title="Delete school"
+                          aria-label={`Delete ${school.school_name}`}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                            <path d="M3 4h8M5.5 4V2.5h3V4M4 4l.5 7h5l.5-7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <StageBadge stage={school.stage} />
@@ -889,16 +950,29 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={() => setEditSchool(school)}
-                            className="p-1.5 rounded-lg transition-colors"
-                            style={{ color: '#04ADEF' }}
-                            title="Edit"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                              <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                            </svg>
-                          </button>
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              onClick={() => setEditSchool(school)}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ color: '#04ADEF' }}
+                              title="Edit"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                                <path d="M9.5 2.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(school)}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ color: 'var(--red)' }}
+                              title="Delete school"
+                              aria-label={`Delete ${school.school_name}`}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                                <path d="M3 4h8M5.5 4V2.5h3V4M4 4l.5 7h5l.5-7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -909,6 +983,21 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
           </>
         )}
       </div>
+
+      {/* Delete confirmation */}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete this school?"
+          message={`“${deleteTarget.school_name}” will be permanently removed.`}
+          consequences={deleteConsequences(deleteTarget)}
+          confirmLabel="Delete school"
+          isPending={isDeleting}
+          onConfirm={handleDeleteSchool}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      <Toast toast={toast} />
     </div>
   )
 }
