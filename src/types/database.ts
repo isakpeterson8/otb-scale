@@ -275,6 +275,27 @@ export interface SchoolOutreach {
   created_at: string
 }
 
+/**
+ * Placeholder name given to contacts migrated from a school that had an email or
+ * phone but no contact_name. Rendered with a needs-attention marker in the UI;
+ * editing the name to anything else clears the marker.
+ */
+export const NEEDS_NAME = '(name needed)'
+
+export interface SchoolContact {
+  id: string
+  studio_id: string
+  school_id: string
+  name: string
+  title: string | null
+  subject_area: string | null
+  email: string | null
+  phone: string | null
+  is_primary: boolean
+  created_at: string
+  updated_at: string
+}
+
 export type CadenceStatus = 'active' | 'completed' | 'removed' | 'replied'
 export type OpeningTemplateKey = 'initial_contact' | 'familiar_teacher' | 'shared_student' | 'virtual'
 

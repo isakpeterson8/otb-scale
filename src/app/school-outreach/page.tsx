@@ -7,7 +7,7 @@ import SchoolOutreachClient from './SchoolOutreachClient'
 import { checkGmailReplies } from '@/app/actions/cadence'
 import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
-import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/database'
+import type { SchoolOutreach, SchoolContact, CadenceEnrollment, UserSettings } from '@/types/database'
 
 export const metadata: Metadata = { title: 'School Outreach' }
 
@@ -49,13 +49,24 @@ export default async function SchoolOutreachPage() {
 
   const schoolIds = (schools ?? []).map((s: { id: string }) => s.id)
   let enrollments: CadenceEnrollment[] = []
+  let contacts: SchoolContact[] = []
   if (schoolIds.length > 0) {
-    const { data: enrollmentsData } = await supabase
-      .from('cadence_enrollments')
-      .select('*')
-      .in('school_id', schoolIds)
-      .order('created_at', { ascending: false })
+    // Same authenticated client as the schools query above, so RLS scopes both.
+    const [{ data: enrollmentsData }, { data: contactsData }] = await Promise.all([
+      supabase
+        .from('cadence_enrollments')
+        .select('*')
+        .in('school_id', schoolIds)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('school_contacts')
+        .select('*')
+        .in('school_id', schoolIds)
+        .order('is_primary', { ascending: false })
+        .order('name', { ascending: true }),
+    ])
     enrollments = (enrollmentsData ?? []) as CadenceEnrollment[]
+    contacts = (contactsData ?? []) as SchoolContact[]
   }
 
   return (
@@ -64,6 +75,7 @@ export default async function SchoolOutreachPage() {
         <SchoolOutreachClient
           schools={(schools ?? []) as SchoolOutreach[]}
           enrollments={enrollments}
+          contacts={contacts}
           settings={(settings ?? null) as UserSettings | null}
         />
       </main>

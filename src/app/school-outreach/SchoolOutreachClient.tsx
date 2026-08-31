@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect } from 'react'
 import { createSchoolOutreach, updateSchoolOutreach, deleteSchoolOutreach } from '@/app/actions/school-outreach'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import SchoolContactsModal from './SchoolContactsModal'
 import Toast, { useToast } from '@/components/ui/Toast'
 import {
   enrollInCadence,
@@ -11,7 +12,8 @@ import {
   checkGmailReplies,
   sendCadenceEmail,
 } from '@/app/actions/cadence'
-import type { SchoolOutreach, SchoolOutreachStage, CadenceEnrollment, UserSettings } from '@/types/database'
+import type { SchoolOutreach, SchoolOutreachStage, SchoolContact, CadenceEnrollment, UserSettings } from '@/types/database'
+import { NEEDS_NAME } from '@/types/database'
 import { SCHOOL_STAGES } from '@/types/database'
 import {
   OPENING_TEMPLATES,
@@ -23,6 +25,7 @@ import { applyAutoFills } from '@/lib/utils'
 interface Props {
   schools: SchoolOutreach[]
   enrollments: CadenceEnrollment[]
+  contacts: SchoolContact[]
   settings: UserSettings | null
 }
 
@@ -489,12 +492,13 @@ function TemplateViewerModal({
   )
 }
 
-export default function SchoolOutreachClient({ schools, enrollments, settings }: Props) {
+export default function SchoolOutreachClient({ schools, enrollments, contacts, settings }: Props) {
   const [filterStage, setFilterStage] = useState<SchoolOutreachStage | 'all'>('all')
   const [showForm, setShowForm] = useState(false)
   const [editSchool, setEditSchool] = useState<SchoolOutreach | null>(null)
   const [enrollModal, setEnrollModal] = useState<SchoolOutreach | null>(null)
   const [templateViewer, setTemplateViewer] = useState<{ school: SchoolOutreach; enrollment: CadenceEnrollment } | null>(null)
+  const [contactsModal, setContactsModal] = useState<SchoolOutreach | null>(null)
   const [showPhoneScript, setShowPhoneScript] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [deleteTarget, setDeleteTarget] = useState<SchoolOutreach | null>(null)
@@ -514,6 +518,31 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
 
   function getEnrollment(schoolId: string): CadenceEnrollment | null {
     return enrollments.find(e => e.school_id === schoolId) ?? null
+  }
+
+  function getContacts(schoolId: string): SchoolContact[] {
+    return contacts.filter(c => c.school_id === schoolId)
+  }
+
+  // A school's contacts link doubles as a to-do marker: the amber dot means at
+  // least one contact still carries the '(name needed)' placeholder.
+  function ContactsLink({ school }: { school: SchoolOutreach }) {
+    const own = getContacts(school.id)
+    const needsAttention = own.some(c => c.name === NEEDS_NAME)
+    return (
+      <button
+        onClick={() => setContactsModal(school)}
+        className="inline-flex items-center gap-1 text-xs text-[var(--accent-text)] hover:underline"
+      >
+        {own.length === 0 ? 'Add contacts' : `Contacts (${own.length})`}
+        {needsAttention && (
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--amber)]"
+            title="A contact still needs a name"
+          />
+        )}
+      </button>
+    )
   }
 
   // What a delete would cascade away — cadence_enrollments is ON DELETE CASCADE,
@@ -555,6 +584,7 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
         setEditSchool(null)
         setEnrollModal(null)
         setTemplateViewer(null)
+        setContactsModal(null)
       }
     })
   }
@@ -756,6 +786,14 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
         />
       )}
 
+      {contactsModal && (
+        <SchoolContactsModal
+          school={contactsModal}
+          contacts={getContacts(contactsModal.id)}
+          onClose={() => setContactsModal(null)}
+        />
+      )}
+
       {templateViewer && (
         <TemplateViewerModal
           school={templateViewer.school}
@@ -789,6 +827,7 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                           {school.contact_name ?? '—'}{school.email ? ` · ${school.email}` : ''}
                         </p>
                         {school.phone && <p className="text-xs text-[var(--ink-3)]">{school.phone}</p>}
+                        <div className="mt-1"><ContactsLink school={school} /></div>
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
                         <button
@@ -893,6 +932,7 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                           <div className="space-y-0.5">
                             <p className="text-[var(--ink-2)] whitespace-nowrap">{school.contact_name ?? '—'}</p>
                             <p className="text-xs text-[var(--ink-3)]">{school.email ?? ''}</p>
+                            <ContactsLink school={school} />
                           </div>
                         </td>
                         <td className="px-4 py-3 text-[var(--ink-3)] text-xs whitespace-nowrap">
