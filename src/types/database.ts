@@ -70,13 +70,47 @@ export interface Profile {
   created_at: string
 }
 
+/**
+ * Lead pipeline statuses for `contacts.status`.
+ *
+ * Single source of truth: the Edit-lead dropdown, the /leads status filter tabs
+ * and the DB CHECK constraint (see the lead-statuses migration) all derive from
+ * this list, in this order. `value` is what is stored; `description` is helper
+ * text only and is never persisted. A NULL status means "not yet triaged".
+ *
+ * Not to be confused with LEAD_SOURCES below, which is the separate
+ * `contacts.lead_source` field.
+ */
+export type LeadStatus =
+  | 'to be contacted'
+  | 'initial outreach campaign'
+  | 'consultation scheduled'
+  | 'pending registration'
+  | 'future follow-up'
+  | 'not interested'
+  | 'active student'
+  | 'past student'
+  | 'waitlist'
+
+export const LEAD_STATUSES: { value: LeadStatus; label: string; description: string }[] = [
+  { value: 'to be contacted',           label: 'To Be Contacted',           description: 'Inquired or not yet emailed' },
+  { value: 'initial outreach campaign', label: 'Initial Outreach Campaign', description: 'Actively receiving initial contact workflow' },
+  { value: 'consultation scheduled',    label: 'Consultation Scheduled',    description: 'Meeting booked' },
+  { value: 'pending registration',      label: 'Pending Registration',      description: 'Interested but hasn’t paid' },
+  { value: 'future follow-up',          label: 'Future Follow-Up',          description: 'Did not respond to outreach or wants to circle back' },
+  { value: 'not interested',            label: 'Not Interested',            description: 'Not a fit or declined contact' },
+  { value: 'active student',            label: 'Active Student',            description: 'Enrolled & paying tuition' },
+  { value: 'past student',              label: 'Past Student',              description: 'Paused or stopped payments' },
+  { value: 'waitlist',                  label: 'Waitlist',                  description: '' },
+]
+
 export interface Contact {
   id: string
   studio_id: string
   name: string
   email: string | null
   phone: string | null
-  status: string | null
+  status: LeadStatus | null
   source: string | null
   lead_source: string | null
   lead_sub_source: string | null
