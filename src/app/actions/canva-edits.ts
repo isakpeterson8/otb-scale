@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import { getStudioId } from '@/app/actions/_shared'
+import { getCachedStudioTier } from '@/lib/supabase/cached'
+import { graduateBlockedRoute } from '@/lib/features'
 import { getDesignerEmails, isDesignerEmail } from '@/lib/designer'
 import { Resend } from 'resend'
 
@@ -44,6 +46,12 @@ export async function submitCanvaRequest(formData: {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Not authenticated' }
   if (ctx.viewOnly) return { error: 'Cannot submit requests in View As mode' }
+
+  // Same boundary the proxy enforces on /canva-edits: route gating alone
+  // would not stop this action being invoked from another page.
+  const tier = await getCachedStudioTier(ctx.studioId)
+  const blocked = graduateBlockedRoute(tier, '/canva-edits')
+  if (blocked) return { error: blocked.toast }
 
   const { supabase, studioId, userId, userEmail } = ctx
 

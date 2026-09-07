@@ -5,9 +5,47 @@ import { requestTierUpgrade } from '@/app/actions/admin'
 
 interface Props {
   feature: string
+  /**
+   * The viewing studio's tier. Only the education-library denial passes it:
+   * a Graduate studio came down from Scale, so offering a Scale upgrade there
+   * is wrong. Every other call site omits it and renders exactly as before.
+   */
+  tier?: string
 }
 
-export default function UpgradeBanner({ feature }: Props) {
+function BannerIcon() {
+  return (
+    <div
+      className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
+      style={{ background: 'var(--accent-l)' }}
+    >
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M12 2l2.5 5.5 5.5.8-4 3.9 1 5.5L12 15l-5 2.7 1-5.5-4-3.9 5.5-.8L12 2z"
+          fill="currentColor"
+          style={{ color: 'var(--accent-text)' }}
+        />
+      </svg>
+    </div>
+  )
+}
+
+export default function UpgradeBanner({ feature, tier }: Props) {
+  // Graduate: explain the plan, no upgrade CTA. Returns before the shared
+  // upgrade markup below, which is left exactly as it was for every other tier.
+  if (tier === 'graduate') {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[360px] px-4">
+        <div className="text-center max-w-sm">
+          <BannerIcon />
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+            The education library is a Scale feature. As a Graduate, you&apos;ve completed the program, but your student tracking and financials stay with you here anytime. :)
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const [isPending, startTransition] = useTransition()
   const [sent, setSent] = useState(false)
 
@@ -21,18 +59,7 @@ export default function UpgradeBanner({ feature }: Props) {
   return (
     <div className="flex-1 flex items-center justify-center min-h-[360px] px-4">
       <div className="text-center max-w-sm">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
-          style={{ background: 'var(--accent-l)' }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-              d="M12 2l2.5 5.5 5.5.8-4 3.9 1 5.5L12 15l-5 2.7 1-5.5-4-3.9 5.5-.8L12 2z"
-              fill="currentColor"
-              style={{ color: 'var(--accent-text)' }}
-            />
-          </svg>
-        </div>
+        <BannerIcon />
         <h3
           className="text-lg font-medium mb-2"
           style={{ fontFamily: 'var(--font-heading)', color: 'var(--ink)' }}

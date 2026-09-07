@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import { getStudioId } from '@/app/actions/_shared'
+import { getCachedStudioTier } from '@/lib/supabase/cached'
+import { graduateBlockedRoute } from '@/lib/features'
 import { Resend } from 'resend'
 import { COPY_PACK_PROMPT, CIRCLE_SYNC_PROMPT } from '@/lib/squarespace-prompts'
 import type {
@@ -95,6 +97,12 @@ export async function submitSquarespaceRequest(
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Not authenticated' }
   if (ctx.viewOnly) return { error: 'Cannot submit requests in View As mode' }
+
+  // Same boundary the proxy enforces on /squarespace-concierge: route gating alone
+  // would not stop this action being invoked from another page.
+  const tier = await getCachedStudioTier(ctx.studioId)
+  const blocked = graduateBlockedRoute(tier, '/squarespace-concierge')
+  if (blocked) return { error: blocked.toast }
   const { studioId, userId, userEmail } = ctx
 
   const { error } = await adminClient.from('squarespace_requests').insert({

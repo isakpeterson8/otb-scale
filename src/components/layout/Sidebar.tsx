@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { graduateBlockedRoute, hasFeatureAccess } from '@/lib/features'
 import { createClient } from '@/lib/supabase/client'
 import { initials } from '@/lib/utils'
 import { TrendingUp } from 'lucide-react'
@@ -176,6 +177,20 @@ export default function Sidebar({ displayName, isAdmin, showAdminLink, tier, vie
   const effectiveTier = viewOnly && viewAsTier != null ? viewAsTier : tier
   const isFree = viewOnly ? viewAsTier === 'free' : (!isAdmin && tier === 'free')
 
+  // The tier whose restrictions apply to what is rendered. Mirrors isFree above:
+  // in View As it is the viewed studio's tier; otherwise the user's own tier,
+  // except that a real admin outside View As is subject to none (null).
+  const restrictedTier = viewOnly ? viewAsTier : (isAdmin ? null : tier)
+
+  // Nav visibility comes from the same two sources the server enforces:
+  // GRADUATE_BLOCKED for route blocks, ACCESS_MATRIX for the education library.
+  const hiddenForTier = (href: string) => {
+    if (!restrictedTier) return false
+    if (graduateBlockedRoute(restrictedTier, href)) return true
+    if (href === '/education' && !hasFeatureAccess(restrictedTier, 'education_library')) return true
+    return false
+  }
+
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -331,7 +346,7 @@ export default function Sidebar({ displayName, isAdmin, showAdminLink, tier, vie
           ) : (
             <>
               {/* Paid tier / admin: full nav */}
-              {NAV_ALL.map(({ label, href, icon }) => {
+              {NAV_ALL.filter(({ href }) => !hiddenForTier(href)).map(({ label, href, icon }) => {
                 const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
                 return (
                   <Link key={href} href={href} onClick={onClose} className={navLinkClass(active)}>
