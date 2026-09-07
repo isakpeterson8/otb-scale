@@ -42,6 +42,16 @@ function statusLabel(status: LeadStatus): string {
   return LEAD_STATUSES.find(s => s.value === status)?.label ?? status
 }
 
+// Dropdown-only display text: "To Be Contacted (inquired or not yet emailed)".
+// Composed at render time from the LEAD_STATUSES description — the stored
+// descriptions stay canonical Title-case, and a status added later inherits
+// this automatically. Never used as an option value: contacts.status only
+// accepts the short form, enforced by parseStatus and the DB CHECK.
+function statusOptionText(label: string, description: string): string {
+  if (!description) return label
+  return `${label} (${description.charAt(0).toLowerCase()}${description.slice(1)})`
+}
+
 function formatLeadSource(
   contact: Contact,
   groups: FacebookGroupOption[],
@@ -91,7 +101,6 @@ function LeadForm({
   )
 
   const activeGroups = facebookGroups.filter(g => g.is_active)
-  const statusHelp = LEAD_STATUSES.find(s => s.value === status)?.description
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -154,14 +163,11 @@ function LeadForm({
         >
           <option value="">{STATUS_PLACEHOLDER}</option>
           {LEAD_STATUSES.map(({ value, label, description }) => (
-            <option key={value} value={value} title={description} className="bg-[var(--surface)]">
-              {label}
+            <option key={value} value={value} className="bg-[var(--surface)]">
+              {statusOptionText(label, description)}
             </option>
           ))}
         </select>
-        {statusHelp && (
-          <p className="text-xs text-[var(--ink-3)] mt-1">{statusHelp}</p>
-        )}
       </div>
 
       {/* Lead source cascade */}
