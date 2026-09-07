@@ -4,7 +4,8 @@ import { generateReminders } from '@/app/actions/reminders'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
 import AppShell from '@/components/layout/AppShell'
 import DashboardClient from './DashboardClient'
-import type { SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
+import type { Contact, SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
+import { ACTIVE_LEAD_STATUSES } from '@/types/database'
 
 export default async function DashboardPage({
   searchParams,
@@ -24,15 +25,31 @@ export default async function DashboardPage({
 
   const { toast } = await searchParams
 
-  // Free tier: only fetch snapshot data
+  // Active leads are shown on both the free and paid dashboards, so the query is
+  // defined once here. Building it does not execute it: whichever tier branch
+  // runs below awaits it exactly once, inside that branch's Promise.all.
+  //
+  // updated_at is not maintained on contacts (no trigger, never written by the
+  // app — it equals created_at on every row), so secondary sort is name A–Z.
+  const activeLeadsQuery = supabase
+    .from('contacts')
+    .select('id, name, status')
+    .eq('studio_id', studioId)
+    .in('status', ACTIVE_LEAD_STATUSES)
+    .order('name', { ascending: true })
+
+  // Free tier: snapshot + active leads only
   if (isFreeTier) {
-    const { data: snapshotData } = await supabase
-      .from('studio_snapshots')
-      .select('snapshot_date, enrollment, collected_revenue')
-      .eq('studio_id', studioId)
-      .order('snapshot_date', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const [{ data: snapshotData }, activeLeadsRes] = await Promise.all([
+      supabase
+        .from('studio_snapshots')
+        .select('snapshot_date, enrollment, collected_revenue')
+        .eq('studio_id', studioId)
+        .order('snapshot_date', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      activeLeadsQuery,
+    ])
 
     return (
       <AppShell>
@@ -44,6 +61,7 @@ export default async function DashboardPage({
             schools={[]}
             enrollments={[]}
             activeGroups={[]}
+            activeLeads={(activeLeadsRes.data ?? []) as Pick<Contact, 'id' | 'name' | 'status'>[]}
           />
         </main>
       </AppShell>
@@ -51,7 +69,7 @@ export default async function DashboardPage({
   }
 
   // Paid tier: fetch all data
-  const [snapshotRes, schoolsRes, groupsRes] = await Promise.all([
+  const [snapshotRes, schoolsRes, groupsRes, activeLeadsRes] = await Promise.all([
     supabase
       .from('studio_snapshots')
       .select('snapshot_date, enrollment, collected_revenue')
@@ -70,6 +88,7 @@ export default async function DashboardPage({
       .eq('studio_id', studioId)
       .eq('is_active', true)
       .order('group_name', { ascending: true }),
+    activeLeadsQuery,
   ])
 
   const schoolIds = (schoolsRes.data ?? []).map((s: { id: string }) => s.id)
@@ -93,6 +112,7 @@ export default async function DashboardPage({
           schools={(schoolsRes.data ?? []) as Pick<SchoolOutreach, 'id' | 'school_name' | 'stage'>[]}
           enrollments={enrollmentsData}
           activeGroups={(groupsRes.data ?? []) as Pick<FacebookGroup, 'id' | 'group_name' | 'most_recent_post_date'>[]}
+          activeLeads={(activeLeadsRes.data ?? []) as Pick<Contact, 'id' | 'name' | 'status'>[]}
         />
       </main>
     </AppShell>
