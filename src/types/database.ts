@@ -104,6 +104,20 @@ export const LEAD_STATUSES: { value: LeadStatus; label: string; description: str
   { value: 'waitlist',                  label: 'Waitlist',                  description: '' },
 ]
 
+/**
+ * The subset of LeadStatus values that count as an "active lead" on the
+ * dashboard — a lead currently being worked.
+ *
+ * Order is PRIORITY order (hottest first), which is deliberately the reverse
+ * of the pipeline order in LEAD_STATUSES. Do not re-sort it to match.
+ * The dashboard count, the filter and the list sort all read from here.
+ */
+export const ACTIVE_LEAD_STATUSES: LeadStatus[] = [
+  'pending registration',
+  'consultation scheduled',
+  'initial outreach campaign',
+]
+
 export interface Contact {
   id: string
   studio_id: string

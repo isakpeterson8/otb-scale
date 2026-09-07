@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import type { SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
+import type { Contact, LeadStatus, SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
+import { ACTIVE_LEAD_STATUSES, LEAD_STATUSES } from '@/types/database'
 import GettingStartedCard from '@/components/dashboard/GettingStartedCard'
 
 const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
@@ -12,6 +13,7 @@ type Snapshot   = Pick<StudioSnapshot, 'snapshot_date' | 'enrollment' | 'collect
 type School     = Pick<SchoolOutreach, 'id' | 'school_name' | 'stage'>
 type Enrollment = Pick<CadenceEnrollment, 'id' | 'school_id' | 'status' | 'current_email_number' | 'email_2_due_at' | 'email_3_due_at' | 'email_4_due_at'>
 type Group      = Pick<FacebookGroup, 'id' | 'group_name' | 'most_recent_post_date'>
+type ActiveLead = Pick<Contact, 'id' | 'name' | 'status'>
 
 interface Props {
   isFreeTier?: boolean
@@ -20,6 +22,7 @@ interface Props {
   schools: School[]
   enrollments: Enrollment[]
   activeGroups: Group[]
+  activeLeads: ActiveLead[]
 }
 
 function fmtCurrency(n: number | null) {
@@ -35,6 +38,18 @@ function fmtDate(d: string) {
   const parsed = new Date(d + 'T12:00:00')
   if (isNaN(parsed.getTime())) return 'Due soon'
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function leadStatusLabel(status: LeadStatus | null): string {
+  if (!status) return ''
+  return LEAD_STATUSES.find(s => s.value === status)?.label ?? status
+}
+
+// Priority rank from ACTIVE_LEAD_STATUSES (hottest first). Anything not in that
+// list sorts last rather than jumping to the front on a -1 index.
+function activeLeadRank(status: LeadStatus | null): number {
+  const i = status ? ACTIVE_LEAD_STATUSES.indexOf(status) : -1
+  return i === -1 ? ACTIVE_LEAD_STATUSES.length : i
 }
 
 function Card({ children, href, className = '' }: { children: React.ReactNode; href?: string; className?: string }) {
@@ -67,7 +82,65 @@ function InnerCard({ children }: { children: React.ReactNode }) {
   return <div className="bg-white rounded-xl p-4 space-y-2 shadow-sm">{children}</div>
 }
 
-export default function DashboardClient({ isFreeTier, toastMessage, latestSnapshot, schools, enrollments, activeGroups }: Props) {
+/**
+ * Active Leads section — rendered by both the free and paid dashboards, so the
+ * counter, the priority list and the empty state can never drift apart.
+ */
+function ActiveLeadsSection({ activeLeads }: { activeLeads: ActiveLead[] }) {
+  // Priority order, hottest first. Array.prototype.sort is stable, so the
+  // name A–Z ordering from the query is preserved within each status group.
+  const byPriority = [...activeLeads].sort(
+    (a, b) => activeLeadRank(a.status) - activeLeadRank(b.status),
+  )
+  const counts = ACTIVE_LEAD_STATUSES.map(value => ({
+    value,
+    label: leadStatusLabel(value),
+    count: activeLeads.filter(l => l.status === value).length,
+  }))
+
+  return (
+    <section className="space-y-3">
+      <SectionHeading>Active Leads</SectionHeading>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card href="/leads">
+          <CardTitle>Active Leads</CardTitle>
+          <BigNumber>{activeLeads.length}</BigNumber>
+          {activeLeads.length > 0 && (
+            <p className="text-xs text-[#6b7280]">
+              {counts
+                .filter(s => s.count > 0)
+                .map(s => `${s.count} ${s.label.toLowerCase()}`)
+                .join(' · ')}
+            </p>
+          )}
+        </Card>
+        <Card>
+          <CardTitle>Priority Order</CardTitle>
+          {byPriority.length === 0 ? (
+            <p className="text-sm text-[#6b7280]">No active leads</p>
+          ) : (
+            <InnerCard>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {byPriority.map(lead => (
+                  <Link
+                    key={lead.id}
+                    href="/leads"
+                    className="flex items-center justify-between text-sm hover:opacity-80 transition-opacity"
+                  >
+                    <span className="font-medium text-[#111827] truncate max-w-[55%]">{lead.name}</span>
+                    <span className="text-xs text-[#6b7280] shrink-0 ml-2">{leadStatusLabel(lead.status)}</span>
+                  </Link>
+                ))}
+              </div>
+            </InnerCard>
+          )}
+        </Card>
+      </div>
+    </section>
+  )
+}
+
+export default function DashboardClient({ isFreeTier, toastMessage, latestSnapshot, schools, enrollments, activeGroups, activeLeads }: Props) {
   const router = useRouter()
   const [toast, setToast] = useState<string | null>(toastMessage ?? null)
 
@@ -143,6 +216,9 @@ export default function DashboardClient({ isFreeTier, toastMessage, latestSnapsh
             </Card>
           </div>
         </section>
+
+        {/* Active Leads */}
+        <ActiveLeadsSection activeLeads={activeLeads} />
 
         {/* Upgrade banner */}
         <div
@@ -251,7 +327,10 @@ export default function DashboardClient({ isFreeTier, toastMessage, latestSnapsh
         </div>
       </section>
 
-      {/* Row 2 — School Outreach */}
+      {/* Row 2 — Active Leads */}
+      <ActiveLeadsSection activeLeads={activeLeads} />
+
+      {/* Row 3 — School Outreach */}
       <section className="space-y-3">
         <SectionHeading>School Outreach</SectionHeading>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -305,7 +384,7 @@ export default function DashboardClient({ isFreeTier, toastMessage, latestSnapsh
         </div>
       </section>
 
-      {/* Row 3 — Facebook Groups */}
+      {/* Row 4 — Facebook Groups */}
       <section className="space-y-3">
         <SectionHeading>Facebook Groups</SectionHeading>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
