@@ -247,6 +247,7 @@ export interface FacebookGroup {
   post_days: string[] | null
   post_week_pattern: WeekPattern | null
   qualification_status: QualificationStatus
+  notes: string | null
   created_at: string
 }
 
