@@ -131,6 +131,17 @@ function LeadForm({
           placeholder="Jane Smith"
         />
       </div>
+      <div>
+        <label className="block text-xs text-[var(--ink-3)] mb-1">
+          Contact Name (parent, guardian or decision maker)
+        </label>
+        <input
+          name="guardian_name"
+          defaultValue={contact?.guardian_name ?? ''}
+          className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+          placeholder="Parent, guardian or decision maker"
+        />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs text-[var(--ink-3)] mb-1">Email</label>

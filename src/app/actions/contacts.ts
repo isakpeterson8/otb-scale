@@ -25,6 +25,7 @@ export async function createContact(formData: FormData) {
   const { error } = await supabase.from('contacts').insert({
     studio_id: studioId,
     name: formData.get('name') as string,
+    guardian_name: (formData.get('guardian_name') as string) || null,
     email: (formData.get('email') as string) || null,
     phone: (formData.get('phone') as string) || null,
     status: parseStatus(formData),
@@ -55,6 +56,7 @@ export async function updateContact(id: string, formData: FormData) {
     .from('contacts')
     .update({
       name: formData.get('name') as string,
+      guardian_name: (formData.get('guardian_name') as string) || null,
       email: (formData.get('email') as string) || null,
       phone: (formData.get('phone') as string) || null,
       status: parseStatus(formData),
