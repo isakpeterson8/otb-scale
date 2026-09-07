@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { GRADUATE_BLOCKED, graduateBlockedRoute } from '@/lib/features'
 
 const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
 
@@ -55,17 +56,36 @@ export async function proxy(request: NextRequest) {
 
   // Tier-based route protection — only runs for logged-in users on blocked paths
   if (user) {
-    const blocked = FREE_TIER_BLOCKED.find(r => pathname.startsWith(r.path))
-    if (blocked) {
-      // Fast path: admin in View As mode for a free-tier studio — redirect without a DB query
-      const viewAsStudioId = request.cookies.get('view_as_studio_id')?.value
-      const viewAsTier = request.cookies.get('view_as_tier')?.value
-      if (viewAsStudioId && viewAsTier === 'free') {
+    const freeBlocked = FREE_TIER_BLOCKED.find(r => pathname.startsWith(r.path))
+    const graduateCandidate = GRADUATE_BLOCKED.some(r => pathname.startsWith(r.path))
+
+    if (freeBlocked || graduateCandidate) {
+      const cookieOpts = { httpOnly: true, path: '/', sameSite: 'lax' as const, maxAge: TIER_COOKIE_MAX_AGE }
+
+      // The route this tier may not reach, or null when it is allowed through.
+      // Free keeps its existing list; graduate uses the shared GRADUATE_BLOCKED set.
+      const blockedFor = (tier: string) =>
+        tier === 'free' ? (freeBlocked ?? null) : graduateBlockedRoute(tier, pathname)
+
+      const bounce = (hit: { toast: string }, extraCookie?: { value: string }) => {
         const url = request.nextUrl.clone()
         url.pathname = '/dashboard'
         url.searchParams.delete('toast')
-        if (blocked.toast) url.searchParams.set('toast', blocked.toast)
-        return NextResponse.redirect(url)
+        if (hit.toast) url.searchParams.set('toast', hit.toast)
+        const redirectResponse = NextResponse.redirect(url)
+        if (extraCookie) redirectResponse.cookies.set(TIER_COOKIE, extraCookie.value, cookieOpts)
+        return redirectResponse
+      }
+
+      // Fast path: admin in View As — the viewed studio's tier decides, so an
+      // admin viewing a graduate studio sees its restrictions, exactly as
+      // View-As-free already worked.
+      const viewAsStudioId = request.cookies.get('view_as_studio_id')?.value
+      const viewAsTier = request.cookies.get('view_as_tier')?.value
+      if (viewAsStudioId && viewAsTier) {
+        const hit = blockedFor(viewAsTier)
+        if (hit) return bounce(hit)
+        return supabaseResponse
       }
 
       // Fast path: cached tier from a previous DB query (5-minute window, user-scoped)
@@ -75,13 +95,9 @@ export async function proxy(request: NextRequest) {
         const cachedUserId = cachedTierValue.slice(0, colonIdx)
         const cachedTier = cachedTierValue.slice(colonIdx + 1)
         if (cachedUserId === user.id && cachedTier) {
-          if (cachedTier === 'free') {
-            const url = request.nextUrl.clone()
-            url.pathname = '/dashboard'
-            url.searchParams.delete('toast')
-            if (blocked.toast) url.searchParams.set('toast', blocked.toast)
-            return NextResponse.redirect(url)
-          }
+          // 'admin' is written for real admins below and bypasses every block.
+          const hit = cachedTier === 'admin' ? null : blockedFor(cachedTier)
+          if (hit) return bounce(hit)
           return supabaseResponse
         }
       }
@@ -94,7 +110,6 @@ export async function proxy(request: NextRequest) {
         .single()
 
       const isAdmin = profile?.role === 'otb_admin' || profile?.role === 'otb_staff'
-      const cookieOpts = { httpOnly: true, path: '/', sameSite: 'lax' as const, maxAge: TIER_COOKIE_MAX_AGE }
 
       if (isAdmin) {
         supabaseResponse.cookies.set(TIER_COOKIE, `${user.id}:admin`, cookieOpts)
@@ -106,15 +121,8 @@ export async function proxy(request: NextRequest) {
           .single()
 
         const tier = studio?.subscription_tier ?? 'free'
-        if (tier === 'free') {
-          const url = request.nextUrl.clone()
-          url.pathname = '/dashboard'
-          url.searchParams.delete('toast')
-          if (blocked.toast) url.searchParams.set('toast', blocked.toast)
-          const redirectResponse = NextResponse.redirect(url)
-          redirectResponse.cookies.set(TIER_COOKIE, `${user.id}:free`, cookieOpts)
-          return redirectResponse
-        }
+        const hit = blockedFor(tier)
+        if (hit) return bounce(hit, { value: `${user.id}:${tier}` })
         supabaseResponse.cookies.set(TIER_COOKIE, `${user.id}:${tier}`, cookieOpts)
       }
     }

@@ -17,7 +17,11 @@ export default async function EducationResourcesPage() {
   const isAdmin = !!(userEmail && adminEmails.includes(userEmail.toLowerCase()))
 
   const tier = await getCachedStudioTier(ctx.studioId)
-  const hasAccess = isAdmin || hasFeatureAccess(tier, 'education_library')
+  // View As mirrors the viewed studio's restrictions (same shape as /resources),
+  // so an admin viewing a Graduate studio sees the denial rather than bypassing it.
+  const hasAccess = ctx.viewOnly
+    ? hasFeatureAccess(tier, 'education_library')
+    : isAdmin || hasFeatureAccess(tier, 'education_library')
 
   if (!hasAccess) {
     return (
@@ -26,7 +30,7 @@ export default async function EducationResourcesPage() {
           <h2 className="text-2xl text-[var(--ink)] mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
             Education Library
           </h2>
-          <UpgradeBanner feature="Education Library" />
+          <UpgradeBanner feature="Education Library" tier={tier} />
         </main>
       </AppShell>
     )
