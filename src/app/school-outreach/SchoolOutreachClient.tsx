@@ -13,6 +13,7 @@ import {
 } from '@/app/actions/cadence'
 import type { SchoolOutreach, SchoolOutreachStage, CadenceEnrollment, UserSettings } from '@/types/database'
 import { SCHOOL_STAGES } from '@/types/database'
+import FilterTabs from '@/components/ui/FilterTabs'
 import {
   OPENING_TEMPLATES,
   FOLLOWUP_EMAILS,
@@ -695,32 +696,18 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
       </div>
 
       {/* Stage filter tabs */}
-      <div className="flex items-center gap-1 border-b border-[var(--ink)]/8 overflow-x-auto">
-        <button
-          onClick={() => setFilterStage('all')}
-          className={[
-            'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
-            filterStage === 'all' ? 'text-[var(--ink)] border-[var(--accent-text)]' : 'text-[var(--ink-3)] border-transparent hover:text-[var(--ink-2)]',
-          ].join(' ')}
-        >
-          All ({schools.length})
-        </button>
-        {SCHOOL_STAGES.map(({ value, label }) => {
-          const count = schools.filter((s) => s.stage === value).length
-          return (
-            <button
-              key={value}
-              onClick={() => setFilterStage(value)}
-              className={[
-                'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
-                filterStage === value ? 'text-[var(--ink)] border-[var(--accent-text)]' : 'text-[var(--ink-3)] border-transparent hover:text-[var(--ink-2)]',
-              ].join(' ')}
-            >
-              {label} ({count})
-            </button>
-          )
-        })}
-      </div>
+      <FilterTabs
+        tabs={[
+          { value: 'all' as const, label: 'All', count: schools.length },
+          ...SCHOOL_STAGES.map(({ value, label }) => ({
+            value,
+            label,
+            count: schools.filter((s) => s.stage === value).length,
+          })),
+        ]}
+        active={filterStage}
+        onChange={setFilterStage}
+      />
 
       {/* Modals */}
       {(showForm || editSchool) && (

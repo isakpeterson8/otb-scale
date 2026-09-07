@@ -2,6 +2,15 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStudioId } from './_shared'
+import { LEAD_STATUSES } from '@/types/database'
+import type { LeadStatus } from '@/types/database'
+
+// Anything not in LEAD_STATUSES — including the five retired values — is stored
+// as NULL, so a stale client can never write an unsupported status.
+function parseStatus(formData: FormData): LeadStatus | null {
+  const raw = (formData.get('status') as string) || ''
+  return LEAD_STATUSES.some(s => s.value === raw) ? (raw as LeadStatus) : null
+}
 
 export async function createContact(formData: FormData) {
   const ctx = await getStudioId()
@@ -18,7 +27,7 @@ export async function createContact(formData: FormData) {
     name: formData.get('name') as string,
     email: (formData.get('email') as string) || null,
     phone: (formData.get('phone') as string) || null,
-    status: (formData.get('status') as string) || 'prospect',
+    status: parseStatus(formData),
     notes: (formData.get('notes') as string) || null,
     lead_source: leadSource,
     lead_sub_source: leadSource === 'facebook_group' ? leadSubSource : null,
@@ -48,7 +57,7 @@ export async function updateContact(id: string, formData: FormData) {
       name: formData.get('name') as string,
       email: (formData.get('email') as string) || null,
       phone: (formData.get('phone') as string) || null,
-      status: (formData.get('status') as string) || 'prospect',
+      status: parseStatus(formData),
       notes: (formData.get('notes') as string) || null,
       lead_source: leadSource,
       lead_sub_source: leadSource === 'facebook_group' ? leadSubSource : null,

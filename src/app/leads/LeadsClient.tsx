@@ -4,8 +4,9 @@ import { useState, useTransition } from 'react'
 import { formatDate, daysAgo } from '@/lib/utils'
 import { createContact, updateContact, deleteContact } from '@/app/actions/contacts'
 import { createOrganicOutreach, updateOrganicOutreach, deleteOrganicOutreach } from '@/app/actions/organic-outreach'
-import type { Contact, OrganicOutreach, OutreachType, OutreachStatus } from '@/types/database'
-import { LEAD_SOURCES, LEAD_SUB_SOURCES, OUTREACH_TYPES } from '@/types/database'
+import type { Contact, LeadStatus, OrganicOutreach, OutreachType, OutreachStatus } from '@/types/database'
+import { LEAD_SOURCES, LEAD_STATUSES, LEAD_SUB_SOURCES, OUTREACH_TYPES } from '@/types/database'
+import FilterTabs from '@/components/ui/FilterTabs'
 
 interface FacebookGroupOption {
   id: string
@@ -19,7 +20,27 @@ interface LeadsClientProps {
   outreachEntries: OrganicOutreach[]
 }
 
-const STATUS_OPTIONS = ['prospect', 'lead', 'active', 'inactive', 'student']
+// Shown when a lead has no status yet — either never set, or cleared by the
+// lead-statuses migration and awaiting re-triage.
+const STATUS_PLACEHOLDER = '— Select status —'
+
+const STATUS_BADGE: Record<LeadStatus, string> = {
+  'to be contacted':           'bg-white/8 text-[var(--ink-2)]',
+  'initial outreach campaign': 'bg-[var(--accent-light)] text-[var(--accent-text)]',
+  'consultation scheduled':    'bg-[var(--accent-light)] text-[var(--accent-text)]',
+  'pending registration':      'bg-[var(--amber-l)] text-[var(--amber)]',
+  'future follow-up':          'bg-white/8 text-[var(--ink-2)]',
+  'not interested':            'bg-[var(--red-l)] text-[var(--red)]',
+  'active student':            'bg-[var(--green-l)] text-[var(--green)]',
+  'past student':              'bg-white/8 text-[var(--ink-3)]',
+  'waitlist':                  'bg-[var(--amber-l)] text-[var(--amber)]',
+}
+
+const DEFAULT_STATUS_BADGE = 'bg-white/8 text-[var(--ink-2)]'
+
+function statusLabel(status: LeadStatus): string {
+  return LEAD_STATUSES.find(s => s.value === status)?.label ?? status
+}
 
 function formatLeadSource(
   contact: Contact,
@@ -58,6 +79,7 @@ function LeadForm({
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<string>(contact?.status ?? '')
   const [leadSource, setLeadSource] = useState<string>(
     contact?.lead_source ?? '',
   )
@@ -69,6 +91,7 @@ function LeadForm({
   )
 
   const activeGroups = facebookGroups.filter(g => g.is_active)
+  const statusHelp = LEAD_STATUSES.find(s => s.value === status)?.description
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -125,15 +148,20 @@ function LeadForm({
         <label className="block text-xs text-[var(--ink-3)] mb-1">Status</label>
         <select
           name="status"
-          defaultValue={contact?.status ?? 'prospect'}
+          value={status}
+          onChange={e => setStatus(e.target.value)}
           className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
         >
-          {STATUS_OPTIONS.map(s => (
-            <option key={s} value={s} className="bg-[var(--surface)]">
-              {s}
+          <option value="">{STATUS_PLACEHOLDER}</option>
+          {LEAD_STATUSES.map(({ value, label, description }) => (
+            <option key={value} value={value} title={description} className="bg-[var(--surface)]">
+              {label}
             </option>
           ))}
         </select>
+        {statusHelp && (
+          <p className="text-xs text-[var(--ink-3)] mt-1">{statusHelp}</p>
+        )}
       </div>
 
       {/* Lead source cascade */}
@@ -366,12 +394,15 @@ function OutreachForm({
 
 function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookGroups: FacebookGroupOption[] }) {
   const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<LeadStatus | 'all'>('all')
   const [showForm, setShowForm] = useState(false)
   const [editContact, setEditContact] = useState<Contact | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const filtered = contacts.filter(c => {
+  // Search first, then status — so the tab counts describe what each tab shows.
+  // Leads with no status (NULL) match no status tab but stay visible under All.
+  const searched = contacts.filter(c => {
     const q = search.toLowerCase()
     return (
       c.name.toLowerCase().includes(q) ||
@@ -379,6 +410,18 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
       (c.phone ?? '').toLowerCase().includes(q)
     )
   })
+
+  const filtered =
+    filterStatus === 'all' ? searched : searched.filter(c => c.status === filterStatus)
+
+  const statusTabs = [
+    { value: 'all' as const, label: 'All', count: searched.length },
+    ...LEAD_STATUSES.map(({ value, label }) => ({
+      value,
+      label,
+      count: searched.filter(c => c.status === value).length,
+    })),
+  ]
 
   function handleDelete(id: string) {
     if (!confirm('Delete this lead? This cannot be undone.')) return
@@ -418,6 +461,9 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
         />
       </div>
 
+      {/* Status filter tabs — second-level filter inside the Leads tab */}
+      <FilterTabs tabs={statusTabs} active={filterStatus} onChange={setFilterStatus} />
+
       {(showForm || editContact) && (
         <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
           <div className="flex-1 overflow-y-auto bg-[var(--surface)] sm:flex-none sm:rounded-2xl sm:border sm:border-[var(--ink)]/8 sm:max-h-[90vh] sm:w-full sm:max-w-md p-6 flex flex-col">
@@ -447,7 +493,7 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <p className="text-sm text-[var(--ink-3)]">
-              {search ? 'No leads match your search.' : 'No leads yet.'}
+              {search || filterStatus !== 'all' ? 'No leads match this view.' : 'No leads yet.'}
             </p>
           </div>
         ) : (
@@ -466,10 +512,8 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
                         <p className="font-medium text-[var(--ink)] text-sm truncate">{contact.name}</p>
                         {contact.status && (
                           <span className={['inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0',
-                            contact.status === 'student' ? 'bg-[var(--green-l)] text-[var(--green)]'
-                              : contact.status === 'active' ? 'bg-[var(--accent-light)] text-[var(--accent-text)]'
-                              : 'bg-white/8 text-[var(--ink-2)]',
-                          ].join(' ')}>{contact.status}</span>
+                            STATUS_BADGE[contact.status] ?? DEFAULT_STATUS_BADGE,
+                          ].join(' ')}>{statusLabel(contact.status)}</span>
                         )}
                       </div>
                       <p className="text-xs text-[var(--ink-3)] mt-0.5 truncate">{contact.email ?? '—'}</p>
@@ -524,10 +568,8 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
                         <td className="px-5 py-3">
                           {contact.status && (
                             <span className={['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                              contact.status === 'student' ? 'bg-[var(--green-l)] text-[var(--green)]'
-                                : contact.status === 'active' ? 'bg-[var(--accent-light)] text-[var(--accent-text)]'
-                                : 'bg-white/8 text-[var(--ink-2)]',
-                            ].join(' ')}>{contact.status}</span>
+                              STATUS_BADGE[contact.status] ?? DEFAULT_STATUS_BADGE,
+                            ].join(' ')}>{statusLabel(contact.status)}</span>
                           )}
                         </td>
                         <td className="px-5 py-3 text-[var(--ink-3)] text-xs hidden lg:table-cell max-w-[180px]">
