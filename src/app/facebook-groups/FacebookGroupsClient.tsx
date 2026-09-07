@@ -614,6 +614,17 @@ function GroupForm({
         <label htmlFor="is_active" className="text-sm text-[var(--ink-2)]">Active group</label>
       </div>
 
+      <div>
+        <label className="block text-xs text-[var(--ink-3)] mb-1">Notes</label>
+        <textarea
+          name="notes"
+          defaultValue={group?.notes ?? ''}
+          rows={3}
+          placeholder="Any notes…"
+          className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] resize-none"
+        />
+      </div>
+
       {error && (
         <p className="text-xs text-[var(--red)] bg-[var(--red-l)] px-3 py-2 rounded-lg">{error}</p>
       )}

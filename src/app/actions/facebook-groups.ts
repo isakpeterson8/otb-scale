@@ -31,6 +31,7 @@ export async function createFacebookGroup(formData: FormData) {
     post_days: postDays.length > 0 ? postDays : [],
     post_week_pattern: weekPattern,
     qualification_status: (formData.get('qualification_status') as string) || 'active',
+    notes: (formData.get('notes') as string) || null,
   })
 
   if (error) return { error: error.message }
@@ -67,6 +68,7 @@ export async function updateFacebookGroup(id: string, formData: FormData) {
       post_days: postDays.length > 0 ? postDays : [],
       post_week_pattern: weekPattern,
       qualification_status: (formData.get('qualification_status') as string) || 'active',
+      notes: (formData.get('notes') as string) || null,
     })
     .eq('id', id)
 
