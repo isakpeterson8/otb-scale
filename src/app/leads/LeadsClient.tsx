@@ -5,8 +5,9 @@ import { formatDate, daysAgo } from '@/lib/utils'
 import { createContact, updateContact, deleteContact } from '@/app/actions/contacts'
 import { createOrganicOutreach, updateOrganicOutreach, deleteOrganicOutreach } from '@/app/actions/organic-outreach'
 import type { Contact, LeadStatus, OrganicOutreach, OutreachType, OutreachStatus } from '@/types/database'
-import { LEAD_SOURCES, LEAD_STATUSES, LEAD_SUB_SOURCES, OUTREACH_TYPES } from '@/types/database'
+import { LEAD_SOURCES, LEAD_STATUSES, LEAD_SUB_SOURCES, OUTREACH_TYPES, WAITLIST_STATUS } from '@/types/database'
 import FilterTabs from '@/components/ui/FilterTabs'
+import LeadsTabBar from './LeadsTabBar'
 
 interface FacebookGroupOption {
   id: string
@@ -18,6 +19,7 @@ interface LeadsClientProps {
   contacts: Contact[]
   facebookGroups: FacebookGroupOption[]
   outreachEntries: OrganicOutreach[]
+  initialTab?: 'leads' | 'outreach'
 }
 
 // Shown when a lead has no status yet — either never set, or cleared by the
@@ -819,13 +821,9 @@ export default function LeadsClient({
   contacts: initial,
   facebookGroups,
   outreachEntries,
+  initialTab = 'leads',
 }: LeadsClientProps) {
-  const [activeTab, setActiveTab] = useState<LeadsTab>('leads')
-
-  const tabs: { key: LeadsTab; label: string; count: number }[] = [
-    { key: 'leads',    label: 'Leads',            count: initial.length },
-    { key: 'outreach', label: 'Organic Outreach',  count: outreachEntries.length },
-  ]
+  const [activeTab, setActiveTab] = useState<LeadsTab>(initialTab)
 
   return (
     <div className="space-y-5">
@@ -836,22 +834,15 @@ export default function LeadsClient({
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-[var(--ink)]/8">
-        {tabs.map(({ key, label, count }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className={[
-              'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
-              activeTab === key
-                ? 'text-[var(--ink)] border-[var(--accent-text)]'
-                : 'text-[var(--ink-3)] border-transparent hover:text-[var(--ink-2)]',
-            ].join(' ')}
-          >
-            {label} <span className="ml-1 text-xs opacity-60">({count})</span>
-          </button>
-        ))}
-      </div>
+      <LeadsTabBar
+        active={activeTab}
+        counts={{
+          leads: initial.length,
+          outreach: outreachEntries.length,
+          waitlist: initial.filter(c => c.status === WAITLIST_STATUS).length,
+        }}
+        onSelect={setActiveTab}
+      />
 
       {activeTab === 'leads' && (
         <LeadsTab contacts={initial} facebookGroups={facebookGroups} />

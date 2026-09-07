@@ -7,7 +7,12 @@ import type { Contact, FacebookGroup, OrganicOutreach } from '@/types/database'
 
 export const metadata: Metadata = { title: 'Leads' }
 
-export default async function LeadsPage() {
+export default async function LeadsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const { tab } = await searchParams
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
   const { supabase, studioId } = ctx
@@ -37,6 +42,7 @@ export default async function LeadsPage() {
           contacts={(contacts ?? []) as Contact[]}
           facebookGroups={(groups ?? []) as Pick<FacebookGroup, 'id' | 'group_name' | 'is_active'>[]}
           outreachEntries={(outreach ?? []) as OrganicOutreach[]}
+          initialTab={tab === 'outreach' ? 'outreach' : 'leads'}
         />
       </main>
     </AppShell>

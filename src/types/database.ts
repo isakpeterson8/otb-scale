@@ -104,6 +104,10 @@ export const LEAD_STATUSES: { value: LeadStatus; label: string; description: str
   { value: 'waitlist',                  label: 'Waitlist',                  description: '' },
 ]
 
+/** The status backing the Waitlist tab. Referenced instead of a bare literal
+ *  so the page, the query and the tab count all agree with LEAD_STATUSES. */
+export const WAITLIST_STATUS: LeadStatus = 'waitlist'
+
 /**
  * The subset of LeadStatus values that count as an "active lead" on the
  * dashboard — a lead currently being worked.
@@ -126,6 +130,7 @@ export interface Contact {
   email: string | null
   phone: string | null
   status: LeadStatus | null
+  waitlist_rank: number | null
   source: string | null
   lead_source: string | null
   lead_sub_source: string | null

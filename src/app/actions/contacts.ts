@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStudioId } from './_shared'
-import { LEAD_STATUSES } from '@/types/database'
+import { LEAD_STATUSES, WAITLIST_STATUS } from '@/types/database'
 import type { LeadStatus } from '@/types/database'
 
 // Anything not in LEAD_STATUSES — including the five retired values — is stored
@@ -71,6 +71,59 @@ export async function updateContact(id: string, formData: FormData) {
 
   revalidatePath('/leads')
   revalidatePath('/contacts')
+  return { error: null }
+}
+
+/**
+ * Persist a manual waitlist ordering by renumbering waitlist_rank 0..n-1.
+ *
+ * The id list comes from the browser, so it is never trusted: every id is
+ * re-read from the DB scoped to this studio and to status = waitlist before
+ * anything is written, and each write is scoped to the studio as well. Ids
+ * belonging to another studio therefore cannot be touched.
+ */
+export async function updateWaitlistOrder(orderedContactIds: string[]) {
+  const ctx = await getStudioId()
+  if (!ctx) return { error: 'Unauthorized' }
+  if (ctx.viewOnly) return { error: 'View only mode' }
+  const { supabase, studioId } = ctx
+
+  if (orderedContactIds.length === 0) return { error: null }
+
+  // Reject duplicates outright rather than letting them collapse silently.
+  if (new Set(orderedContactIds).size !== orderedContactIds.length) {
+    return { error: 'Duplicate leads in the new order' }
+  }
+
+  const { data: owned, error: ownershipError } = await supabase
+    .from('contacts')
+    .select('id')
+    .eq('studio_id', studioId)
+    .eq('status', WAITLIST_STATUS)
+    .in('id', orderedContactIds)
+
+  if (ownershipError) return { error: ownershipError.message }
+
+  const ownedIds = new Set((owned ?? []).map((r: { id: string }) => r.id))
+  if (ownedIds.size !== orderedContactIds.length) {
+    return { error: 'The waitlist changed — reload and try again' }
+  }
+
+  const results = await Promise.all(
+    orderedContactIds.map((id, index) =>
+      supabase
+        .from('contacts')
+        .update({ waitlist_rank: index })
+        .eq('id', id)
+        .eq('studio_id', studioId),
+    ),
+  )
+
+  const failed = results.find(r => r.error)
+  if (failed?.error) return { error: failed.error.message }
+
+  revalidatePath('/leads/waitlist')
+  revalidatePath('/leads')
   return { error: null }
 }
 
