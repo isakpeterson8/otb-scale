@@ -108,6 +108,7 @@ export interface Contact {
   id: string
   studio_id: string
   name: string
+  guardian_name: string | null
   email: string | null
   phone: string | null
   status: LeadStatus | null
