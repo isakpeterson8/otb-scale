@@ -1,0 +1,1098 @@
+{
+  "source": "Notion export: OTB Work Plan (2)",
+  "task_count": 49,
+  "milestone_tag_set": [
+    "website",
+    "gbp",
+    "instagram",
+    "flyer",
+    "seo",
+    "general"
+  ],
+  "tasks": [
+    {
+      "title": "Goal Setting",
+      "timeframe_group": "Week 1",
+      "week_number": 1,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/mindset/goal-setting",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1E3l-cr4tKxiZJvR6aXDslcIRhooCVevdkqK1XfAzOyc/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/mindset/maximize-your-results",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/mindset/task-batching",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/mindset/successful-habits",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/mindset/going-for-your-goals",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Select a Studio Management Software",
+      "timeframe_group": "Week 1",
+      "week_number": 1,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 2,
+      "milestone_tag": "general",
+      "description": "Fons/MakeMusic Studio: OTB code gives a first-year discount plus complimentary concierge onboarding. My Music Staff: extended free trial through the OTB link. (Confirm both offers are current.)",
+      "links": [],
+      "flag": "Body carries a dated promo ('OTBSUMMER2026', 50% off, 60-day trial, $299). Verify current offer before templating."
+    },
+    {
+      "title": "Research 30-40 Facebook Groups",
+      "timeframe_group": "Week 1",
+      "week_number": 1,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 3,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/facebook-groups",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1wTArX43-0pcTNvkD4ATvPo_nDZlSLSaT5n5RD3Vf7A4/edit?usp=drive_link",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion/intro-to-facebook-group-selfpromotion",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion/researching-facebook-groups-for-selfpromotion",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion/key-group-information-for-facebook-group-selfpromotion",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Engage in Facebook groups",
+      "timeframe_group": "Week 1",
+      "week_number": 1,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 4,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/facebook-groups",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1wTArX43-0pcTNvkD4ATvPo_nDZlSLSaT5n5RD3Vf7A4/edit?usp=drive_link",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion/joining--warming-up-facebook-groups-for-selfpromotion",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion/organizing-a-facebook-group-selfpromotion-schedule",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Join 1-2 Facebook groups daily",
+      "timeframe_group": "Week 1",
+      "week_number": 1,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 5,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/facebook-groups",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1wTArX43-0pcTNvkD4ATvPo_nDZlSLSaT5n5RD3Vf7A4/edit?usp=drive_link",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion/joining--warming-up-facebook-groups-for-selfpromotion",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion/organizing-a-facebook-group-selfpromotion-schedule",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Assess & refine policies/rates",
+      "timeframe_group": "Week 1",
+      "week_number": 1,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 6,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/structure/policies-vs-contracts",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/drive/u/1/folders/1iJcPu_q2qks2VZau58VSivcgJaGxpeKv",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://docs.google.com/document/d/1AiEOtcvuP0w8W4ZlrR-dssvjMy9YyYnG3UqY6mgUtFs/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://www.outsidethebachs.com/calculator-private-music-lessons-rates",
+          "label": "provides baseline rates; confirm with Team OTB",
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1knOEigB3TBD1f9o7as73is_XPgfaiuWnmsKsXWVkvpA/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://docs.google.com/document/d/1DZ_mZ6MMAnSmj6C1iZgRwSiQz0lKoei3zwTw7ABQOTg/edit?usp=sharing",
+          "label": "New Student",
+          "internal": false
+        }
+      ],
+      "flag": "Rates-calculator link says 'confirm with Team OTB'. Keep that caveat."
+    },
+    {
+      "title": "Fall introductory lesson package set up & promo kickoff",
+      "timeframe_group": "Week 1",
+      "week_number": 1,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 7,
+      "milestone_tag": "general",
+      "description": "Sub-steps: (1) outline package options (3-6 lessons); (2) create promo flyer (request Canva edit support); (3) set up enrollment process (consultation + registration in studio management software).",
+      "links": [
+        {
+          "url": "https://docs.google.com/document/d/12gxuWHq1LenBQzPGeGHmq6TuiGr12IEW8tirnkJ35oQ/edit?usp=drive_link",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://docs.google.com/document/d/1dwub9TKC5vZjLhdKPbEeNi2zvmfs208Yf7dSOOppb1s/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": "Seasonal wording ('Fall') + has a 3-item sub-checklist. Make season-neutral or template the term."
+    },
+    {
+      "title": "Schedule Online Presence Check-In w/Isak",
+      "timeframe_group": "Week 1",
+      "week_number": 1,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 8,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://calendly.com/isakpeterson/online-presence",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": "Consumes Isak time; links his Calendly. Fine, just an ops note."
+    },
+    {
+      "title": "School contact research 50-100",
+      "timeframe_group": "Week 2",
+      "week_number": 2,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": "School Research Strategies",
+      "links": [
+        {
+          "url": "https://docs.google.com/document/d/1A2MUlp-vdkASk754hIcZyndhrHaubevqTsj2fx1HpLg/edit?usp=drive_link",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/school-outreach",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Draft school visit/community outreach topic list",
+      "timeframe_group": "Week 2",
+      "week_number": 2,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 2,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://docs.google.com/document/d/1cxKR0jCSfzfGSpWsqG9QGlrNGjyUrOculT0ab3ZMR7w/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Mindset training",
+      "timeframe_group": "Week 2",
+      "week_number": 2,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 3,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://docs.google.com/document/d/1ql4dhyC5XCgnlJ3BhN4sE0WrSswnjHY55Tb-GTgG4U4/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Draft niche statement for consultation",
+      "timeframe_group": "Week 2",
+      "week_number": 2,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 4,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/trials-vs-consultations-part-1",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/niching-down",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/your-niche-statement",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/drive/u/1/folders/1CWfyH_Z4it7qn9S0Y0fdbT-wpHL4tUqQ",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Draft thesis for consultation",
+      "timeframe_group": "Week 2",
+      "week_number": 2,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 5,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/trials-vs-consultations-part-1",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/your-thesis-statement",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/drive/u/1/folders/1CWfyH_Z4it7qn9S0Y0fdbT-wpHL4tUqQ",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Write self-promo copy",
+      "timeframe_group": "Week 2",
+      "week_number": 2,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 6,
+      "milestone_tag": "general",
+      "description": "Post Content for FB Group Self-Promotion: Promo Copy & Image",
+      "links": [
+        {
+          "url": "https://docs.google.com/document/d/152uQq733DEaZMgaXdGWf3NoVyJLgIeymMAN-N9g9lBw/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Self-promo posting begins",
+      "timeframe_group": "Week 2",
+      "week_number": 2,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 7,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Ask current students & colleagues for testimonials",
+      "timeframe_group": "Week 3",
+      "week_number": 3,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/marketing/testimonial-requests",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/drive/folders/1_F4shfZjTylojf3ZHNfcUNZg1wU02nSK?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Draft action plan for consultation",
+      "timeframe_group": "Week 3",
+      "week_number": 3,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 2,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/trials-vs-consultations-part-1",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/action-plan",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/drive/u/1/folders/1CWfyH_Z4it7qn9S0Y0fdbT-wpHL4tUqQ",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Draft vehicle for consultation",
+      "timeframe_group": "Week 3",
+      "week_number": 3,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 3,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/trials-vs-consultations-part-1",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations/the-vehicle",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/drive/u/1/folders/1CWfyH_Z4it7qn9S0Y0fdbT-wpHL4tUqQ",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Edit email signature",
+      "timeframe_group": "Week 3",
+      "week_number": 3,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 4,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://docs.google.com/document/d/1ImJ3vF06_drCiel6FVrLuB8_s65ER02ksL3qbmTZSjs/edit?usp=drive_link",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Complete digital flyer",
+      "timeframe_group": "Week 3",
+      "week_number": 3,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 5,
+      "milestone_tag": "flyer",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion/post-content-for-facebook-group-selfpromotion-promo-copy--image",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/canva-edits",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "School email cadence begins",
+      "timeframe_group": "Week 3",
+      "week_number": 3,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 6,
+      "milestone_tag": "general",
+      "description": "(All follow-up templates available here)",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1cxKR0jCSfzfGSpWsqG9QGlrNGjyUrOculT0ab3ZMR7w/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Log End-Of-Month Studio Recap",
+      "timeframe_group": "Week 4",
+      "week_number": 4,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/financials",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Complete website",
+      "timeframe_group": "Week 4",
+      "week_number": 4,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 2,
+      "milestone_tag": "website",
+      "description": null,
+      "links": [
+        {
+          "url": "https://docs.google.com/document/d/1_xoWH0mm7Td7TCkohrYa1DouHZTh-fnzRhx0DZkHfD8/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        },
+        {
+          "url": "https://studio.outsidethebachs.com/squarespace-concierge",
+          "label": "Squarespace",
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Set Up Custom Email",
+      "timeframe_group": "Week 4",
+      "week_number": 4,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 3,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [],
+      "flag": null
+    },
+    {
+      "title": "Research community organizations & outreach",
+      "timeframe_group": "Week 5",
+      "week_number": 5,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": "Organic Outreach Videos",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/resources#organicoutreach",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Quick Consultation (QC) script done",
+      "timeframe_group": "Week 5",
+      "week_number": 5,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 2,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1tLGwec_hNvZp7CmEPY-t3GXTu_IQIRWWH38Vi7FdcUc/edit?usp=drive_link",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Practice Quick Consultation (QC) with posting partners & other OTB members",
+      "timeframe_group": "Week 5",
+      "week_number": 5,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 3,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/consultations",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1tLGwec_hNvZp7CmEPY-t3GXTu_IQIRWWH38Vi7FdcUc/edit?usp=drive_link",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Ask local private music teachers to grab coffee",
+      "timeframe_group": "Week 5",
+      "week_number": 5,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 4,
+      "milestone_tag": "general",
+      "description": "Organic Outreach Videos",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/resources#organicoutreach",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Begin outreach calls & emails to community organizations",
+      "timeframe_group": "Week 6",
+      "week_number": 6,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": "Organic Outreach Videos",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/resources#organicoutreach",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Set Up Google Business Profile",
+      "timeframe_group": "Week 6",
+      "week_number": 6,
+      "is_recurring": false,
+      "starts_after_week": null,
+      "sort_order": 2,
+      "milestone_tag": "gbp",
+      "description": null,
+      "links": [],
+      "flag": null
+    },
+    {
+      "title": "Third party posting A-Week/B-Week",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": 4,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": "Track all group posting in OTB",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/facebook-groups",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/file/d/1pgend-1WLVgiEzRTVEnr0rz8s-no1aew/view?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Self-promo posting A-Week/B-Week",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": 4,
+      "sort_order": 2,
+      "milestone_tag": "general",
+      "description": "Track all group posting in OTB",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/facebook-groups",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/file/d/1pgend-1WLVgiEzRTVEnr0rz8s-no1aew/view?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Engage in groups A-Week/B-Week",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": 4,
+      "sort_order": 3,
+      "milestone_tag": "general",
+      "description": "Track all group posting in OTB",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/facebook-groups",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://drive.google.com/file/d/1pgend-1WLVgiEzRTVEnr0rz8s-no1aew/view?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "School email follow up",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": 4,
+      "sort_order": 4,
+      "milestone_tag": "general",
+      "description": "(All follow-up templates available here)",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/facebook-group-self-promotion",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Follow up with all leads",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": 4,
+      "sort_order": 5,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/leads",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1TC-Z8XY5x5eU3Yl9_PXLiFuUPEdje1TRBK6adslcdTA/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Identify & contact helpful leads in network",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": 4,
+      "sort_order": 6,
+      "milestone_tag": "general",
+      "description": "Organic Outreach Videos",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/resources#organicoutreach",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Weekly: Submit Cadence Form",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 7,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://cadence.outsidethebachs.com/",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Affirmations",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": 4,
+      "sort_order": 8,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/mindset",
+          "label": null,
+          "internal": true
+        },
+        {
+          "url": "https://docs.google.com/document/d/1ql4dhyC5XCgnlJ3BhN4sE0WrSswnjHY55Tb-GTgG4U4/edit?usp=sharing",
+          "label": null,
+          "internal": false
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Facebook & Instagram business page posting - Begin Week 5",
+      "timeframe_group": "Weekly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": 4,
+      "sort_order": 9,
+      "milestone_tag": "instagram",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/content",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Email student leads that haven’t responded since first 4-week campaign",
+      "timeframe_group": "Monthly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/leads",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Self-promotion post on personal Facebook feed once a month",
+      "timeframe_group": "Monthly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 2,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [],
+      "flag": null
+    },
+    {
+      "title": "Post self-promo on Next Door twice per month",
+      "timeframe_group": "Monthly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 3,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [],
+      "flag": null
+    },
+    {
+      "title": "Revisit goals & affirmations",
+      "timeframe_group": "Monthly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 4,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/mindset",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Run studio numbers: enrollment, attrition, revenue, expenses, close rate",
+      "timeframe_group": "Monthly",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 5,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/financials",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Follow up with all previous leads",
+      "timeframe_group": "Semester",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 1,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/leads",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Check in with all previously visited schools",
+      "timeframe_group": "Semester",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 2,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/school-outreach",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Follow up with all school leads",
+      "timeframe_group": "Semester",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 3,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/school-outreach",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Check in & network with other private teachers in area",
+      "timeframe_group": "Semester",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 4,
+      "milestone_tag": "general",
+      "description": "Organic Outreach Videos",
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/resources#organicoutreach",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    },
+    {
+      "title": "Revisit mindset training",
+      "timeframe_group": "Semester",
+      "week_number": null,
+      "is_recurring": true,
+      "starts_after_week": null,
+      "sort_order": 5,
+      "milestone_tag": "general",
+      "description": null,
+      "links": [
+        {
+          "url": "https://studio.outsidethebachs.com/education/mindset",
+          "label": null,
+          "internal": true
+        }
+      ],
+      "flag": null
+    }
+  ],
+  "excluded_from_template": [
+    {
+      "title": "Finish AJ’s Background Check",
+      "reason": "client-specific (named client)",
+      "timeframe": "Week 1"
+    },
+    {
+      "title": "Third-Party Posting: Check In w/ OTB Team",
+      "reason": "internal/team staging (Brain Dump)",
+      "timeframe": "Brain Dump"
+    },
+    {
+      "title": "(blank)",
+      "reason": "empty row",
+      "timeframe": "Week 1"
+    }
+  ]
+}
