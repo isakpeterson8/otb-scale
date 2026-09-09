@@ -168,6 +168,84 @@ export async function setWorkPlanTaskDone(
 }
 
 /**
+ * The row shape a timeframe_group implies. Week 1-6 are one-time launch-sprint
+ * tasks; Weekly/Monthly/Semester are recurring cadences. Returns null for a
+ * group outside the standard set, meaning "leave week_number and is_recurring
+ * alone" rather than guessing.
+ */
+function shapeForGroup(group: string): { week_number: number | null; is_recurring: boolean } | null {
+  const week = group.match(/^Week (\d+)$/)
+  if (week) return { week_number: Number(week[1]), is_recurring: false }
+  if (group === 'Weekly' || group === 'Monthly' || group === 'Semester') {
+    return { week_number: null, is_recurring: true }
+  }
+  return null
+}
+
+/**
+ * Move a task into a different timeframe_group and renumber both groups.
+ *
+ * `orderedTargetIds` is the target group including the moved task in its new
+ * position; `orderedSourceIds` is the source group without it, which closes the
+ * gap left behind. Both are re-read scoped to this plan before anything is
+ * written, so ids from another plan cannot be renumbered through this action.
+ */
+export async function moveWorkPlanTaskToGroup(
+  planId: string,
+  taskId: string,
+  targetGroup: string,
+  orderedTargetIds: string[],
+  orderedSourceIds: string[],
+): Promise<Result> {
+  const ctx = await getStaffContext()
+  if (!ctx) return { error: 'Unauthorized' }
+
+  const allIds = [...new Set([...orderedTargetIds, ...orderedSourceIds])]
+  if (!orderedTargetIds.includes(taskId)) {
+    return { error: 'The moved task is missing from the target order' }
+  }
+  if (allIds.length !== orderedTargetIds.length + orderedSourceIds.length) {
+    return { error: 'Duplicate tasks in the new order' }
+  }
+
+  const { data: owned, error: ownershipError } = await ctx.supabase
+    .from('work_plan_tasks')
+    .select('id')
+    .eq('work_plan_id', planId)
+    .in('id', allIds)
+  if (ownershipError) return { error: ownershipError.message }
+  if ((owned?.length ?? 0) !== allIds.length) {
+    return { error: 'The task list changed — reload and try again' }
+  }
+
+  // Group first, so week_number/is_recurring cannot be left describing the old
+  // group if a later renumber fails.
+  const shape = shapeForGroup(targetGroup)
+  const { error: moveError } = await ctx.supabase
+    .from('work_plan_tasks')
+    .update({ timeframe_group: targetGroup, ...(shape ?? {}) })
+    .eq('id', taskId)
+    .eq('work_plan_id', planId)
+  if (moveError) return { error: moveError.message }
+
+  const renumber = (ids: string[]) =>
+    ids.map((id, index) =>
+      ctx.supabase
+        .from('work_plan_tasks')
+        .update({ sort_order: index })
+        .eq('id', id)
+        .eq('work_plan_id', planId),
+    )
+
+  const results = await Promise.all([...renumber(orderedTargetIds), ...renumber(orderedSourceIds)])
+  const failed = results.find(r => r.error)
+  if (failed?.error) return { error: failed.error.message }
+
+  revalidatePlan(planId)
+  return { error: null }
+}
+
+/**
  * Renumber sort_order 0..n-1 within one timeframe_group after a drag.
  * Ids are re-read scoped to this plan and group first, so a forged id from
  * another plan cannot be renumbered through this action.
