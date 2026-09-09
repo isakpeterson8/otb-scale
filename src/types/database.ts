@@ -469,3 +469,76 @@ export interface SquaresspaceSyncLog {
   raw_input_chars: number | null
   notes: string | null
 }
+
+// ── Work plans (Phase 1, admin-only) ─────────────────────────────────────────
+
+export type MilestoneTag = 'website' | 'gbp' | 'instagram' | 'flyer' | 'seo' | 'general'
+export type WorkPlanStatus = 'active' | 'archived'
+
+export const MILESTONE_TAGS: { value: MilestoneTag; label: string }[] = [
+  { value: 'general',   label: 'General' },
+  { value: 'website',   label: 'Website' },
+  { value: 'gbp',       label: 'Google Business' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'flyer',     label: 'Flyer' },
+  { value: 'seo',       label: 'SEO' },
+]
+
+/** A resource link on a task. `internal` marks an OTB-hosted URL the UI can
+ *  deep-link inside the app instead of bouncing the user out. */
+export interface WorkPlanLink {
+  url: string
+  label: string | null
+  internal: boolean
+}
+
+/** Fields shared by template tasks and per-client instance tasks. */
+export interface WorkPlanTaskShape {
+  id: string
+  title: string
+  description: string | null
+  /** Team-only. Never rendered on a client-facing surface. */
+  internal_note: string | null
+  timeframe_group: string
+  week_number: number | null
+  is_recurring: boolean
+  starts_after_week: number | null
+  sort_order: number
+  milestone_tag: MilestoneTag
+  links: WorkPlanLink[]
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkPlanTemplate {
+  id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkPlanTemplateTask extends WorkPlanTaskShape {
+  template_id: string
+}
+
+export interface WorkPlan {
+  id: string
+  studio_id: string
+  template_id: string | null
+  title: string
+  status: WorkPlanStatus
+  /** Client visibility. Stays false for all of Phase 1. */
+  is_published: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkPlanTask extends WorkPlanTaskShape {
+  work_plan_id: string
+  is_done: boolean
+  done_at: string | null
+  done_by: string | null
+}
