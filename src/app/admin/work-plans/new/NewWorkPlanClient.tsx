@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { createBlankWorkPlan, createWorkPlanFromTemplate } from '@/app/actions/work-plans'
+import { labelStudioOptions, type StudioOption } from '@/lib/work-plans'
 
 const BLANK = '__blank__'
 const INPUT =
@@ -14,7 +15,7 @@ export default function NewWorkPlanClient({
   templates,
   loadError,
 }: {
-  studios: { id: string; name: string }[]
+  studios: StudioOption[]
   templates: { id: string; name: string; description: string | null }[]
   loadError: string | null
 }) {
@@ -24,6 +25,9 @@ export default function NewWorkPlanClient({
   const [blankTitle, setBlankTitle] = useState('Work Plan')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // One option per studio id; a disambiguator is added only where a name repeats.
+  const studioOptions = labelStudioOptions(studios)
 
   const isBlank = templateId === BLANK
 
@@ -64,8 +68,8 @@ export default function NewWorkPlanClient({
         <label className="block text-xs text-[var(--ink-3)] mb-1">Studio *</label>
         <select value={studioId} onChange={e => setStudioId(e.target.value)} className={INPUT}>
           <option value="">— Select studio —</option>
-          {studios.map(s => (
-            <option key={s.id} value={s.id} className="bg-[var(--surface)]">{s.name}</option>
+          {studioOptions.map(s => (
+            <option key={s.id} value={s.id} className="bg-[var(--surface)]">{s.label}</option>
           ))}
         </select>
         {studios.length === 0 && (

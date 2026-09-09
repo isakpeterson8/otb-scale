@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getStaffContext } from '@/lib/staff'
 import AdminShell from '../../AdminShell'
 import NewWorkPlanClient from './NewWorkPlanClient'
+import type { StudioOption } from '@/lib/work-plans'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'New Work Plan' }
@@ -15,7 +16,14 @@ export default async function NewWorkPlanPage() {
   // "Staff can read studios" policy added by 20260909000001 — without it this
   // list is empty and no plan can be created.
   const [studiosRes, templatesRes] = await Promise.all([
-    ctx.supabase.from('studios').select('id, name').order('name', { ascending: true }),
+    // Reads studios directly — no join, so nothing fans out. Same-named rows
+    // are genuinely distinct studios; created_at feeds the picker's
+    // disambiguator. Secondary sort keeps the order stable between loads.
+    ctx.supabase
+      .from('studios')
+      .select('id, name, created_at')
+      .order('name', { ascending: true })
+      .order('created_at', { ascending: true }),
     ctx.supabase
       .from('work_plan_templates')
       .select('id, name, description')
@@ -27,7 +35,7 @@ export default async function NewWorkPlanPage() {
     <AdminShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <NewWorkPlanClient
-          studios={(studiosRes.data ?? []) as { id: string; name: string }[]}
+          studios={(studiosRes.data ?? []) as StudioOption[]}
           templates={(templatesRes.data ?? []) as { id: string; name: string; description: string | null }[]}
           loadError={studiosRes.error?.message ?? templatesRes.error?.message ?? null}
         />
