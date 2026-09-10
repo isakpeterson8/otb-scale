@@ -76,11 +76,36 @@ export async function getStudioId(): Promise<StudioContext | null> {
       .insert({ owner_user_id: user.id, name: studioName, subscription_tier: initialTier })
       .select('id')
       .single()
-    if (error || !created) {
+
+    if (error?.code === '23505') {
+      // Lost a race: a concurrent call for this same user already created the
+      // studio. On a user's first authenticated load several server components
+      // call getStudioId() at once, all see no studio, and all insert — which
+      // is how this database ended up with 78 duplicate studios. Adopt the
+      // winner's row rather than failing; without this the loser would be
+      // returned null and bounced to /auth/login on their very first load.
+      //
+      // No-op until a unique constraint on studios.owner_user_id exists, since
+      // nothing raises 23505 before then.
+      const { data: winner, error: reselectError } = await supabase
+        .from('studios')
+        .select('id')
+        .eq('owner_user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (reselectError || !winner) {
+        console.error('[getStudioId] studio re-select after 23505 failed:', reselectError?.message, reselectError?.code)
+        return null
+      }
+      studioId = winner.id
+    } else if (error || !created) {
+      // Every other failure behaves exactly as before.
       console.error('[getStudioId] studio insert failed:', error?.message, error?.code, error?.details)
       return null
+    } else {
+      studioId = created.id
     }
-    studioId = created.id
   }
 
   // Backfill the profile so future calls hit the fast path
