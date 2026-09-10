@@ -11,7 +11,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import {
-  DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors,
+  DndContext, KeyboardSensor, PointerSensor, closestCorners, useDroppable, useSensor, useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
@@ -21,8 +21,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  deleteWorkPlan, deleteWorkPlanTask, createWorkPlanTask, reorderWorkPlanTasks,
-  setWorkPlanTaskDone, updateWorkPlan, updateWorkPlanTask,
+  deleteWorkPlan, deleteWorkPlanTask, createWorkPlanTask, moveWorkPlanTaskToGroup,
+  reorderWorkPlanTasks, setWorkPlanTaskDone, updateWorkPlan, updateWorkPlanTask,
 } from '@/app/actions/work-plans'
 import { completionPercent, groupTasksByTimeframe, TIMEFRAME_ORDER } from '@/lib/work-plans'
 import { MILESTONE_TAGS, type WorkPlan, type WorkPlanStatus, type WorkPlanTask } from '@/types/database'
@@ -112,6 +112,22 @@ function TaskRow({
   )
 }
 
+/** Makes a whole group a drop target, so a task can land in it from elsewhere. */
+function GroupDropZone({ group, children }: { group: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `group:${group}` })
+  return (
+    <div
+      ref={setNodeRef}
+      className={[
+        'bg-[var(--surface)] rounded-xl border overflow-hidden transition-colors',
+        isOver ? 'border-[var(--accent-text)]' : 'border-[var(--ink)]/8',
+      ].join(' ')}
+    >
+      {children}
+    </div>
+  )
+}
+
 // ── Editor ───────────────────────────────────────────────────────────────────
 
 export default function WorkPlanEditorClient({
@@ -158,19 +174,76 @@ export default function WorkPlanEditorClient({
     run(() => setWorkPlanTaskDone(plan.id, task.id, next), () => setTasks(previous))
   }
 
-  function handleDragEnd(group: string, event: DragEndEvent) {
+  const orderedGroup = (source: WorkPlanTask[], group: string) =>
+    source.filter(t => t.timeframe_group === group).sort((a, b) => a.sort_order - b.sort_order)
+
+  /** week_number/is_recurring the target group implies — mirrors the server. */
+  function shapeForGroup(group: string): Partial<WorkPlanTask> {
+    const week = group.match(/^Week (\d+)$/)
+    if (week) return { week_number: Number(week[1]), is_recurring: false }
+    if (group === 'Weekly' || group === 'Monthly' || group === 'Semester') {
+      return { week_number: null, is_recurring: true }
+    }
+    return {}
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    const inGroup = tasks.filter(t => t.timeframe_group === group).sort((a, b) => a.sort_order - b.sort_order)
-    const from = inGroup.findIndex(t => t.id === active.id)
-    const to = inGroup.findIndex(t => t.id === over.id)
-    if (from === -1 || to === -1) return
 
+    const moved = tasks.find(t => t.id === active.id)
+    if (!moved) return
+
+    // Dropping on a task targets that task's group; dropping on empty space in
+    // a group targets the group itself.
+    const overId = String(over.id)
+    const overTask = tasks.find(t => t.id === overId)
+    const targetGroup = overTask?.timeframe_group ?? (overId.startsWith('group:') ? overId.slice(6) : null)
+    if (!targetGroup) return
+
+    const sourceGroup = moved.timeframe_group
     const previous = tasks
-    const reordered = arrayMove(inGroup, from, to)
-    const orderById = new Map(reordered.map((t, i) => [t.id, i]))
-    setTasks(ts => ts.map(t => (orderById.has(t.id) ? { ...t, sort_order: orderById.get(t.id)! } : t)))
-    run(() => reorderWorkPlanTasks(plan.id, group, reordered.map(t => t.id)), () => setTasks(previous))
+
+    if (targetGroup === sourceGroup) {
+      const inGroup = orderedGroup(tasks, sourceGroup)
+      const from = inGroup.findIndex(t => t.id === active.id)
+      const to = inGroup.findIndex(t => t.id === overId)
+      if (from === -1 || to === -1) return
+
+      const reordered = arrayMove(inGroup, from, to)
+      const orderById = new Map(reordered.map((t, i) => [t.id, i]))
+      setTasks(ts => ts.map(t => (orderById.has(t.id) ? { ...t, sort_order: orderById.get(t.id)! } : t)))
+      run(() => reorderWorkPlanTasks(plan.id, sourceGroup, reordered.map(t => t.id)), () => setTasks(previous))
+      return
+    }
+
+    // Cross-group: insert at the hovered task's position, or append when the
+    // drop landed on the group rather than a task.
+    const targetTasks = orderedGroup(tasks, targetGroup)
+    const insertAt = overTask ? targetTasks.findIndex(t => t.id === overId) : targetTasks.length
+    const nextTarget = [...targetTasks]
+    nextTarget.splice(insertAt === -1 ? targetTasks.length : insertAt, 0, moved)
+    const nextSource = orderedGroup(tasks, sourceGroup).filter(t => t.id !== moved.id)
+
+    const targetOrder = new Map(nextTarget.map((t, i) => [t.id, i]))
+    const sourceOrder = new Map(nextSource.map((t, i) => [t.id, i]))
+    setTasks(ts =>
+      ts.map(t => {
+        if (t.id === moved.id) {
+          return { ...t, ...shapeForGroup(targetGroup), timeframe_group: targetGroup, sort_order: targetOrder.get(t.id)! }
+        }
+        if (targetOrder.has(t.id)) return { ...t, sort_order: targetOrder.get(t.id)! }
+        if (sourceOrder.has(t.id)) return { ...t, sort_order: sourceOrder.get(t.id)! }
+        return t
+      }),
+    )
+    run(
+      () => moveWorkPlanTaskToGroup(
+        plan.id, moved.id, targetGroup,
+        nextTarget.map(t => t.id), nextSource.map(t => t.id),
+      ),
+      () => setTasks(previous),
+    )
   }
 
   return (
@@ -225,21 +298,22 @@ export default function WorkPlanEditorClient({
           </button>
         </div>
       ) : (
-        groups.map(({ group, tasks: groupTasks }) => (
-          <section key={group} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-[var(--ink-2)] uppercase tracking-wide">
-                {group} <span className="text-[var(--ink-3)] normal-case">({groupTasks.filter(t => t.is_done).length}/{groupTasks.length})</span>
-              </h3>
-              <button onClick={() => setAdding(group)} className="text-xs text-[var(--accent-text)] hover:underline">+ Add task</button>
-            </div>
-            <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                modifiers={[restrictToVerticalAxis]}
-                onDragEnd={e => handleDragEnd(group, e)}
-              >
+        // One context across every group, so a task can be dragged between them.
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          modifiers={[restrictToVerticalAxis]}
+          onDragEnd={handleDragEnd}
+        >
+          {groups.map(({ group, tasks: groupTasks }) => (
+            <section key={group} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-[var(--ink-2)] uppercase tracking-wide">
+                  {group} <span className="text-[var(--ink-3)] normal-case">({groupTasks.filter(t => t.is_done).length}/{groupTasks.length})</span>
+                </h3>
+                <button onClick={() => setAdding(group)} className="text-xs text-[var(--accent-text)] hover:underline">+ Add task</button>
+              </div>
+              <GroupDropZone group={group}>
                 <SortableContext items={groupTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                   <div className="divide-y divide-[var(--ink)]/6">
                     {groupTasks.map(task => (
@@ -247,10 +321,10 @@ export default function WorkPlanEditorClient({
                     ))}
                   </div>
                 </SortableContext>
-              </DndContext>
-            </div>
-          </section>
-        ))
+              </GroupDropZone>
+            </section>
+          ))}
+        </DndContext>
       )}
 
       <div className="pt-2 border-t border-[var(--ink)]/8">
