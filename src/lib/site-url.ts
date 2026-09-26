@@ -25,8 +25,17 @@ const PRODUCTION_ORIGIN = 'https://studio.outsidethebachs.com'
 
 const ALLOWED_HOST_PATTERNS: RegExp[] = [
   /^studio\.outsidethebachs\.com$/,
-  // Vercel preview + deployment hostnames for this project.
-  /^[a-z0-9-]+\.vercel\.app$/,
+  /**
+   * This project's Vercel hostnames only. The `-isaks-projects-19b4ab7e` team
+   * suffix is the security-relevant part: anyone can register a *.vercel.app
+   * subdomain, so a bare /^[a-z0-9-]+\.vercel\.app$/ would let a stranger's
+   * deployment be treated as ours.
+   *
+   * Covers both shapes Vercel serves:
+   *   branch alias  otb-scale-git-feature-client-wor-907e2f-isaks-projects-19b4ab7e.vercel.app
+   *   immutable     otb-scale-83tqtg7ev-isaks-projects-19b4ab7e.vercel.app
+   */
+  /^otb-scale(?:-[a-z0-9-]+)?-isaks-projects-19b4ab7e\.vercel\.app$/,
   /^localhost(:\d+)?$/,
   /^127\.0\.0\.1(:\d+)?$/,
 ]
