@@ -468,13 +468,7 @@ export default function WorkPlanBoardClient({
   }
 
   return (
-    <div
-      className="space-y-4"
-      // The app renders a floating round control at the bottom-right on phones.
-      // Page-scoped padding keeps the last card clear of it without touching
-      // that control anywhere else.
-      style={{ paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
-    >
+    <div className="space-y-4">
       {/* Header */}
       <div>
         <div className="flex items-start justify-between gap-3 flex-wrap">
