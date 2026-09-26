@@ -42,13 +42,19 @@ export function toInput(task: {
 // ── Task form ────────────────────────────────────────────────────────────────
 
 export default function TaskForm({
-  initial, onSave, onDelete, onClose, isPending,
+  initial, onSave, onDelete, onClose, isPending, clientNote, itemDoneById,
 }: {
   initial: TaskInput
   onSave: (input: TaskInput) => void
   onDelete?: () => void
   onClose: () => void
   isPending: boolean
+  /**
+   * Read-only context from the client's side. Passed by the per-plan editor only
+   * — a template has no client, so both are undefined there.
+   */
+  clientNote?: string | null
+  itemDoneById?: Record<string, boolean>
 }) {
   const [form, setForm] = useState<TaskInput>(initial)
   const set = <K extends keyof TaskInput>(k: K, v: TaskInput[K]) => setForm(f => ({ ...f, [k]: v }))
@@ -200,6 +206,17 @@ export default function TaskForm({
           ))}
         </div>
 
+        {/* The client's own notes. Read-only here: it is their writing, and staff
+            editing it silently would be surprising. Never internal_note. */}
+        {clientNote && (
+          <div className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--accent-light)' }}>
+            <p className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--accent-text)' }}>
+              Client&apos;s notes
+            </p>
+            <p className="text-sm text-[var(--ink-2)] whitespace-pre-wrap mt-1">{clientNote}</p>
+          </div>
+        )}
+
         {/* Checklist. Ids travel with existing rows so saving DIFFS rather than
             replacing — members tick these, and a rebuild would wipe that. */}
         <div className="space-y-2 pt-2 border-t border-[var(--ink)]/8">
@@ -216,8 +233,23 @@ export default function TaskForm({
           {form.items.length === 0 && (
             <p className="text-xs text-[var(--ink-3)]">No sub-steps. The client sees a plain task.</p>
           )}
+          {itemDoneById && form.items.length > 0 && (
+            <p className="text-xs text-[var(--ink-2)] tabular-nums">
+              Client has ticked {form.items.filter(i => i.id && itemDoneById[i.id]).length} of {form.items.length}
+            </p>
+          )}
           {form.items.map((item, i) => (
             <div key={item.id ?? `new-${i}`} className="flex items-center gap-1.5">
+              {/* What the client has ticked. Read-only: staff edit the wording,
+                  the client owns the state. */}
+              <span
+                aria-hidden
+                title={item.id && itemDoneById?.[item.id] ? 'Client has ticked this' : 'Not ticked by the client'}
+                className="shrink-0 w-4 text-center text-xs"
+                style={{ color: item.id && itemDoneById?.[item.id] ? 'var(--green)' : 'var(--ink-3)' }}
+              >
+                {item.id && itemDoneById?.[item.id] ? '✓' : '○'}
+              </span>
               <input
                 value={item.title}
                 maxLength={300}

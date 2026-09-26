@@ -112,7 +112,7 @@ function CardShell({
           {task.milestone_tag !== 'general' && (
             <Chip fg="var(--accent-text)" bg="var(--accent-light)">{categoryLabel(task.milestone_tag)}</Chip>
           )}
-          {task.is_client_added && <Chip>yours</Chip>}
+          {task.is_client_added && <Chip>Added by you</Chip>}
         </div>
       )}
 
@@ -123,7 +123,7 @@ function CardShell({
           <Chip fg="var(--accent-text)" bg="var(--accent-light)">{categoryLabel(task.milestone_tag)}</Chip>
         )}
         {task.is_recurring && <Chip>recurring</Chip>}
-        {task.is_client_added && <Chip>yours</Chip>}
+        {task.is_client_added && <Chip>Added by you</Chip>}
       </div>
     </div>
   )
@@ -187,7 +187,7 @@ function GroupedTasks({
                 <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-2)]">{group}</span>
-              <span className="ml-auto text-[11px] text-[var(--ink-3)] tabular-nums">
+              <span className="ml-auto text-[11px] text-[var(--ink-2)] tabular-nums">
                 {remaining > 0 ? `${remaining} of ${groupTasks.length} left` : `${groupTasks.length} done`}
               </span>
             </button>
@@ -250,7 +250,7 @@ function Checklist({
 
   return (
     <div className="space-y-1.5">
-      <p className="text-xs text-[var(--ink-3)] uppercase tracking-wide">
+      <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">
         Steps <span className="tabular-nums normal-case">{done}/{items.length}</span>
       </p>
       {items.map(item => (
@@ -318,8 +318,8 @@ function ClientNotes({ task, disabled }: { task: Task; disabled: boolean }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs text-[var(--ink-3)] uppercase tracking-wide">Your notes</p>
-        <span className="text-[11px] text-[var(--ink-3)]" aria-live="polite">
+        <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">Your notes</p>
+        <span className="text-[11px] text-[var(--ink-2)]" aria-live="polite">
           {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : state === 'error' ? 'Not saved' : ''}
         </span>
       </div>
@@ -336,7 +336,7 @@ function ClientNotes({ task, disabled }: { task: Task; disabled: boolean }) {
         placeholder="What you tried, what you want to ask about…"
         className={INPUT + ' resize-y disabled:opacity-60'}
       />
-      <p className="text-[11px] text-[var(--ink-3)]">Visible to your OTB coach</p>
+      <p className="text-[11px] text-[var(--ink-2)]">Visible to your OTB coach</p>
     </div>
   )
 }
@@ -513,12 +513,16 @@ function TaskSheet({
               <Chip fg="var(--accent-text)" bg="var(--accent-light)">{categoryLabel(task.milestone_tag)}</Chip>
             )}
             {task.is_recurring && <Chip>recurring</Chip>}
-            {task.is_client_added && <Chip>added by you</Chip>}
+            {task.is_client_added && <Chip>Added by you</Chip>}
           </div>
 
-          {task.description
-            ? <p className="text-sm text-[var(--ink-2)] whitespace-pre-wrap leading-relaxed">{task.description}</p>
-            : <p className="text-sm text-[var(--ink-3)]">No further detail on this step.</p>}
+          {task.description && (
+            <p className="text-sm text-[var(--ink-2)] whitespace-pre-wrap leading-relaxed">{task.description}</p>
+          )}
+          {/* Only when the step carries nothing else — a checklist IS the detail. */}
+          {!task.description && task.items.length === 0 && (
+            <p className="text-sm text-[var(--ink-3)]">No further detail on this step.</p>
+          )}
 
           <Checklist
             items={task.items}
@@ -528,7 +532,7 @@ function TaskSheet({
 
           {(task.links ?? []).length > 0 && (
             <div className="space-y-1.5 pt-1">
-              <p className="text-xs text-[var(--ink-3)] uppercase tracking-wide">Links</p>
+              <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">Links</p>
               {task.links.map((l, i) => (
                 <a
                   key={`${l.url}-${i}`}
@@ -547,7 +551,7 @@ function TaskSheet({
           <ClientNotes task={task} disabled={viewOnly} />
 
           <div className="pt-2 border-t border-[var(--border)] space-y-2">
-            <p className="text-xs text-[var(--ink-3)] uppercase tracking-wide">Move to</p>
+            <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">Move to</p>
             <div className="grid grid-cols-3 gap-2">
               {TASK_STATUSES.map(({ value }) => {
                 const s = STATUS_STYLE[value]
@@ -625,14 +629,22 @@ export default function WorkPlanBoardClient({
   // Standard groups plus whatever this plan already uses, in display order.
   const groupOptions = Array.from(new Set([...TIMEFRAME_ORDER, ...orderTimeframeGroups(tasks)]))
 
-  function defaultOpenGroup(status: WorkPlanTaskStatus): string | null {
-    const groups = groupTasksByTimeframe(byStatus(status))
-    const firstUnfinished = groups.find(g => g.tasks.some(t => t.status !== 'done'))
-    return (firstUnfinished ?? groups[0])?.group ?? null
-  }
+  /**
+   * Which group opens by default, per column — computed ONCE from the data this
+   * component mounted with. Deriving it on every render made moving a card
+   * change the answer, which collapsed the destination column's open group.
+   */
+  const [defaultOpenGroup] = useState<Record<WorkPlanTaskStatus, string | null>>(() => {
+    const compute = (status: WorkPlanTaskStatus) => {
+      const groups = groupTasksByTimeframe(initialTasks.filter(t => t.status === status))
+      const firstUnfinished = groups.find(g => g.tasks.some(t => t.status !== 'done'))
+      return (firstUnfinished ?? groups[0])?.group ?? null
+    }
+    return { todo: compute('todo'), doing: compute('doing'), done: compute('done') }
+  })
 
   function isExpanded(status: WorkPlanTaskStatus, group: string) {
-    return overrides[`${status}:${group}`] ?? group === defaultOpenGroup(status)
+    return overrides[`${status}:${group}`] ?? group === defaultOpenGroup[status]
   }
 
   function onToggleGroup(status: WorkPlanTaskStatus, group: string, next: boolean) {
@@ -653,7 +665,7 @@ export default function WorkPlanBoardClient({
       const result = await action()
       if (result.error) {
         setTasks(previous)
-        setError(result.error)
+        showToast(result.error, 'error')
         return
       }
       if (successMessage) showToast(successMessage)
@@ -683,6 +695,12 @@ export default function WorkPlanBoardClient({
     )
   }
 
+  /** Provisional rows have no server id yet, so they are not openable. */
+  function openTask(task: Task) {
+    if (task.id.startsWith('temp-')) return
+    setOpen(task)
+  }
+
   function handleDragStart(event: DragStartEvent) {
     setDragging(tasks.find(t => t.id === event.active.id) ?? null)
   }
@@ -706,7 +724,7 @@ export default function WorkPlanBoardClient({
           tasks={byStatus(value)}
           isExpanded={isExpanded}
           onToggleGroup={onToggleGroup}
-          onOpen={setOpen}
+          onOpen={openTask}
         />
       ))}
     </div>
@@ -721,7 +739,7 @@ export default function WorkPlanBoardClient({
             <h2 className="text-2xl text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
               {plan.title}
             </h2>
-            <p className="text-sm text-[var(--ink-3)] mt-0.5 tabular-nums">
+            <p className="text-sm text-[var(--ink-2)] mt-0.5 tabular-nums">
               {done}/{tasks.length} done ({pct}%)
             </p>
           </div>
@@ -808,7 +826,7 @@ export default function WorkPlanBoardClient({
                 tasks={byStatus(activeTab)}
                 isExpanded={isExpanded}
                 onToggleGroup={onToggleGroup}
-                renderCard={task => <CardShell key={task.id} task={task} onOpen={setOpen} />}
+                renderCard={task => <CardShell key={task.id} task={task} onOpen={openTask} />}
               />
             </div>
           </div>
@@ -847,10 +865,40 @@ export default function WorkPlanBoardClient({
           onClose={() => setAdding(false)}
           onSave={input => {
             setAdding(false)
+            const previous = tasks
+            const now = new Date().toISOString()
+            // Provisional row so the card appears immediately. The id is replaced
+            // by the server's on refresh; cards carrying one are not openable.
+            const provisional: Task = {
+              id: `temp-${now}`,
+              work_plan_id: plan.id,
+              title: input.title,
+              description: input.description || null,
+              timeframe_group: input.timeframeGroup,
+              week_number: null,
+              is_recurring: false,
+              starts_after_week: null,
+              sort_order: Number.MAX_SAFE_INTEGER,
+              milestone_tag: 'general',
+              links: [],
+              status: 'todo',
+              is_done: false,
+              done_at: null,
+              client_note: null,
+              is_client_added: true,
+              created_at: now,
+              updated_at: now,
+              items: [],
+            }
+            setTasks(ts => [...ts, provisional])
             setError(null)
             startTransition(async () => {
               const result = await createMyWorkPlanTask({ planId: plan.id, ...input })
-              if (result.error) { setError(result.error); return }
+              if (result.error) {
+                setTasks(previous)
+                showToast(result.error, 'error')
+                return
+              }
               showToast('Step added')
               router.refresh()
             })

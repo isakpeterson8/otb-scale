@@ -401,6 +401,10 @@ export default function WorkPlanEditorClient({
       {editing && (
         <TaskForm
           initial={toInput(editing, itemsByTask[editing.id] ?? [])}
+          clientNote={editing.client_note}
+          itemDoneById={Object.fromEntries(
+            (itemsByTask[editing.id] ?? []).map(i => [i.id, i.is_done]),
+          )}
           isPending={isPending}
           onClose={() => setEditing(null)}
           onSave={input => { run(() => updateWorkPlanTask(plan.id, editing.id, input)); setEditing(null) }}
