@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getOriginFromRequest } from '@/lib/site-url'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const error = searchParams.get('error')
 
-  const settingsUrl = `${process.env.GOOGLE_REDIRECT_URI!.split('/api/')[0]}/settings`
+  // Where to send the user afterwards: this request's own origin, not the
+  // GOOGLE_REDIRECT_URI host. The redirect_uri sent to Google below still has to
+  // be the env var, because it must byte-match the one registered in the Google
+  // console and used in the authorize request.
+  const settingsUrl = `${await getOriginFromRequest(request)}/settings`
 
   if (error || !code) {
     return NextResponse.redirect(`${settingsUrl}?gmail_error=${error ?? 'missing_code'}`)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getRequestOrigin } from '@/lib/site-url'
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
@@ -11,7 +12,7 @@ export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.redirect(new URL('/auth/login', process.env.GOOGLE_REDIRECT_URI!).origin + '/auth/login')
+    return NextResponse.redirect(`${await getRequestOrigin()}/auth/login`)
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID
