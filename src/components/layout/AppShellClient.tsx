@@ -13,9 +13,10 @@ interface Props {
   viewOnly: boolean
   viewAsStudioName: string | null
   viewAsTier: string | null
+  hasWorkPlan: boolean
 }
 
-export default function AppShellClient({ children, displayName, isAdmin, showAdminLink, tier, viewOnly, viewAsStudioName, viewAsTier }: Props) {
+export default function AppShellClient({ children, displayName, isAdmin, showAdminLink, tier, viewOnly, viewAsStudioName, viewAsTier, hasWorkPlan }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -42,6 +43,7 @@ export default function AppShellClient({ children, displayName, isAdmin, showAdm
         tier={tier}
         viewOnly={viewOnly}
         viewAsTier={viewAsTier}
+        hasWorkPlan={hasWorkPlan}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />

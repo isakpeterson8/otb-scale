@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStaffContext } from '@/lib/staff'
-import type { MilestoneTag, WorkPlanLink, WorkPlanStatus } from '@/types/database'
+import type { MilestoneTag, WorkPlanLink, WorkPlanStatus, WorkPlanTaskStatus } from '@/types/database'
 
 /**
  * Every action here runs on the staff member's own request-scoped client, so
@@ -144,23 +144,27 @@ export async function deleteWorkPlanTask(planId: string, taskId: string): Promis
   return { error: null }
 }
 
-/** Team check-in toggle. Phase 1 stamps the staff member into done_by. */
-export async function setWorkPlanTaskDone(
+/**
+ * Move a task between board columns.
+ *
+ * Goes through the same set_work_plan_task_status RPC the member board calls,
+ * rather than updating the table directly, so staff and members share one write
+ * path and one set of rules. The RPC writes only `status`; is_done, done_at and
+ * done_by are derived by the work_plan_tasks_sync_done trigger, which also
+ * keeps completionPercent() and the admin list's is_done count honest.
+ */
+export async function setWorkPlanTaskStatus(
   planId: string,
   taskId: string,
-  isDone: boolean,
+  status: WorkPlanTaskStatus,
 ): Promise<Result> {
   const ctx = await getStaffContext()
   if (!ctx) return { error: 'Unauthorized' }
 
-  const { error } = await ctx.supabase
-    .from('work_plan_tasks')
-    .update({
-      is_done: isDone,
-      done_at: isDone ? new Date().toISOString() : null,
-      done_by: isDone ? ctx.userId : null,
-    })
-    .eq('id', taskId)
+  const { error } = await ctx.supabase.rpc('set_work_plan_task_status', {
+    p_task_id: taskId,
+    p_status: status,
+  })
   if (error) return { error: error.message }
 
   revalidatePlan(planId)

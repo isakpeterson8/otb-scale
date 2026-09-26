@@ -53,6 +53,36 @@ const NAV_FREE = [
   SETTINGS_NAV_ITEM,
 ]
 
+type NavItem = { label: string; href: string; icon: React.ReactNode }
+
+const WORK_PLAN_NAV_ITEM: NavItem = {
+  label: 'Work Plan',
+  href: '/work-plan',
+  icon: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2" y="2" width="3.5" height="12" rx="1" fill="currentColor" opacity=".4" />
+      <rect x="6.25" y="2" width="3.5" height="12" rx="1" fill="currentColor" opacity=".7" />
+      <rect x="10.5" y="2" width="3.5" height="12" rx="1" fill="currentColor" />
+    </svg>
+  ),
+}
+
+/**
+ * Work Plan sits between Dashboard and Leads, and appears only when the studio
+ * has a published active plan. Visibility is PUBLICATION, not tier — there is
+ * deliberately no ACCESS_MATRIX entry and no proxy route block for it, so this
+ * item is spliced into the free and paid navs alike.
+ *
+ * Under View As the flag is computed for the VIEWED studio, so the item appears
+ * and disappears exactly as it would for that member.
+ */
+function withWorkPlan(items: readonly NavItem[], show: boolean): NavItem[] {
+  if (!show) return [...items]
+  const dashboardIndex = items.findIndex(i => i.href === '/dashboard')
+  const at = dashboardIndex === -1 ? 0 : dashboardIndex + 1
+  return [...items.slice(0, at), WORK_PLAN_NAV_ITEM, ...items.slice(at)]
+}
+
 // Nav items locked for free tier (shown with lock icon + modal trigger)
 const NAV_LOCKED = [
   {
@@ -164,11 +194,13 @@ interface SidebarProps {
   tier?: string | null
   viewOnly?: boolean
   viewAsTier?: string | null
+  /** Studio has a published, active work plan — gates the Work Plan nav item. */
+  hasWorkPlan?: boolean
   isOpen?: boolean
   onClose?: () => void
 }
 
-export default function Sidebar({ displayName, isAdmin, showAdminLink, tier, viewOnly, viewAsTier, isOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ displayName, isAdmin, showAdminLink, tier, viewOnly, viewAsTier, hasWorkPlan = false, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [lockedModal, setLockedModal] = useState<string | null>(null) // feature label
@@ -317,7 +349,7 @@ export default function Sidebar({ displayName, isAdmin, showAdminLink, tier, vie
           {isFree ? (
             <>
               {/* Free tier: unlocked items */}
-              {NAV_FREE.map(({ label, href, icon }) => {
+              {withWorkPlan(NAV_FREE, hasWorkPlan).map(({ label, href, icon }) => {
                 const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
                 return (
                   <Link key={href} href={href} onClick={onClose} className={navLinkClass(active)}>
@@ -346,7 +378,7 @@ export default function Sidebar({ displayName, isAdmin, showAdminLink, tier, vie
           ) : (
             <>
               {/* Paid tier / admin: full nav */}
-              {NAV_ALL.filter(({ href }) => !hiddenForTier(href)).map(({ label, href, icon }) => {
+              {withWorkPlan(NAV_ALL, hasWorkPlan).filter(({ href }) => !hiddenForTier(href)).map(({ label, href, icon }) => {
                 const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
                 return (
                   <Link key={href} href={href} onClick={onClose} className={navLinkClass(active)}>

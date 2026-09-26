@@ -22,20 +22,23 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   deleteWorkPlan, deleteWorkPlanTask, createWorkPlanTask, moveWorkPlanTaskToGroup,
-  reorderWorkPlanTasks, setWorkPlanTaskDone, updateWorkPlan, updateWorkPlanTask,
+  reorderWorkPlanTasks, setWorkPlanTaskStatus, updateWorkPlan, updateWorkPlanTask,
 } from '@/app/actions/work-plans'
 import { completionPercent, groupTasksByTimeframe, TIMEFRAME_ORDER } from '@/lib/work-plans'
-import { MILESTONE_TAGS, type WorkPlan, type WorkPlanStatus, type WorkPlanTask } from '@/types/database'
+import {
+  MILESTONE_TAGS, TASK_STATUSES,
+  type WorkPlan, type WorkPlanStatus, type WorkPlanTask, type WorkPlanTaskStatus,
+} from '@/types/database'
 
 import TaskForm, { emptyInput, toInput } from '../TaskForm'
 
 // ── Task row ─────────────────────────────────────────────────────────────────
 
 function TaskRow({
-  task, onToggleDone, onEdit,
+  task, onSetStatus, onEdit,
 }: {
   task: WorkPlanTask
-  onToggleDone: (task: WorkPlanTask) => void
+  onSetStatus: (task: WorkPlanTask, status: WorkPlanTaskStatus) => void
   onEdit: (task: WorkPlanTask) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
@@ -59,13 +62,18 @@ function TaskRow({
         </svg>
       </button>
 
-      <input
-        type="checkbox"
-        checked={task.is_done}
-        onChange={() => onToggleDone(task)}
-        aria-label={`Mark ${task.title} ${task.is_done ? 'not done' : 'done'}`}
-        className="mt-1 shrink-0 rounded"
-      />
+      {/* Three-state, so staff can see what the client has moved — not just
+          whether it is finished. Writes through the same RPC the board uses. */}
+      <select
+        value={task.status}
+        onChange={e => onSetStatus(task, e.target.value as WorkPlanTaskStatus)}
+        aria-label={`Status for ${task.title}`}
+        className="mt-0.5 shrink-0 px-2 py-1 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-xs text-[var(--ink-2)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+      >
+        {TASK_STATUSES.map(({ value, label }) => (
+          <option key={value} value={value} className="bg-[var(--surface)]">{label}</option>
+        ))}
+      </select>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -167,11 +175,15 @@ export default function WorkPlanEditorClient({
     })
   }
 
-  function handleToggleDone(task: WorkPlanTask) {
-    const next = !task.is_done
+  function handleSetStatus(task: WorkPlanTask, status: WorkPlanTaskStatus) {
+    if (status === task.status) return
     const previous = tasks
-    setTasks(ts => ts.map(t => (t.id === task.id ? { ...t, is_done: next } : t)))
-    run(() => setWorkPlanTaskDone(plan.id, task.id, next), () => setTasks(previous))
+    // Mirror the DB trigger optimistically, so the strikethrough and the
+    // completion counts move with the select rather than after the round trip.
+    setTasks(ts =>
+      ts.map(t => (t.id === task.id ? { ...t, status, is_done: status === 'done' } : t)),
+    )
+    run(() => setWorkPlanTaskStatus(plan.id, task.id, status), () => setTasks(previous))
   }
 
   const orderedGroup = (source: WorkPlanTask[], group: string) =>
@@ -269,7 +281,10 @@ export default function WorkPlanEditorClient({
               <option value="active" className="bg-[var(--surface)]">Active</option>
               <option value="archived" className="bg-[var(--surface)]">Archived</option>
             </select>
-            <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]" title="Phase 2: flips client visibility on. Leave off for now.">
+            <label
+              className="flex items-center gap-2 text-sm text-[var(--ink-2)]"
+              title="Shows this plan on the client's Work Plan board and adds the sidebar link."
+            >
               <input
                 type="checkbox"
                 checked={plan.is_published}
@@ -317,7 +332,7 @@ export default function WorkPlanEditorClient({
                 <SortableContext items={groupTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                   <div className="divide-y divide-[var(--ink)]/6">
                     {groupTasks.map(task => (
-                      <TaskRow key={task.id} task={task} onToggleDone={handleToggleDone} onEdit={setEditing} />
+                      <TaskRow key={task.id} task={task} onSetStatus={handleSetStatus} onEdit={setEditing} />
                     ))}
                   </div>
                 </SortableContext>

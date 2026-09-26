@@ -2,6 +2,26 @@ import { formatDate } from '@/lib/utils'
 import type { WorkPlanTaskShape } from '@/types/database'
 
 /**
+ * The ONLY columns a client-facing surface may read, for plans and for tasks.
+ *
+ * These mirror the work_plans_client / work_plan_tasks_client views column for
+ * column. The views are the security boundary for a real member; under View As
+ * the app reads base tables with the service-role client, where no view stands
+ * in the way — so the View As path selects exactly these strings instead. Both
+ * paths live in lib/work-plans-data.ts and share these constants, so the two
+ * cannot drift into exposing different data.
+ *
+ * internal_note and done_by are absent by design. Adding either here would
+ * defeat the views.
+ */
+export const CLIENT_PLAN_COLUMNS = 'id, title, status, is_published, created_at, updated_at'
+
+export const CLIENT_TASK_COLUMNS =
+  'id, work_plan_id, title, description, timeframe_group, week_number, ' +
+  'is_recurring, starts_after_week, sort_order, milestone_tag, links, ' +
+  'status, is_done, done_at, created_at, updated_at'
+
+/**
  * Display order for timeframe_group: the one-time Week 1-6 launch sprint first,
  * then the recurring cadences. Anything unrecognised sorts last, alphabetically,
  * so a hand-typed group still renders rather than disappearing.

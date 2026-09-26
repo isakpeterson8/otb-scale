@@ -475,6 +475,16 @@ export interface SquaresspaceSyncLog {
 export type MilestoneTag = 'website' | 'gbp' | 'instagram' | 'flyer' | 'seo' | 'general'
 export type WorkPlanStatus = 'active' | 'archived'
 
+/** Board column for a single task. Kept in lockstep with is_done by the
+ *  work_plan_tasks_sync_done trigger, in both directions. */
+export type WorkPlanTaskStatus = 'todo' | 'doing' | 'done'
+
+export const TASK_STATUSES: { value: WorkPlanTaskStatus; label: string }[] = [
+  { value: 'todo',  label: 'To Do' },
+  { value: 'doing', label: 'Doing' },
+  { value: 'done',  label: 'Done' },
+]
+
 export const MILESTONE_TAGS: { value: MilestoneTag; label: string }[] = [
   { value: 'general',   label: 'General' },
   { value: 'website',   label: 'Website' },
@@ -538,7 +548,19 @@ export interface WorkPlan {
 
 export interface WorkPlanTask extends WorkPlanTaskShape {
   work_plan_id: string
+  status: WorkPlanTaskStatus
   is_done: boolean
   done_at: string | null
   done_by: string | null
 }
+
+// ── Client-facing shapes (Phase 2) ───────────────────────────────────────────
+// Deliberately NOT extensions of the admin types: internal_note and done_by are
+// team-only, and a structural Omit keeps them unrepresentable rather than
+// merely unselected. Mirrors the work_plan_tasks_client / work_plans_client
+// views column for column — if you change one, change the other and the
+// CLIENT_TASK_COLUMNS / CLIENT_PLAN_COLUMNS constants in lib/work-plans.ts.
+
+export type ClientWorkPlanTask = Omit<WorkPlanTask, 'internal_note' | 'done_by'>
+
+export type ClientWorkPlan = Omit<WorkPlan, 'studio_id' | 'template_id' | 'created_by'>
