@@ -24,10 +24,11 @@ import {
   deleteWorkPlan, deleteWorkPlanTask, createWorkPlanTask, moveWorkPlanTaskToGroup,
   reorderWorkPlanTasks, setWorkPlanTaskStatus, updateWorkPlan, updateWorkPlanTask,
 } from '@/app/actions/work-plans'
-import { completionPercent, groupTasksByTimeframe, TIMEFRAME_ORDER } from '@/lib/work-plans'
+import { BRAIN_DUMP_GROUP, completionPercent, groupTasksByTimeframe, TIMEFRAME_ORDER } from '@/lib/work-plans'
 import {
-  MILESTONE_TAGS, TASK_STATUSES,
-  type WorkPlan, type WorkPlanStatus, type WorkPlanTask, type WorkPlanTaskStatus,
+  CATEGORY_TAGS, TASK_STATUSES,
+  type WorkPlan, type WorkPlanStatus, type WorkPlanTask, type WorkPlanTaskItem,
+  type WorkPlanTaskStatus,
 } from '@/types/database'
 
 import TaskForm, { emptyInput, toInput } from '../TaskForm'
@@ -35,14 +36,15 @@ import TaskForm, { emptyInput, toInput } from '../TaskForm'
 // ── Task row ─────────────────────────────────────────────────────────────────
 
 function TaskRow({
-  task, onSetStatus, onEdit,
+  task, items, onSetStatus, onEdit,
 }: {
   task: WorkPlanTask
+  items: WorkPlanTaskItem[]
   onSetStatus: (task: WorkPlanTask, status: WorkPlanTaskStatus) => void
   onEdit: (task: WorkPlanTask) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
-  const tagLabel = MILESTONE_TAGS.find(t => t.value === task.milestone_tag)?.label ?? task.milestone_tag
+  const tagLabel = CATEGORY_TAGS.find(t => t.value === task.milestone_tag)?.label ?? task.milestone_tag
 
   return (
     <div
@@ -83,6 +85,14 @@ function TaskRow({
           {task.milestone_tag !== 'general' && (
             <span className="px-1.5 py-0.5 rounded-full text-xs bg-[var(--accent-light)] text-[var(--accent-text)]">{tagLabel}</span>
           )}
+          {task.is_client_added && (
+            <span
+              className="px-1.5 py-0.5 rounded-full text-xs"
+              style={{ background: 'var(--green-l)', color: 'var(--green)' }}
+            >
+              Added by client
+            </span>
+          )}
           {task.is_recurring && (
             <span className="px-1.5 py-0.5 rounded-full text-xs bg-white/8 text-[var(--ink-3)]">
               recurring{task.starts_after_week ? ` · after wk ${task.starts_after_week}` : ''}
@@ -90,8 +100,26 @@ function TaskRow({
           )}
         </div>
         {task.description && <p className="text-xs text-[var(--ink-3)] mt-0.5">{task.description}</p>}
+        {items.length > 0 && (
+          <p className="text-xs text-[var(--ink-3)] mt-1 tabular-nums">
+            Checklist {items.filter(i => i.is_done).length}/{items.length}
+            {' · '}
+            {items.map(i => i.title).join(' · ').slice(0, 90)}
+            {items.map(i => i.title).join(' · ').length > 90 ? '…' : ''}
+          </p>
+        )}
         {task.internal_note && (
           <p className="text-xs text-[var(--amber)] mt-1">🔒 Team only: {task.internal_note}</p>
+        )}
+        {/* The client's own notes. Read-only here: it is their writing, and staff
+            editing it silently would be surprising. Never internal_note. */}
+        {task.client_note && (
+          <div className="mt-1.5 px-2.5 py-2 rounded-lg" style={{ background: 'var(--accent-light)' }}>
+            <p className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--accent-text)' }}>
+              Client&apos;s notes
+            </p>
+            <p className="text-xs text-[var(--ink-2)] whitespace-pre-wrap mt-0.5">{task.client_note}</p>
+          </div>
         )}
         {(task.links ?? []).length > 0 && (
           <div className="flex flex-wrap gap-2 mt-1">
@@ -139,11 +167,12 @@ function GroupDropZone({ group, children }: { group: string; children: React.Rea
 // ── Editor ───────────────────────────────────────────────────────────────────
 
 export default function WorkPlanEditorClient({
-  plan, studioName, tasks: initialTasks, loadError,
+  plan, studioName, tasks: initialTasks, itemsByTask, loadError,
 }: {
   plan: WorkPlan
   studioName: string
   tasks: WorkPlanTask[]
+  itemsByTask: Record<string, WorkPlanTaskItem[]>
   loadError: string | null
 }) {
   const router = useRouter()
@@ -196,6 +225,7 @@ export default function WorkPlanEditorClient({
     if (group === 'Weekly' || group === 'Monthly' || group === 'Semester') {
       return { week_number: null, is_recurring: true }
     }
+    if (group === BRAIN_DUMP_GROUP) return { week_number: null, is_recurring: false }
     return {}
   }
 
@@ -332,7 +362,7 @@ export default function WorkPlanEditorClient({
                 <SortableContext items={groupTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                   <div className="divide-y divide-[var(--ink)]/6">
                     {groupTasks.map(task => (
-                      <TaskRow key={task.id} task={task} onSetStatus={handleSetStatus} onEdit={setEditing} />
+                      <TaskRow key={task.id} task={task} items={itemsByTask[task.id] ?? []} onSetStatus={handleSetStatus} onEdit={setEditing} />
                     ))}
                   </div>
                 </SortableContext>
@@ -370,7 +400,7 @@ export default function WorkPlanEditorClient({
 
       {editing && (
         <TaskForm
-          initial={toInput(editing)}
+          initial={toInput(editing, itemsByTask[editing.id] ?? [])}
           isPending={isPending}
           onClose={() => setEditing(null)}
           onSave={input => { run(() => updateWorkPlanTask(plan.id, editing.id, input)); setEditing(null) }}

@@ -26,12 +26,14 @@
 
 import { adminClient } from '@/lib/supabase/admin'
 import { getStudioId } from '@/app/actions/_shared'
-import { CLIENT_PLAN_COLUMNS, CLIENT_TASK_COLUMNS } from '@/lib/work-plans'
-import type { ClientWorkPlan, ClientWorkPlanTask } from '@/types/database'
+import { CLIENT_PLAN_COLUMNS, CLIENT_TASK_COLUMNS, CLIENT_TASK_ITEM_COLUMNS } from '@/lib/work-plans'
+import type {
+  ClientWorkPlan, ClientWorkPlanTask, ClientWorkPlanTaskItem, ClientWorkPlanTaskWithItems,
+} from '@/types/database'
 
 export interface ClientWorkPlanData {
   plan: ClientWorkPlan | null
-  tasks: ClientWorkPlanTask[]
+  tasks: ClientWorkPlanTaskWithItems[]
   /** True while an admin is impersonating — the board renders read-only. */
   viewOnly: boolean
   /** Published active plans beyond the one shown. Surfaced so a studio that
@@ -102,11 +104,38 @@ export async function loadClientWorkPlan(): Promise<ClientWorkPlanData> {
         .eq('work_plan_id', plan.id)
         .order('sort_order', { ascending: true })
 
+  const tasks = (taskRows ?? []) as unknown as ClientWorkPlanTask[]
+  if (tasks.length === 0) {
+    return { plan, tasks: [], viewOnly, extraPublishedCount, error: taskError?.message ?? null }
+  }
+
+  // Checklist items for exactly these tasks. One query, then grouped in memory —
+  // an items-per-task query would be an N+1 across a 49-step plan.
+  const taskIds = tasks.map(t => t.id)
+  const { data: itemRows, error: itemError } = ctx.viewOnly
+    ? await adminClient
+        .from('work_plan_task_items')
+        .select(CLIENT_TASK_ITEM_COLUMNS)
+        .in('task_id', taskIds)
+        .order('sort_order', { ascending: true })
+    : await ctx.supabase
+        .from('work_plan_task_items_client')
+        .select(CLIENT_TASK_ITEM_COLUMNS)
+        .in('task_id', taskIds)
+        .order('sort_order', { ascending: true })
+
+  const byTask = new Map<string, ClientWorkPlanTaskItem[]>()
+  for (const row of (itemRows ?? []) as unknown as ClientWorkPlanTaskItem[]) {
+    const list = byTask.get(row.task_id)
+    if (list) list.push(row)
+    else byTask.set(row.task_id, [row])
+  }
+
   return {
     plan,
-    tasks: (taskRows ?? []) as unknown as ClientWorkPlanTask[],
+    tasks: tasks.map(t => ({ ...t, items: byTask.get(t.id) ?? [] })),
     viewOnly,
     extraPublishedCount,
-    error: taskError?.message ?? null,
+    error: taskError?.message ?? itemError?.message ?? null,
   }
 }

@@ -472,7 +472,7 @@ export interface SquaresspaceSyncLog {
 
 // ── Work plans (Phase 1, admin-only) ─────────────────────────────────────────
 
-export type MilestoneTag = 'website' | 'gbp' | 'instagram' | 'flyer' | 'seo' | 'general'
+export type CategoryTag = 'website' | 'gbp' | 'instagram' | 'flyer' | 'seo' | 'general'
 export type WorkPlanStatus = 'active' | 'archived'
 
 /** Board column for a single task. Kept in lockstep with is_done by the
@@ -485,7 +485,7 @@ export const TASK_STATUSES: { value: WorkPlanTaskStatus; label: string }[] = [
   { value: 'done',  label: 'Done' },
 ]
 
-export const MILESTONE_TAGS: { value: MilestoneTag; label: string }[] = [
+export const CATEGORY_TAGS: { value: CategoryTag; label: string }[] = [
   { value: 'general',   label: 'General' },
   { value: 'website',   label: 'Website' },
   { value: 'gbp',       label: 'Google Business' },
@@ -514,7 +514,7 @@ export interface WorkPlanTaskShape {
   is_recurring: boolean
   starts_after_week: number | null
   sort_order: number
-  milestone_tag: MilestoneTag
+  milestone_tag: CategoryTag
   links: WorkPlanLink[]
   created_at: string
   updated_at: string
@@ -552,6 +552,41 @@ export interface WorkPlanTask extends WorkPlanTaskShape {
   is_done: boolean
   done_at: string | null
   done_by: string | null
+  /** The client's own notes. Distinct from internal_note, which is team-only. */
+  client_note: string | null
+  /** True when the member created this task. The authority for "may they edit it". */
+  is_client_added: boolean
+  created_by: string | null
+  template_task_id: string | null
+}
+
+/** A checklist item on a per-client task. Members may toggle is_done, nothing else. */
+export interface WorkPlanTaskItem {
+  id: string
+  task_id: string
+  title: string
+  sort_order: number
+  is_done: boolean
+  done_at: string | null
+  done_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** One checklist row as a form edits it. id === null means "not saved yet". */
+export interface ChecklistInput {
+  id: string | null
+  title: string
+}
+
+/** Checklist items on a template task. No completion columns — templates aren't worked. */
+export interface WorkPlanTemplateTaskItem {
+  id: string
+  template_task_id: string
+  title: string
+  sort_order: number
+  created_at: string
+  updated_at: string
 }
 
 // ── Client-facing shapes (Phase 2) ───────────────────────────────────────────
@@ -561,6 +596,14 @@ export interface WorkPlanTask extends WorkPlanTaskShape {
 // views column for column — if you change one, change the other and the
 // CLIENT_TASK_COLUMNS / CLIENT_PLAN_COLUMNS constants in lib/work-plans.ts.
 
-export type ClientWorkPlanTask = Omit<WorkPlanTask, 'internal_note' | 'done_by'>
+export type ClientWorkPlanTask =
+  Omit<WorkPlanTask, 'internal_note' | 'done_by' | 'created_by' | 'template_task_id'>
 
 export type ClientWorkPlan = Omit<WorkPlan, 'studio_id' | 'template_id' | 'created_by'>
+
+export type ClientWorkPlanTaskItem = Omit<WorkPlanTaskItem, 'done_by'>
+
+/** A task plus its checklist, as the member board consumes it. */
+export interface ClientWorkPlanTaskWithItems extends ClientWorkPlanTask {
+  items: ClientWorkPlanTaskItem[]
+}

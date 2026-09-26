@@ -219,6 +219,183 @@ async function main() {
     'this studio has no unpublished or archived plan to probe',
   )
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 3: member writes. Everything below runs on the member's anon session.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // The member's own published plan, read the way the board reads it.
+  const { data: ownPlans } = await anon.from('work_plans_client').select('id').limit(1)
+  const ownPlanId = (ownPlans?.[0]?.id as string | undefined) ?? null
+
+  // An ADMIN task in the member's own plan — the thing they must not edit.
+  const { data: adminTaskRows } = await anon
+    .from('work_plan_tasks_client')
+    .select('id, is_client_added')
+    .eq('is_client_added', false)
+    .limit(1)
+  const adminTaskId = (adminTaskRows?.[0]?.id as string | undefined) ?? null
+
+  // ── Cannot edit or delete a task set by staff ──────────────────────────────
+  if (!adminTaskId) {
+    record('Cannot UPDATE an admin task', 'SKIP', 'no admin task visible to this member')
+    record('Cannot DELETE an admin task', 'SKIP', 'no admin task visible to this member')
+  } else {
+    const { error: upErr } = await anon.rpc('update_client_work_plan_task', {
+      p_task_id: adminTaskId, p_title: 'probe should not succeed',
+      p_description: null, p_timeframe_group: 'Week 1',
+    })
+    record('Cannot UPDATE an admin task',
+      upErr && /OTB coach/i.test(upErr.message) ? 'PASS' : upErr ? 'PASS' : 'FAIL',
+      upErr ? `rejected (${upErr.code ?? '?'}): ${upErr.message}` : 'ACCEPTED — members can edit staff tasks!')
+
+    const { error: delErr } = await anon.rpc('delete_client_work_plan_task', { p_task_id: adminTaskId })
+    record('Cannot DELETE an admin task',
+      delErr ? 'PASS' : 'FAIL',
+      delErr ? `rejected (${delErr.code ?? '?'}): ${delErr.message}` : 'ACCEPTED — staff task was DELETED!')
+  }
+
+  // ── internal_note is unreachable through any RPC ───────────────────────────
+  if (admin && adminTaskId) {
+    // client_note is captured too: writing a note on a staff task is legitimate
+    // (members annotate them), so this probe must restore what was there.
+    const { data: before } = await admin
+      .from('work_plan_tasks').select('internal_note, client_note').eq('id', adminTaskId).maybeSingle()
+    // Try to smuggle it through the note RPC's text argument and the update RPC.
+    await anon.rpc('set_work_plan_task_client_note', { p_task_id: adminTaskId, p_note: 'probe note' })
+    await anon.rpc('update_client_work_plan_task', {
+      p_task_id: adminTaskId, p_title: 'x', p_description: 'y', p_timeframe_group: 'Week 1',
+    })
+    const { data: after } = await admin
+      .from('work_plan_tasks').select('internal_note').eq('id', adminTaskId).maybeSingle()
+    const unchanged = (before?.internal_note ?? null) === (after?.internal_note ?? null)
+    record('internal_note unchanged after RPC attempts', unchanged ? 'PASS' : 'FAIL',
+      unchanged ? 'identical before and after' : 'CHANGED — an RPC reached internal_note!')
+
+    // Put the task's own note back: the probe must not leave content behind.
+    const { error: restoreError } = await admin
+      .from('work_plan_tasks')
+      .update({ client_note: before?.client_note ?? null })
+      .eq('id', adminTaskId)
+    record('Probe restored the admin task\'s client_note', restoreError ? 'FAIL' : 'PASS',
+      restoreError ? `RESTORE FAILED: ${restoreError.message}` : 'restored to its prior value')
+  } else {
+    record('internal_note unchanged after RPC attempts', 'SKIP', 'needs service-role key and an admin task')
+  }
+
+  // ── Another studio's task, note and checklist item are all refused ─────────
+  if (otherTaskId) {
+    const { error } = await anon.rpc('set_work_plan_task_client_note', {
+      p_task_id: otherTaskId, p_note: 'probe',
+    })
+    record("Cannot write a note on another studio's task", error ? 'PASS' : 'FAIL',
+      error ? `rejected (${error.code ?? '?'}): ${error.message}` : 'ACCEPTED — cross-studio write!')
+  } else {
+    record("Cannot write a note on another studio's task", 'SKIP', 'no other-studio task id')
+  }
+
+  let otherItemId: string | null = null
+  if (admin && ownStudioId) {
+    const { data } = await admin
+      .from('work_plan_task_items')
+      .select('id, work_plan_tasks!inner(work_plan_id, work_plans!inner(studio_id))')
+      .limit(200)
+    type ItemRow = { id: string; work_plan_tasks: unknown }
+    const first = (v: unknown) => (Array.isArray(v) ? v[0] : v)
+    otherItemId = ((data ?? []) as unknown as ItemRow[]).find(r => {
+      const task = first(r.work_plan_tasks) as { work_plans?: unknown } | undefined
+      const plan = first(task?.work_plans) as { studio_id?: string } | undefined
+      return plan?.studio_id !== undefined && plan.studio_id !== ownStudioId
+    })?.id ?? null
+  }
+  if (otherItemId) {
+    const { error } = await anon.rpc('set_work_plan_task_item_done', {
+      p_item_id: otherItemId, p_is_done: true,
+    })
+    record("Cannot tick another studio's checklist item", error ? 'PASS' : 'FAIL',
+      error ? `rejected (${error.code ?? '?'}): ${error.message}` : 'ACCEPTED — cross-studio write!')
+  } else {
+    record("Cannot tick another studio's checklist item", 'SKIP',
+      'no checklist item exists outside this studio')
+  }
+
+  // ── Input limits ──────────────────────────────────────────────────────────
+  if (!ownPlanId) {
+    record('Input limits enforced', 'SKIP', 'no own published plan to create against')
+    record('Create → update → delete round-trip', 'SKIP', 'no own published plan')
+  } else {
+    const limitCases: { name: string; args: Record<string, unknown> }[] = [
+      { name: 'empty title',        args: { p_title: '   ', p_description: null, p_timeframe_group: 'Brain dump' } },
+      { name: 'title > 200',        args: { p_title: 'a'.repeat(201), p_description: null, p_timeframe_group: 'Brain dump' } },
+      { name: 'group > 60',         args: { p_title: 'ok', p_description: null, p_timeframe_group: 'g'.repeat(61) } },
+      { name: 'empty group',        args: { p_title: 'ok', p_description: null, p_timeframe_group: '  ' } },
+      { name: 'description > 5000', args: { p_title: 'ok', p_description: 'd'.repeat(5001), p_timeframe_group: 'Brain dump' } },
+    ]
+    const rejected: string[] = []
+    const accepted: string[] = []
+    for (const c of limitCases) {
+      const { data, error } = await anon.rpc('create_client_work_plan_task', {
+        p_plan_id: ownPlanId, ...c.args,
+      })
+      if (error) rejected.push(c.name)
+      else {
+        accepted.push(c.name)
+        // Should not have been created — clean it up immediately.
+        if (data) await anon.rpc('delete_client_work_plan_task', { p_task_id: data as string })
+      }
+    }
+    record('Input limits enforced', accepted.length === 0 ? 'PASS' : 'FAIL',
+      accepted.length === 0
+        ? `all ${rejected.length} malformed inputs rejected`
+        : `ACCEPTED: ${accepted.join(', ')}`)
+
+    // ── Round-trip on the member's own task, cleaning up after itself ────────
+    let createdId: string | null = null
+    try {
+      const { data, error } = await anon.rpc('create_client_work_plan_task', {
+        p_plan_id: ownPlanId,
+        p_title: 'RLS probe temporary step',
+        p_description: 'created by scripts/probe-work-plan-rls.ts',
+        p_timeframe_group: 'Brain dump',
+      })
+      if (error || !data) {
+        record('Create → update → delete round-trip', 'FAIL', `create failed: ${error?.message}`)
+      } else {
+        createdId = data as string
+        const { error: upErr } = await anon.rpc('update_client_work_plan_task', {
+          p_task_id: createdId, p_title: 'RLS probe temporary step (edited)',
+          p_description: null, p_timeframe_group: 'Brain dump',
+        })
+        const { error: noteErr } = await anon.rpc('set_work_plan_task_client_note', {
+          p_task_id: createdId, p_note: 'probe note',
+        })
+        const { error: statusErr } = await anon.rpc('set_work_plan_task_status', {
+          p_task_id: createdId, p_status: 'doing',
+        })
+        // is_client_added must be true, and it must be visible through the view.
+        const { data: seen } = await anon
+          .from('work_plan_tasks_client')
+          .select('id, title, is_client_added, client_note, status')
+          .eq('id', createdId).maybeSingle()
+
+        const ok = !upErr && !noteErr && !statusErr
+          && seen?.is_client_added === true
+          && seen?.client_note === 'probe note'
+          && seen?.status === 'doing'
+        record('Create → update → delete round-trip', ok ? 'PASS' : 'FAIL',
+          ok ? 'created, edited, noted, moved, visible via the view'
+             : `create ok but: update=${upErr?.message ?? 'ok'}, note=${noteErr?.message ?? 'ok'}, `
+               + `status=${statusErr?.message ?? 'ok'}, row=${JSON.stringify(seen)}`)
+      }
+    } finally {
+      if (createdId) {
+        const { error } = await anon.rpc('delete_client_work_plan_task', { p_task_id: createdId })
+        record('Round-trip cleaned up after itself', error ? 'FAIL' : 'PASS',
+          error ? `DELETE FAILED — remove task ${createdId} by hand: ${error.message}`
+                : 'temporary task deleted')
+      }
+    }
+  }
+
   summarise()
 }
 

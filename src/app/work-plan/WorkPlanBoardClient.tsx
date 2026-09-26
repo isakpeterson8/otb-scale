@@ -1,53 +1,57 @@
 'use client'
 
 /**
- * CLIENT-FACING board. The types it receives (ClientWorkPlan / ClientWorkPlanTask)
- * structurally exclude internal_note and done_by, so team-only content is not
- * merely unrendered here — it is unrepresentable. Do not widen these props to
- * the admin WorkPlanTask type.
+ * CLIENT-FACING board. The types it receives structurally exclude internal_note,
+ * done_by and created_by, so team-only content is not merely unrendered here — it
+ * is unrepresentable. Do not widen these props to the admin WorkPlanTask type.
  *
  * Two presentations of one data model:
- *   md and up — three drag-and-drop columns (unchanged from the first version).
- *   below md  — a sticky segmented control; one column at a time, no dragging.
- *               Cards open a bottom sheet whose "Move to" buttons do what
- *               dragging does on desktop.
+ *   md and up — three drag-and-drop columns, detail in a right-hand drawer.
+ *   below md  — a sticky segmented control; one column at a time, no dragging,
+ *               detail in a bottom sheet whose Move-to buttons replace dragging.
+ *
+ * Every write goes through a server action wrapping a SECURITY DEFINER RPC. The
+ * member may: move any task, tick any checklist item, write their own note, and
+ * create / edit / delete only tasks they added themselves.
  */
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor,
   useDraggable, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
-import { setMyWorkPlanTaskStatus } from '@/app/actions/work-plan-board'
-import Toast, { useToast } from '@/components/ui/Toast'
-import { completionPercent, groupTasksByTimeframe } from '@/lib/work-plans'
 import {
-  MILESTONE_TAGS, TASK_STATUSES,
-  type ClientWorkPlan, type ClientWorkPlanTask, type WorkPlanTaskStatus,
+  createMyWorkPlanTask, deleteMyWorkPlanTask, setMyWorkPlanTaskClientNote,
+  setMyWorkPlanTaskItemDone, setMyWorkPlanTaskStatus, updateMyWorkPlanTask,
+} from '@/app/actions/work-plan-board'
+import Toast, { useToast } from '@/components/ui/Toast'
+import {
+  BRAIN_DUMP_GROUP, completionPercent, groupTasksByTimeframe, linkLabel,
+  orderTimeframeGroups, TIMEFRAME_ORDER,
+} from '@/lib/work-plans'
+import {
+  CATEGORY_TAGS, TASK_STATUSES,
+  type ClientWorkPlan, type ClientWorkPlanTaskItem, type ClientWorkPlanTaskWithItems,
+  type WorkPlanTaskStatus,
 } from '@/types/database'
 
-/**
- * One tint per status, from the app's existing pairs in globals.css. Used by the
- * mobile tabs, the desktop column counts and the sheet's Move-to buttons, so a
- * status reads the same colour everywhere.
- */
+type Task = ClientWorkPlanTaskWithItems
+
 const STATUS_STYLE: Record<WorkPlanTaskStatus, { label: string; fg: string; bg: string }> = {
   todo:  { label: 'To Do', fg: 'var(--red)',   bg: 'var(--red-l)' },
   doing: { label: 'Doing', fg: 'var(--amber)', bg: 'var(--amber-l)' },
   done:  { label: 'Done',  fg: 'var(--green)', bg: 'var(--green-l)' },
 }
 
-/**
- * Expand/collapse choices survive navigating away and back within the session.
- * Module-level rather than state so it outlives the unmount, matching the
- * module-cache pattern already used in the admin tabs. Keyed `status:group`.
- */
+/** Expand/collapse choices survive navigating away and back within the session. */
 const groupOverrides: Record<string, boolean> = {}
 
-function milestoneLabel(tag: string) {
-  return MILESTONE_TAGS.find(t => t.value === tag)?.label ?? tag
+const NEW_GROUP = '__new__'
+
+function categoryLabel(tag: string) {
+  return CATEGORY_TAGS.find(t => t.value === tag)?.label ?? tag
 }
 
 function Chip({ children, fg, bg }: { children: React.ReactNode; fg?: string; bg?: string }) {
@@ -61,23 +65,26 @@ function Chip({ children, fg, bg }: { children: React.ReactNode; fg?: string; bg
   )
 }
 
+const INPUT =
+  'w-full px-3 py-2 rounded-lg border border-[var(--border-s)] bg-[var(--canvas)] text-sm ' +
+  'text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
+
 // ── Card ─────────────────────────────────────────────────────────────────────
 
-/** Presentational card. Rendered directly on mobile; wrapped for drag on desktop. */
 function CardShell({
   task, onOpen, dragging = false,
 }: {
-  task: ClientWorkPlanTask
-  onOpen?: (task: ClientWorkPlanTask) => void
+  task: Task
+  onOpen?: (task: Task) => void
   dragging?: boolean
 }) {
+  const itemsDone = task.items.filter(i => i.is_done).length
+
   return (
     <div
       onClick={onOpen ? () => onOpen(task) : undefined}
       className={[
         'w-full rounded-xl border p-3 transition-colors cursor-pointer',
-        // Mobile: tinted card on the white page. Desktop: white card inside the
-        // tinted column. Either way the card reads as a distinct surface.
         'bg-[var(--surface)] md:bg-[var(--canvas)]',
         dragging ? 'border-[var(--accent-text)] shadow-lg' : 'border-[var(--border)] hover:border-[var(--border-s)]',
       ].join(' ')}
@@ -89,7 +96,6 @@ function CardShell({
         ].join(' ')}>
           {task.title}
         </p>
-        {/* Mobile affordance: the card opens a sheet. */}
         <svg
           width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden
           className="shrink-0 mt-0.5 text-[var(--ink-3)] md:hidden"
@@ -98,32 +104,32 @@ function CardShell({
         </svg>
       </div>
 
-      {/* Mobile stays slim: no week chip, because the group header above already
-          states the week. A milestone tag still earns its space when set. */}
-      {task.milestone_tag !== 'general' && (
-        <div className="md:hidden mt-1.5">
-          <Chip fg="var(--accent-text)" bg="var(--accent-light)">{milestoneLabel(task.milestone_tag)}</Chip>
+      {/* Mobile stays slim: no week chip (the group header states it), but the
+          checklist count and category are worth the line. */}
+      {(task.items.length > 0 || task.milestone_tag !== 'general' || task.is_client_added) && (
+        <div className="md:hidden flex items-center gap-1.5 flex-wrap mt-1.5">
+          {task.items.length > 0 && <Chip>{itemsDone}/{task.items.length}</Chip>}
+          {task.milestone_tag !== 'general' && (
+            <Chip fg="var(--accent-text)" bg="var(--accent-light)">{categoryLabel(task.milestone_tag)}</Chip>
+          )}
+          {task.is_client_added && <Chip>yours</Chip>}
         </div>
       )}
 
-      {/* Desktop keeps the fuller chip row. */}
       <div className="hidden md:flex items-center gap-1.5 flex-wrap mt-1.5">
         <Chip>{task.timeframe_group}</Chip>
+        {task.items.length > 0 && <Chip>{itemsDone}/{task.items.length}</Chip>}
         {task.milestone_tag !== 'general' && (
-          <Chip fg="var(--accent-text)" bg="var(--accent-light)">{milestoneLabel(task.milestone_tag)}</Chip>
+          <Chip fg="var(--accent-text)" bg="var(--accent-light)">{categoryLabel(task.milestone_tag)}</Chip>
         )}
         {task.is_recurring && <Chip>recurring</Chip>}
+        {task.is_client_added && <Chip>yours</Chip>}
       </div>
     </div>
   )
 }
 
-function DraggableCard({
-  task, onOpen,
-}: {
-  task: ClientWorkPlanTask
-  onOpen: (task: ClientWorkPlanTask) => void
-}) {
+function DraggableCard({ task, onOpen }: { task: Task; onOpen: (task: Task) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
   return (
     <div
@@ -138,19 +144,17 @@ function DraggableCard({
   )
 }
 
-// ── Grouped task list, shared by both presentations ──────────────────────────
+// ── Grouped list ─────────────────────────────────────────────────────────────
 
 function GroupedTasks({
   status, tasks, isExpanded, onToggleGroup, renderCard,
 }: {
   status: WorkPlanTaskStatus
-  tasks: ClientWorkPlanTask[]
+  tasks: Task[]
   isExpanded: (status: WorkPlanTaskStatus, group: string) => boolean
   onToggleGroup: (status: WorkPlanTaskStatus, group: string, next: boolean) => void
-  renderCard: (task: ClientWorkPlanTask) => React.ReactNode
+  renderCard: (task: Task) => React.ReactNode
 }) {
-  // Timeframe order and within-group order both come from the admin's plan —
-  // members move cards between columns but never reorder them.
   const groups = groupTasksByTimeframe(tasks)
 
   if (groups.length === 0) {
@@ -187,11 +191,7 @@ function GroupedTasks({
                 {remaining > 0 ? `${remaining} of ${groupTasks.length} left` : `${groupTasks.length} done`}
               </span>
             </button>
-            {expanded && (
-              <div className="space-y-2 pb-1">
-                {groupTasks.map(task => renderCard(task))}
-              </div>
-            )}
+            {expanded && <div className="space-y-2 pb-1">{groupTasks.map(task => renderCard(task))}</div>}
           </div>
         )
       })}
@@ -199,16 +199,14 @@ function GroupedTasks({
   )
 }
 
-// ── Desktop column (drop target) ─────────────────────────────────────────────
-
 function DesktopColumn({
   status, tasks, isExpanded, onToggleGroup, onOpen,
 }: {
   status: WorkPlanTaskStatus
-  tasks: ClientWorkPlanTask[]
+  tasks: Task[]
   isExpanded: (status: WorkPlanTaskStatus, group: string) => boolean
   onToggleGroup: (status: WorkPlanTaskStatus, group: string, next: boolean) => void
-  onOpen: (task: ClientWorkPlanTask) => void
+  onOpen: (task: Task) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` })
   const style = STATUS_STYLE[status]
@@ -238,30 +236,231 @@ function DesktopColumn({
   )
 }
 
-// ── Detail panel: bottom sheet below md, right drawer at md+ ──────────────────
+// ── Checklist ────────────────────────────────────────────────────────────────
+
+function Checklist({
+  items, disabled, onToggle,
+}: {
+  items: ClientWorkPlanTaskItem[]
+  disabled: boolean
+  onToggle: (item: ClientWorkPlanTaskItem) => void
+}) {
+  if (items.length === 0) return null
+  const done = items.filter(i => i.is_done).length
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs text-[var(--ink-3)] uppercase tracking-wide">
+        Steps <span className="tabular-nums normal-case">{done}/{items.length}</span>
+      </p>
+      {items.map(item => (
+        <label
+          key={item.id}
+          className={[
+            'flex items-start gap-2.5 py-1.5 px-2 -mx-2 rounded-lg',
+            disabled ? '' : 'cursor-pointer hover:bg-[var(--surface)]',
+          ].join(' ')}
+        >
+          <input
+            type="checkbox"
+            checked={item.is_done}
+            disabled={disabled}
+            onChange={() => onToggle(item)}
+            className="mt-0.5 shrink-0 w-4 h-4 rounded accent-[var(--green)]"
+          />
+          <span className={[
+            'text-sm leading-snug',
+            item.is_done ? 'text-[var(--ink-3)] line-through' : 'text-[var(--ink-2)]',
+          ].join(' ')}>
+            {item.title}
+          </span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+// ── The client's notes, autosaved ────────────────────────────────────────────
+
+function ClientNotes({ task, disabled }: { task: Task; disabled: boolean }) {
+  const [value, setValue] = useState(task.client_note ?? '')
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSaved = useRef(task.client_note ?? '')
+
+  // Re-seed when the sheet opens on a different task.
+  useEffect(() => {
+    setValue(task.client_note ?? '')
+    lastSaved.current = task.client_note ?? ''
+    setState('idle')
+  }, [task.id, task.client_note])
+
+  const save = useCallback(async (next: string) => {
+    if (next === lastSaved.current) return
+    setState('saving')
+    const result = await setMyWorkPlanTaskClientNote(task.id, next)
+    if (result.error) { setState('error'); return }
+    lastSaved.current = next
+    setState('saved')
+  }, [task.id])
+
+  function onChange(next: string) {
+    setValue(next)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => void save(next), 800)
+  }
+
+  // Flush a pending edit if the sheet closes mid-debounce.
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs text-[var(--ink-3)] uppercase tracking-wide">Your notes</p>
+        <span className="text-[11px] text-[var(--ink-3)]" aria-live="polite">
+          {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : state === 'error' ? 'Not saved' : ''}
+        </span>
+      </div>
+      <textarea
+        value={value}
+        disabled={disabled}
+        onChange={e => onChange(e.target.value)}
+        onBlur={() => {
+          if (timer.current) clearTimeout(timer.current)
+          void save(value)
+        }}
+        rows={3}
+        maxLength={10000}
+        placeholder="What you tried, what you want to ask about…"
+        className={INPUT + ' resize-y disabled:opacity-60'}
+      />
+      <p className="text-[11px] text-[var(--ink-3)]">Visible to your OTB coach</p>
+    </div>
+  )
+}
+
+// ── Add / edit a client task ─────────────────────────────────────────────────
+
+function TaskEditorSheet({
+  initial, groupOptions, pending, onSave, onDelete, onClose,
+}: {
+  initial: { title: string; description: string; timeframeGroup: string }
+  groupOptions: string[]
+  pending: boolean
+  onSave: (input: { title: string; description: string; timeframeGroup: string }) => void
+  onDelete?: () => void
+  onClose: () => void
+}) {
+  const [title, setTitle] = useState(initial.title)
+  const [description, setDescription] = useState(initial.description)
+  const [group, setGroup] = useState(
+    groupOptions.includes(initial.timeframeGroup) ? initial.timeframeGroup : NEW_GROUP,
+  )
+  const [newGroup, setNewGroup] = useState(
+    groupOptions.includes(initial.timeframeGroup) ? '' : initial.timeframeGroup,
+  )
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  const effectiveGroup = group === NEW_GROUP ? newGroup.trim() : group
+  const canSave = title.trim().length > 0 && effectiveGroup.length > 0 && !pending
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end md:items-center md:justify-center" role="dialog" aria-modal="true" aria-label="Task">
+      <button onClick={onClose} aria-label="Close" className="absolute inset-0 bg-black/40 cursor-default" />
+      <div
+        style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+        className="relative w-full md:max-w-lg bg-[var(--canvas)] max-h-[88vh] overflow-y-auto rounded-t-2xl md:rounded-2xl border border-[var(--border)] px-5 pt-5 space-y-4"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-lg text-[var(--ink)]" style={{ fontFamily: 'var(--font-heading)' }}>
+            {onDelete ? 'Edit your step' : 'Add a step'}
+          </h3>
+          <button onClick={onClose} aria-label="Close" className="p-2 -m-1 text-[var(--ink-3)] hover:text-[var(--ink)]">✕</button>
+        </div>
+
+        <div>
+          <label className="block text-xs text-[var(--ink-3)] mb-1">What needs doing *</label>
+          <input value={title} maxLength={200} onChange={e => setTitle(e.target.value)} className={INPUT} />
+        </div>
+
+        <div>
+          <label className="block text-xs text-[var(--ink-3)] mb-1">Notes (optional)</label>
+          <textarea
+            value={description}
+            maxLength={5000}
+            onChange={e => setDescription(e.target.value)}
+            rows={3}
+            className={INPUT + ' resize-y'}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-[var(--ink-3)] mb-1">Group</label>
+          <select value={group} onChange={e => setGroup(e.target.value)} className={INPUT}>
+            {groupOptions.map(g => <option key={g} value={g}>{g}</option>)}
+            <option value={NEW_GROUP}>+ New group…</option>
+          </select>
+          {group === NEW_GROUP && (
+            <input
+              value={newGroup}
+              maxLength={60}
+              onChange={e => setNewGroup(e.target.value)}
+              placeholder="Name your group"
+              className={INPUT + ' mt-2'}
+            />
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+          {onDelete
+            ? <button onClick={onDelete} disabled={pending} className="text-sm text-[var(--red)] hover:underline disabled:opacity-60">Delete</button>
+            : <span />}
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-[var(--ink-3)] hover:text-[var(--ink)]">Cancel</button>
+            <button
+              disabled={!canSave}
+              onClick={() => onSave({ title: title.trim(), description: description.trim(), timeframeGroup: effectiveGroup })}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: 'var(--accent-text)' }}
+            >
+              {pending ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Detail sheet / drawer ────────────────────────────────────────────────────
 
 function TaskSheet({
-  task, viewOnly, pending, onMove, onClose,
+  task, viewOnly, pending, onMove, onToggleItem, onEdit, onClose,
 }: {
-  task: ClientWorkPlanTask
+  task: Task
   viewOnly: boolean
   pending: boolean
-  onMove: (task: ClientWorkPlanTask, status: WorkPlanTaskStatus) => void
+  onMove: (task: Task, status: WorkPlanTaskStatus) => void
+  onToggleItem: (task: Task, item: ClientWorkPlanTaskItem) => void
+  onEdit: (task: Task) => void
   onClose: () => void
 }) {
   const [dragY, setDragY] = useState(0)
   const startY = useRef<number | null>(null)
 
   useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
+    function onKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
-  // Swipe down to dismiss. Bound to the handle/header only, so the body can
-  // still scroll normally.
   function onTouchStart(e: React.TouchEvent) { startY.current = e.touches[0].clientY }
   function onTouchMove(e: React.TouchEvent) {
     if (startY.current == null) return
@@ -276,9 +475,7 @@ function TaskSheet({
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end md:items-stretch md:justify-end"
-      role="dialog"
-      aria-modal="true"
-      aria-label={task.title}
+      role="dialog" aria-modal="true" aria-label={task.title}
     >
       <button onClick={onClose} aria-label="Close details" className="absolute inset-0 bg-black/40 cursor-default" />
 
@@ -291,14 +488,11 @@ function TaskSheet({
         className={[
           'relative w-full bg-[var(--canvas)] max-h-[88vh] overflow-y-auto',
           'rounded-t-2xl border-t border-[var(--border)]',
-          'md:rounded-t-none md:rounded-none md:max-w-md md:h-full md:max-h-none md:border-t-0 md:border-l',
+          'md:rounded-none md:max-w-md md:h-full md:max-h-none md:border-t-0 md:border-l',
         ].join(' ')}
       >
-        {/* Drag handle — mobile only */}
         <div
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
           className="md:hidden pt-2.5 pb-1 flex justify-center cursor-grab active:cursor-grabbing"
           style={{ touchAction: 'none' }}
         >
@@ -316,14 +510,21 @@ function TaskSheet({
           <div className="flex items-center gap-1.5 flex-wrap">
             <Chip>{task.timeframe_group}</Chip>
             {task.milestone_tag !== 'general' && (
-              <Chip fg="var(--accent-text)" bg="var(--accent-light)">{milestoneLabel(task.milestone_tag)}</Chip>
+              <Chip fg="var(--accent-text)" bg="var(--accent-light)">{categoryLabel(task.milestone_tag)}</Chip>
             )}
             {task.is_recurring && <Chip>recurring</Chip>}
+            {task.is_client_added && <Chip>added by you</Chip>}
           </div>
 
           {task.description
             ? <p className="text-sm text-[var(--ink-2)] whitespace-pre-wrap leading-relaxed">{task.description}</p>
             : <p className="text-sm text-[var(--ink-3)]">No further detail on this step.</p>}
+
+          <Checklist
+            items={task.items}
+            disabled={viewOnly}
+            onToggle={item => onToggleItem(task, item)}
+          />
 
           {(task.links ?? []).length > 0 && (
             <div className="space-y-1.5 pt-1">
@@ -334,13 +535,16 @@ function TaskSheet({
                   href={l.url}
                   target={l.internal ? undefined : '_blank'}
                   rel={l.internal ? undefined : 'noreferrer'}
-                  className="block text-sm text-[var(--accent-text)] hover:underline break-all"
+                  title={l.url}
+                  className="block text-sm text-[var(--accent-text)] hover:underline break-words"
                 >
-                  {l.label ?? l.url}{l.internal ? '' : ' ↗'}
+                  {linkLabel(l)}{l.internal ? '' : ' ↗'}
                 </a>
               ))}
             </div>
           )}
+
+          <ClientNotes task={task} disabled={viewOnly} />
 
           <div className="pt-2 border-t border-[var(--border)] space-y-2">
             <p className="text-xs text-[var(--ink-3)] uppercase tracking-wide">Move to</p>
@@ -368,7 +572,12 @@ function TaskSheet({
               })}
             </div>
             {viewOnly && (
-              <p className="text-xs text-[var(--ink-3)]">View only — you can&apos;t move steps while viewing as this studio.</p>
+              <p className="text-xs text-[var(--ink-3)]">View only — you can&apos;t change steps while viewing as this studio.</p>
+            )}
+            {task.is_client_added && !viewOnly && (
+              <button onClick={() => onEdit(task)} className="text-sm text-[var(--accent-text)] hover:underline">
+                Edit or delete this step
+              </button>
             )}
           </div>
         </div>
@@ -383,7 +592,7 @@ export default function WorkPlanBoardClient({
   plan, tasks: initialTasks, viewOnly, extraPublishedCount, loadError,
 }: {
   plan: ClientWorkPlan
-  tasks: ClientWorkPlanTask[]
+  tasks: Task[]
   viewOnly: boolean
   extraPublishedCount: number
   loadError: string | null
@@ -392,13 +601,16 @@ export default function WorkPlanBoardClient({
   const { toast, showToast } = useToast(2500)
   const [tasks, setTasks] = useState(initialTasks)
   const [activeTab, setActiveTab] = useState<WorkPlanTaskStatus>('todo')
-  const [open, setOpen] = useState<ClientWorkPlanTask | null>(null)
-  const [dragging, setDragging] = useState<ClientWorkPlanTask | null>(null)
+  const [open, setOpen] = useState<Task | null>(null)
+  const [editing, setEditing] = useState<Task | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [dragging, setDragging] = useState<Task | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Mirrors the module-level store into state so a toggle re-renders; the module
-  // copy is what survives navigating away and back within the session.
   const [overrides, setOverrides] = useState<Record<string, boolean>>({ ...groupOverrides })
   const [isPending, startTransition] = useTransition()
+
+  // Server data wins after a refresh.
+  useEffect(() => { setTasks(initialTasks) }, [initialTasks])
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -410,11 +622,9 @@ export default function WorkPlanBoardClient({
   const done = byStatus('done').length
   const pct = completionPercent(done, tasks.length)
 
-  /**
-   * Default: within a column, only the first timeframe group that still has
-   * unfinished work is open. A column with nothing unfinished (typically Done)
-   * opens its first group rather than showing everything collapsed.
-   */
+  // Standard groups plus whatever this plan already uses, in display order.
+  const groupOptions = Array.from(new Set([...TIMEFRAME_ORDER, ...orderTimeframeGroups(tasks)]))
+
   function defaultOpenGroup(status: WorkPlanTaskStatus): string | null {
     const groups = groupTasksByTimeframe(byStatus(status))
     const firstUnfinished = groups.find(g => g.tasks.some(t => t.status !== 'done'))
@@ -430,27 +640,47 @@ export default function WorkPlanBoardClient({
     setOverrides({ ...groupOverrides })
   }
 
-  /** The one write path: used by desktop drag and by the sheet's Move-to buttons. */
-  function moveTask(task: ClientWorkPlanTask, target: WorkPlanTaskStatus, closeSheet = false) {
-    if (task.status === target) return
+  /** Every mutation funnels through here so failures revert the same way. */
+  function run(
+    optimistic: () => void,
+    action: () => Promise<{ error: string | null }>,
+    successMessage?: string,
+  ) {
     const previous = tasks
-    // Mirror the DB trigger optimistically so counts and the bar move at once.
-    setTasks(ts =>
-      ts.map(t => (t.id === task.id ? { ...t, status: target, is_done: target === 'done' } : t)),
-    )
+    optimistic()
     setError(null)
-    if (closeSheet) setOpen(null)
-
     startTransition(async () => {
-      const result = await setMyWorkPlanTaskStatus(task.id, target)
+      const result = await action()
       if (result.error) {
         setTasks(previous)
         setError(result.error)
         return
       }
-      showToast(`Moved to ${STATUS_STYLE[target].label}`)
+      if (successMessage) showToast(successMessage)
       router.refresh()
     })
+  }
+
+  function moveTask(task: Task, target: WorkPlanTaskStatus, closeSheet = false) {
+    if (task.status === target) return
+    if (closeSheet) setOpen(null)
+    run(
+      () => setTasks(ts => ts.map(t => (t.id === task.id ? { ...t, status: target, is_done: target === 'done' } : t))),
+      () => setMyWorkPlanTaskStatus(task.id, target),
+      `Moved to ${STATUS_STYLE[target].label}`,
+    )
+  }
+
+  function toggleItem(task: Task, item: ClientWorkPlanTaskItem) {
+    const next = !item.is_done
+    run(
+      () => setTasks(ts => ts.map(t => (
+        t.id === task.id
+          ? { ...t, items: t.items.map(i => (i.id === item.id ? { ...i, is_done: next } : i)) }
+          : t
+      ))),
+      () => setMyWorkPlanTaskItemDone(item.id, next),
+    )
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -467,6 +697,21 @@ export default function WorkPlanBoardClient({
     if (task) moveTask(task, overId.slice(4) as WorkPlanTaskStatus)
   }
 
+  const columns = (
+    <div className="grid grid-cols-3 gap-4">
+      {TASK_STATUSES.map(({ value }) => (
+        <DesktopColumn
+          key={value}
+          status={value}
+          tasks={byStatus(value)}
+          isExpanded={isExpanded}
+          onToggleGroup={onToggleGroup}
+          onOpen={setOpen}
+        />
+      ))}
+    </div>
+  )
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -480,17 +725,25 @@ export default function WorkPlanBoardClient({
               {done}/{tasks.length} done ({pct}%)
             </p>
           </div>
-          {viewOnly && <Chip>View only — dragging is disabled</Chip>}
+          <div className="flex items-center gap-2">
+            {viewOnly
+              ? <Chip>View only</Chip>
+              : (
+                <button
+                  onClick={() => setAdding(true)}
+                  className="px-3 py-2 rounded-xl text-sm font-medium text-white"
+                  style={{ background: 'var(--accent-text)' }}
+                >
+                  + Add step
+                </button>
+              )}
+          </div>
         </div>
 
-        {/* 6px bar with a visible track; any progress at all stays visible. */}
         <div
           className="mt-3 max-w-md rounded-full overflow-hidden"
           style={{ height: 6, background: 'var(--surface-2)' }}
-          role="progressbar"
-          aria-valuenow={pct}
-          aria-valuemin={0}
-          aria-valuemax={100}
+          role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}
         >
           <div
             className="h-full rounded-full"
@@ -522,22 +775,16 @@ export default function WorkPlanBoardClient({
         </div>
       ) : (
         <>
-          {/* ── Mobile: sticky segmented control, one column at a time ───────── */}
+          {/* Mobile: sticky tabs, one column at a time */}
           <div className="md:hidden">
             <div
               className="sticky top-14 z-20 -mx-4 px-4 py-2 border-b"
               style={{ background: 'var(--canvas)', borderColor: 'var(--border)' }}
             >
-              <div
-                role="tablist"
-                aria-label="Board column"
-                className="grid grid-cols-3 gap-1 p-1 rounded-xl"
-                style={{ background: 'var(--surface)' }}
-              >
+              <div role="tablist" aria-label="Board column" className="grid grid-cols-3 gap-1 p-1 rounded-xl" style={{ background: 'var(--surface)' }}>
                 {TASK_STATUSES.map(({ value }) => {
                   const s = STATUS_STYLE[value]
                   const selected = activeTab === value
-                  const count = byStatus(value).length
                   return (
                     <button
                       key={value}
@@ -545,13 +792,10 @@ export default function WorkPlanBoardClient({
                       aria-selected={selected}
                       onClick={() => setActiveTab(value)}
                       className="flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors min-h-[40px]"
-                      style={{
-                        background: selected ? s.bg : 'transparent',
-                        color: selected ? s.fg : 'var(--ink-3)',
-                      }}
+                      style={{ background: selected ? s.bg : 'transparent', color: selected ? s.fg : 'var(--ink-3)' }}
                     >
                       {s.label}
-                      <span className="tabular-nums opacity-70">{count}</span>
+                      <span className="tabular-nums opacity-70">{byStatus(value).length}</span>
                     </button>
                   )
                 })}
@@ -569,35 +813,11 @@ export default function WorkPlanBoardClient({
             </div>
           </div>
 
-          {/* ── Desktop: three drag-and-drop columns, unchanged ──────────────── */}
+          {/* Desktop: three drag-and-drop columns */}
           <div className="hidden md:block">
-            {viewOnly ? (
-              <div className="grid grid-cols-3 gap-4">
-                {TASK_STATUSES.map(({ value }) => (
-                  <DesktopColumn
-                    key={value}
-                    status={value}
-                    tasks={byStatus(value)}
-                    isExpanded={isExpanded}
-                    onToggleGroup={onToggleGroup}
-                    onOpen={setOpen}
-                  />
-                ))}
-              </div>
-            ) : (
+            {viewOnly ? columns : (
               <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                <div className="grid grid-cols-3 gap-4">
-                  {TASK_STATUSES.map(({ value }) => (
-                    <DesktopColumn
-                      key={value}
-                      status={value}
-                      tasks={byStatus(value)}
-                      isExpanded={isExpanded}
-                      onToggleGroup={onToggleGroup}
-                      onOpen={setOpen}
-                    />
-                  ))}
-                </div>
+                {columns}
                 <DragOverlay>
                   {dragging && <div className="w-64"><CardShell task={dragging} dragging /></div>}
                 </DragOverlay>
@@ -613,7 +833,63 @@ export default function WorkPlanBoardClient({
           viewOnly={viewOnly}
           pending={isPending}
           onMove={(task, status) => moveTask(task, status, true)}
+          onToggleItem={toggleItem}
+          onEdit={task => { setOpen(null); setEditing(task) }}
           onClose={() => setOpen(null)}
+        />
+      )}
+
+      {adding && (
+        <TaskEditorSheet
+          initial={{ title: '', description: '', timeframeGroup: BRAIN_DUMP_GROUP }}
+          groupOptions={groupOptions}
+          pending={isPending}
+          onClose={() => setAdding(false)}
+          onSave={input => {
+            setAdding(false)
+            setError(null)
+            startTransition(async () => {
+              const result = await createMyWorkPlanTask({ planId: plan.id, ...input })
+              if (result.error) { setError(result.error); return }
+              showToast('Step added')
+              router.refresh()
+            })
+          }}
+        />
+      )}
+
+      {editing && (
+        <TaskEditorSheet
+          initial={{
+            title: editing.title,
+            description: editing.description ?? '',
+            timeframeGroup: editing.timeframe_group,
+          }}
+          groupOptions={groupOptions}
+          pending={isPending}
+          onClose={() => setEditing(null)}
+          onSave={input => {
+            const target = editing
+            setEditing(null)
+            run(
+              () => setTasks(ts => ts.map(t => (
+                t.id === target.id
+                  ? { ...t, title: input.title, description: input.description || null, timeframe_group: input.timeframeGroup }
+                  : t
+              ))),
+              () => updateMyWorkPlanTask({ taskId: target.id, ...input }),
+              'Step updated',
+            )
+          }}
+          onDelete={() => {
+            const target = editing
+            setEditing(null)
+            run(
+              () => setTasks(ts => ts.filter(t => t.id !== target.id)),
+              () => deleteMyWorkPlanTask(target.id),
+              'Step deleted',
+            )
+          }}
         />
       )}
 

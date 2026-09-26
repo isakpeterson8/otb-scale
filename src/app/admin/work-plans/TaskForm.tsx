@@ -12,7 +12,7 @@
 import { useState } from 'react'
 import type { TaskInput } from '@/app/actions/work-plans'
 import { TIMEFRAME_ORDER } from '@/lib/work-plans'
-import { MILESTONE_TAGS, type MilestoneTag, type WorkPlanLink } from '@/types/database'
+import { CATEGORY_TAGS, type CategoryTag, type ChecklistInput, type WorkPlanLink } from '@/types/database'
 
 export const INPUT =
   'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
@@ -21,20 +21,21 @@ export function emptyInput(group: string): TaskInput {
   return {
     title: '', description: null, internal_note: null,
     timeframe_group: group, week_number: null, is_recurring: false,
-    starts_after_week: null, milestone_tag: 'general', links: [],
+    starts_after_week: null, milestone_tag: 'general', links: [], items: [],
   }
 }
 
 export function toInput(task: {
   title: string; description: string | null; internal_note: string | null
   timeframe_group: string; week_number: number | null; is_recurring: boolean
-  starts_after_week: number | null; milestone_tag: MilestoneTag; links: WorkPlanLink[] | null
-}): TaskInput {
+  starts_after_week: number | null; milestone_tag: CategoryTag; links: WorkPlanLink[] | null
+}, items: { id: string; title: string }[] = []): TaskInput {
   return {
     title: task.title, description: task.description, internal_note: task.internal_note,
     timeframe_group: task.timeframe_group, week_number: task.week_number,
     is_recurring: task.is_recurring, starts_after_week: task.starts_after_week,
     milestone_tag: task.milestone_tag, links: task.links ?? [],
+    items: items.map(i => ({ id: i.id, title: i.title })),
   }
 }
 
@@ -51,6 +52,19 @@ export default function TaskForm({
 }) {
   const [form, setForm] = useState<TaskInput>(initial)
   const set = <K extends keyof TaskInput>(k: K, v: TaskInput[K]) => setForm(f => ({ ...f, [k]: v }))
+
+  function setItem(i: number, patch: Partial<ChecklistInput>) {
+    set('items', form.items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
+  }
+
+  /** Reorder within the form; sort_order is written from array position on save. */
+  function moveItem(i: number, delta: number) {
+    const next = [...form.items]
+    const j = i + delta
+    if (j < 0 || j >= next.length) return
+    ;[next[i], next[j]] = [next[j], next[i]]
+    set('items', next)
+  }
 
   function setLink(i: number, patch: Partial<WorkPlanLink>) {
     set('links', form.links.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
@@ -84,13 +98,13 @@ export default function TaskForm({
             </select>
           </div>
           <div>
-            <label className="block text-xs text-[var(--ink-3)] mb-1">Milestone</label>
+            <label className="block text-xs text-[var(--ink-3)] mb-1">Category</label>
             <select
               value={form.milestone_tag}
-              onChange={e => set('milestone_tag', e.target.value as MilestoneTag)}
+              onChange={e => set('milestone_tag', e.target.value as CategoryTag)}
               className={INPUT}
             >
-              {MILESTONE_TAGS.map(t => (
+              {CATEGORY_TAGS.map(t => (
                 <option key={t.value} value={t.value} className="bg-[var(--surface)]">{t.label}</option>
               ))}
             </select>
@@ -181,6 +195,61 @@ export default function TaskForm({
                 className="text-xs text-[var(--ink-3)] hover:text-[var(--red)]"
               >
                 remove
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Checklist. Ids travel with existing rows so saving DIFFS rather than
+            replacing — members tick these, and a rebuild would wipe that. */}
+        <div className="space-y-2 pt-2 border-t border-[var(--ink)]/8">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs text-[var(--ink-3)]">Checklist (sub-steps)</label>
+            <button
+              type="button"
+              onClick={() => set('items', [...form.items, { id: null, title: '' }])}
+              className="text-xs text-[var(--accent-text)] hover:underline"
+            >
+              + Add item
+            </button>
+          </div>
+          {form.items.length === 0 && (
+            <p className="text-xs text-[var(--ink-3)]">No sub-steps. The client sees a plain task.</p>
+          )}
+          {form.items.map((item, i) => (
+            <div key={item.id ?? `new-${i}`} className="flex items-center gap-1.5">
+              <input
+                value={item.title}
+                maxLength={300}
+                onChange={e => setItem(i, { title: e.target.value })}
+                placeholder={`Step ${i + 1}`}
+                className={INPUT}
+              />
+              <button
+                type="button"
+                aria-label="Move up"
+                disabled={i === 0}
+                onClick={() => moveItem(i, -1)}
+                className="px-1.5 py-1 text-xs text-[var(--ink-3)] hover:text-[var(--ink)] disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label="Move down"
+                disabled={i === form.items.length - 1}
+                onClick={() => moveItem(i, 1)}
+                className="px-1.5 py-1 text-xs text-[var(--ink-3)] hover:text-[var(--ink)] disabled:opacity-30"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                aria-label="Remove item"
+                onClick={() => set('items', form.items.filter((_, idx) => idx !== i))}
+                className="px-1.5 py-1 text-xs text-[var(--ink-3)] hover:text-[var(--red)]"
+              >
+                ✕
               </button>
             </div>
           ))}

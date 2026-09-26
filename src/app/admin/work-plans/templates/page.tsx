@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation'
 import { getStaffContext } from '@/lib/staff'
 import AdminShell from '../../AdminShell'
 import TemplatesClient from './TemplatesClient'
-import type { WorkPlanTemplate, WorkPlanTemplateTask } from '@/types/database'
+import type {
+  WorkPlanTemplate, WorkPlanTemplateTask, WorkPlanTemplateTaskItem,
+} from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Work Plan Templates' }
@@ -36,6 +38,19 @@ export default async function WorkPlanTemplatesPage({
     tasks = (data ?? []) as WorkPlanTemplateTask[]
   }
 
+  // Checklist items for these template tasks, in one query.
+  const itemsByTask: Record<string, WorkPlanTemplateTaskItem[]> = {}
+  if (tasks.length > 0) {
+    const { data: itemRows } = await ctx.supabase
+      .from('work_plan_template_task_items')
+      .select('*')
+      .in('template_task_id', tasks.map(t => t.id))
+      .order('sort_order', { ascending: true })
+    for (const row of (itemRows ?? []) as WorkPlanTemplateTaskItem[]) {
+      ;(itemsByTask[row.template_task_id] ??= []).push(row)
+    }
+  }
+
   return (
     <AdminShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
@@ -43,6 +58,7 @@ export default async function WorkPlanTemplatesPage({
           templates={list}
           selectedId={selectedId}
           tasks={tasks}
+          itemsByTask={itemsByTask}
           loadError={error?.message ?? null}
         />
       </main>
