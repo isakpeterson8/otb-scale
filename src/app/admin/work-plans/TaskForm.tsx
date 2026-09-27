@@ -11,7 +11,7 @@
 
 import { useState } from 'react'
 import type { TaskInput } from '@/app/actions/work-plans'
-import { TIMEFRAME_ORDER } from '@/lib/work-plans'
+import { linkLabel, TIMEFRAME_ORDER } from '@/lib/work-plans'
 import { CATEGORY_TAGS, type CategoryTag, type ChecklistInput, type WorkPlanLink } from '@/types/database'
 
 export const INPUT =
@@ -58,6 +58,8 @@ export default function TaskForm({
 }) {
   const [form, setForm] = useState<TaskInput>(initial)
   const set = <K extends keyof TaskInput>(k: K, v: TaskInput[K]) => setForm(f => ({ ...f, [k]: v }))
+
+  const unlabelledLinks = form.links.filter(l => !(l.label ?? '').trim() && l.url.trim() !== '').length
 
   function setItem(i: number, patch: Partial<ChecklistInput>) {
     set('items', form.items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
@@ -166,7 +168,7 @@ export default function TaskForm({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="block text-xs text-[var(--ink-3)]">Links</label>
+            <label className="block text-xs text-[var(--ink-2)]">Links</label>
             <button
               type="button"
               onClick={() => set('links', [...form.links, { url: '', label: null, internal: false }])}
@@ -175,35 +177,71 @@ export default function TaskForm({
               + Add link
             </button>
           </div>
-          {form.links.map((link, i) => (
-            <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-              <div className="space-y-1">
-                <input
-                  value={link.url}
-                  onChange={e => setLink(i, { url: e.target.value })}
-                  placeholder="https://…"
-                  className={INPUT}
-                />
-                <input
-                  value={link.label ?? ''}
-                  onChange={e => setLink(i, { label: e.target.value || null })}
-                  placeholder="Label (optional)"
-                  className={INPUT}
-                />
-              </div>
-              <label className="flex items-center gap-1 text-xs text-[var(--ink-3)]">
-                <input type="checkbox" checked={link.internal} onChange={e => setLink(i, { internal: e.target.checked })} className="rounded" />
-                internal
-              </label>
-              <button
-                type="button"
-                onClick={() => set('links', form.links.filter((_, idx) => idx !== i))}
-                className="text-xs text-[var(--ink-3)] hover:text-[var(--red)]"
+          {unlabelledLinks > 0 && (
+            <p className="text-xs px-2.5 py-2 rounded-lg" style={{ color: 'var(--amber)', background: 'var(--amber-l)' }}>
+              {unlabelledLinks} link{unlabelledLinks === 1 ? '' : 's'} without a label will show the client
+              a generic name instead of the document title.
+            </p>
+          )}
+          {form.links.map((link, i) => {
+            const missingLabel = !(link.label ?? '').trim()
+            return (
+              <div
+                key={i}
+                className="rounded-lg border p-2.5 space-y-2"
+                style={{ borderColor: missingLabel ? 'var(--amber)' : 'var(--border)' }}
               >
-                remove
-              </button>
-            </div>
-          ))}
+                <div>
+                  <label className="block text-[11px] text-[var(--ink-2)] mb-1">URL</label>
+                  <input
+                    value={link.url}
+                    onChange={e => setLink(i, { url: e.target.value })}
+                    placeholder="https://…"
+                    className={INPUT}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[var(--ink-2)] mb-1">
+                    Label <span className="text-[var(--ink-3)]">— what the client sees</span>
+                  </label>
+                  <input
+                    value={link.label ?? ''}
+                    onChange={e => setLink(i, { label: e.target.value || null })}
+                    placeholder="Document title clients will see"
+                    className={INPUT}
+                    style={missingLabel ? { borderColor: 'var(--amber)' } : undefined}
+                  />
+                  {/* Show the exact fallback the client would get, so the cost of
+                      leaving this blank is visible rather than theoretical. */}
+                  {missingLabel && link.url.trim() !== '' && (
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--amber)' }}>
+                      No label — clients will see “{linkLabel({ url: link.url, label: null })}”
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-xs text-[var(--ink-2)]">
+                    <input
+                      type="checkbox"
+                      checked={link.internal}
+                      onChange={e => setLink(i, { internal: e.target.checked })}
+                      className="rounded"
+                    />
+                    Internal (opens in the app, no ↗)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => set('links', form.links.filter((_, idx) => idx !== i))}
+                    className="text-xs text-[var(--ink-3)] hover:text-[var(--red)]"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {/* The client's own notes. Read-only here: it is their writing, and staff
