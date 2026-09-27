@@ -312,13 +312,110 @@ export const SCHOOL_STAGES: { value: SchoolOutreachStage; label: string; bg: str
   { value: 'not_interested',           label: 'Not Interested',          bg: 'rgba(220,38,38,0.1)',     text: '#b91c1c' },
 ]
 
+// ── School outreach: next step, contacts, activity ───────────────────────────
+
+export type SchoolNextStepOption =
+  | 'send_intro_email'
+  | 'follow_up_email'
+  | 'call_the_school'
+  | 'schedule_a_visit'
+  | 'drop_off_flyers'
+  | 'waiting_to_hear_back'
+  | 'not_interested_right_now'
+  | 'new_school_year_check_in'
+  | 'other'
+
+export const SCHOOL_NEXT_STEP_OPTIONS: { value: SchoolNextStepOption; label: string }[] = [
+  { value: 'send_intro_email',         label: 'Send intro email' },
+  { value: 'follow_up_email',          label: 'Follow-up email' },
+  { value: 'call_the_school',          label: 'Call the school' },
+  { value: 'schedule_a_visit',         label: 'Schedule a visit' },
+  { value: 'drop_off_flyers',          label: 'Drop off flyers' },
+  { value: 'waiting_to_hear_back',     label: 'Waiting to hear back' },
+  { value: 'new_school_year_check_in', label: 'New school year check-in' },
+  { value: 'not_interested_right_now', label: 'Not interested right now' },
+  { value: 'other',                    label: 'Other' },
+]
+
+export type SchoolSubjectArea =
+  | 'band' | 'choir' | 'orchestra' | 'general_music' | 'piano_keyboard'
+  | 'guitar' | 'theater_drama' | 'administration' | 'other'
+
+export const SCHOOL_SUBJECT_AREAS: { value: SchoolSubjectArea; label: string }[] = [
+  { value: 'band',            label: 'Band' },
+  { value: 'choir',           label: 'Choir' },
+  { value: 'orchestra',       label: 'Orchestra' },
+  { value: 'general_music',   label: 'General Music' },
+  { value: 'piano_keyboard',  label: 'Piano/Keyboard' },
+  { value: 'guitar',          label: 'Guitar' },
+  { value: 'theater_drama',   label: 'Theater/Drama' },
+  { value: 'administration',  label: 'Administration/Front Office' },
+  { value: 'other',           label: 'Other' },
+]
+
+/** 'email' and 'next_step_change' are written by the platform, never chosen by
+ *  the user — see SCHOOL_LOGGABLE_TYPES for the Log activity picker. */
+export type SchoolActivityType = 'email' | 'call' | 'visit' | 'other' | 'next_step_change'
+
+export const SCHOOL_ACTIVITY_LABELS: Record<SchoolActivityType, string> = {
+  email:            'Email',
+  call:             'Call',
+  visit:            'Visit',
+  other:            'Other',
+  next_step_change: 'Next step changed',
+}
+
+/** What a user may log by hand. */
+export const SCHOOL_LOGGABLE_TYPES: { value: Extract<SchoolActivityType, 'call' | 'visit' | 'other'>; label: string }[] = [
+  { value: 'call',  label: 'Call' },
+  { value: 'visit', label: 'Visit' },
+  { value: 'other', label: 'Other' },
+]
+
+export interface SchoolContact {
+  id: string
+  studio_id: string
+  school_id: string
+  /** NOT NULL in the database. Backfilled rows with no name read 'Main contact'. */
+  name: string
+  title: string | null
+  subject_area: SchoolSubjectArea | null
+  email: string | null
+  phone: string | null
+  is_primary: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SchoolOutreachActivity {
+  id: string
+  studio_id: string
+  school_id: string
+  /** Null for a front-desk call, or once the contact it referenced was deleted. */
+  contact_id: string | null
+  activity_type: SchoolActivityType
+  occurred_at: string
+  subject: string | null
+  notes: string | null
+  /** Captured at send time so history survives later contact edits. */
+  email_to: string | null
+  gmail_thread_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface SchoolOutreach {
   id: string
   studio_id: string
   school_name: string
+  /** Legacy single-contact fields. school_contacts is the source of truth for
+   *  outreach now; these are kept so the migration stays reversible. */
   contact_name: string | null
   email: string | null
   phone: string | null
+  website: string | null
+  next_step_option: SchoolNextStepOption | null
   stage: SchoolOutreachStage
   first_contact_date: string | null
   last_interacted_date: string | null

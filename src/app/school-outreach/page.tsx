@@ -7,7 +7,9 @@ import SchoolOutreachClient from './SchoolOutreachClient'
 import { checkGmailReplies } from '@/app/actions/cadence'
 import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
-import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/database'
+import type {
+  SchoolOutreach, SchoolContact, SchoolOutreachActivity, CadenceEnrollment, UserSettings,
+} from '@/types/database'
 
 export const metadata: Metadata = { title: 'School Outreach' }
 
@@ -49,13 +51,33 @@ export default async function SchoolOutreachPage() {
 
   const schoolIds = (schools ?? []).map((s: { id: string }) => s.id)
   let enrollments: CadenceEnrollment[] = []
+  let contacts: SchoolContact[] = []
+  let activity: SchoolOutreachActivity[] = []
   if (schoolIds.length > 0) {
-    const { data: enrollmentsData } = await supabase
-      .from('cadence_enrollments')
-      .select('*')
-      .in('school_id', schoolIds)
-      .order('created_at', { ascending: false })
-    enrollments = (enrollmentsData ?? []) as CadenceEnrollment[]
+    // Three scoped reads in parallel rather than per-school fan-out: a studio can
+    // have hundreds of schools, and the board renders all of them at once.
+    const [enrollmentsRes, contactsRes, activityRes] = await Promise.all([
+      supabase
+        .from('cadence_enrollments')
+        .select('*')
+        .in('school_id', schoolIds)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('school_contacts')
+        .select('*')
+        .in('school_id', schoolIds)
+        .order('is_primary', { ascending: false })
+        .order('name', { ascending: true }),
+      supabase
+        .from('school_outreach_activity')
+        .select('*')
+        .in('school_id', schoolIds)
+        .order('occurred_at', { ascending: false })
+        .limit(2000),
+    ])
+    enrollments = (enrollmentsRes.data ?? []) as CadenceEnrollment[]
+    contacts = (contactsRes.data ?? []) as SchoolContact[]
+    activity = (activityRes.data ?? []) as SchoolOutreachActivity[]
   }
 
   return (
@@ -64,6 +86,9 @@ export default async function SchoolOutreachPage() {
         <SchoolOutreachClient
           schools={(schools ?? []) as SchoolOutreach[]}
           enrollments={enrollments}
+          contacts={contacts}
+          activity={activity}
+          viewOnly={viewOnly}
           settings={(settings ?? null) as UserSettings | null}
         />
       </main>

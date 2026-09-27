@@ -107,16 +107,24 @@ function buildRfc2822(to: string, from: string, subject: string, body: string): 
     .replace(/=+$/, '')
 }
 
+/**
+ * Send one cadence email.
+ *
+ * The recipient is resolved HERE from schoolId + contactId, never accepted from
+ * the caller. A client that posted its own toEmail could otherwise redirect mail
+ * through the studio's own Gmail account. contactId is optional: omitted, the
+ * school's primary contact is used, which is what the UI defaults to.
+ */
 export async function sendCadenceEmail({
   enrollmentId,
-  toEmail,
-  toName,
+  schoolId,
+  contactId,
   subject,
   body,
 }: {
   enrollmentId: string
-  toEmail: string
-  toName: string | null
+  schoolId: string
+  contactId?: string | null
   subject: string
   body: string
 }): Promise<{ error: string | null; threadId: string | null }> {
@@ -124,6 +132,39 @@ export async function sendCadenceEmail({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', threadId: null }
+
+  // RLS scopes this to the caller's studio, so a schoolId from another studio
+  // resolves to nothing rather than to someone else's contact list.
+  const { data: school } = await supabase
+    .from('school_outreach')
+    .select('id, studio_id, school_name')
+    .eq('id', schoolId)
+    .maybeSingle()
+  if (!school) return { error: 'School not found.', threadId: null }
+
+  const { data: contacts } = await supabase
+    .from('school_contacts')
+    .select('id, name, email, is_primary')
+    .eq('school_id', schoolId)
+
+  const candidates = (contacts ?? []) as { id: string; name: string; email: string | null; is_primary: boolean }[]
+  const chosen = contactId
+    ? candidates.find(c => c.id === contactId)
+    : (candidates.find(c => c.is_primary) ?? candidates[0])
+
+  if (contactId && !chosen) {
+    return { error: 'That contact is not on this school.', threadId: null }
+  }
+  const toEmail = (chosen?.email ?? '').trim()
+  if (!toEmail) {
+    return {
+      error: chosen
+        ? `${chosen.name} has no email address. Add one, or pick a different contact.`
+        : 'This school has no contact with an email address yet.',
+      threadId: null,
+    }
+  }
+  const toName = chosen?.name ?? null
 
   const accessToken = await getValidAccessToken(supabase, user.id)
   if (!accessToken) return { error: 'Gmail not connected. Connect your account in Settings.', threadId: null }
@@ -164,6 +205,21 @@ export async function sendCadenceEmail({
       .eq('id', enrollmentId)
       .eq('user_id', user.id)
   }
+
+  // Outreach history. Nothing recorded sends before this, so the timeline starts
+  // here — email_to and the thread id are captured now so history survives a
+  // later change of contact details or a deleted contact. Best-effort: a failed
+  // history write must not report a send failure when the mail has gone out.
+  await supabase.from('school_outreach_activity').insert({
+    studio_id: school.studio_id,
+    school_id: school.id,
+    contact_id: chosen?.id ?? null,
+    activity_type: 'email',
+    subject,
+    email_to: toEmail,
+    gmail_thread_id: threadId,
+    created_by: user.id,
+  })
 
   revalidatePath('/school-outreach')
   return { error: null, threadId }
