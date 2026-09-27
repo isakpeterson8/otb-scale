@@ -336,7 +336,6 @@ function ClientNotes({ task, disabled }: { task: Task; disabled: boolean }) {
         placeholder="What you tried, what you want to ask about…"
         className={INPUT + ' resize-y disabled:opacity-60'}
       />
-      <p className="text-[11px] text-[var(--ink-2)]">Visible to your OTB coach</p>
     </div>
   )
 }
