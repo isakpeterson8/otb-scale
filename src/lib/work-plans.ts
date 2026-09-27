@@ -156,6 +156,33 @@ function googleFileLabel(u: URL): string | null {
   return null
 }
 
+/**
+ * Words the slug flattens that should not be title-cased naively.
+ * titleToSlug() strips punctuation, so "Self-Promotion" arrives as
+ * "selfpromotion" and would otherwise render "Selfpromotion".
+ */
+const SPECIAL_WORDS: Record<string, string> = {
+  selfpromotion: 'Self-Promotion',
+  otb:           'OTB',
+  faq:           'FAQ',
+  seo:           'SEO',
+  gbp:           'GBP',
+  ai:            'AI',
+}
+
+/** Kept lowercase in a title unless they lead it. */
+const SMALL_WORDS = new Set([
+  'a', 'an', 'and', 'at', 'by', 'for', 'from', 'in', 'of', 'on', 'or', 'the', 'to', 'via', 'vs', 'with',
+])
+
+function titleCaseWord(word: string, isFirst: boolean): string {
+  const lower = word.toLowerCase()
+  const special = SPECIAL_WORDS[lower]
+  if (special) return special
+  if (!isFirst && SMALL_WORDS.has(lower)) return lower
+  return lower.charAt(0).toUpperCase() + lower.slice(1)
+}
+
 /** Path words that name the platform's plumbing, not the document. */
 const GENERIC_SEGMENTS = new Set(['edit', 'view', 'preview', 'open', 'index', 'd', 'e', 'u', 'p'])
 
@@ -165,12 +192,19 @@ const GENERIC_SEGMENTS = new Set(['edit', 'view', 'preview', 'open', 'index', 'd
  * lowercase words, because titleToSlug() produces them that way.
  */
 function looksLikeId(word: string): boolean {
+  // "part-1" and "week-2" are real slugs; a short bare number is not an id.
+  if (/^\d{1,3}$/.test(word)) return false
   if (word.length > 20) return true
   if (/[A-Z]/.test(word.slice(1))) return true
   // A short trailing number is fine ("week1"); digits anywhere else are not.
   if (/\d/.test(word) && !/^[a-z]+\d{1,2}$/.test(word)) return true
+  // Vowel ratio is the weakest signal and the easiest to get wrong: "contracts"
+  // is 2 vowels in 9 characters and was being rejected as an id, which sent
+  // /education/structure/policies-vs-contracts to "Structure". Opaque hosts are
+  // short-circuited before this runs, so the rule only needs to catch a long
+  // consonant run, not defend the whole function.
   const vowels = (word.match(/[aeiou]/g) ?? []).length
-  if (word.length >= 7 && vowels / word.length < 0.25) return true
+  if (word.length >= 12 && vowels / word.length < 0.2) return true
   return false
 }
 
@@ -182,15 +216,52 @@ function slugToTitle(segment: string): string | null {
   const words = s.split(/[-_]+/).filter(Boolean)
   if (words.length === 0) return null
   if (words.some(w => GENERIC_SEGMENTS.has(w.toLowerCase()))) return null
-  if (words.some(w => !/^[a-zA-Z][a-zA-Z0-9]*$/.test(w))) return null
+  if (words.some(w => !/^(?:[a-zA-Z][a-zA-Z0-9]*|\d{1,3})$/.test(w))) return null
   if (words.some(looksLikeId)) return null
   if (words.join('').length < 3) return null
 
-  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+  return words.map((w, i) => titleCaseWord(w, i === 0)).join(' ')
 }
 
-export function linkLabel(link: { url: string; label: string | null }): string {
+/** Hosts where /education/<category>/<slug> resolves to a library item. */
+const OTB_STUDIO_HOSTS = new Set(['studio.outsidethebachs.com'])
+
+/**
+ * The education_library_items.slug an internal education deep link points at,
+ * or null. The route is /education/<categorySlug>/<videoSlug>, matching how
+ * app/education/[categorySlug]/[videoSlug] resolves it, so section links like
+ * /education or /education/videos return null.
+ */
+export function educationSlugFromUrl(url: string): string | null {
+  let u: URL
+  try {
+    u = new URL(url)
+  } catch {
+    return null
+  }
+  if (!OTB_STUDIO_HOSTS.has(u.hostname)) return null
+  const segments = u.pathname.split('/').filter(Boolean)
+  if (segments[0] !== 'education' || segments.length < 3) return null
+  return segments[segments.length - 1]
+}
+
+/**
+ * @param educationTitles slug → real library title, resolved once per board
+ *   load. Without it an education link falls back to humanising its slug, which
+ *   is lossy: titleToSlug() strips the hyphen from "Self-Promotion".
+ */
+export function linkLabel(
+  link: { url: string; label: string | null },
+  educationTitles?: Record<string, string>,
+): string {
   if (link.label && link.label.trim()) return link.label.trim()
+
+  // A real title beats any amount of guessing at the slug.
+  const educationSlug = educationSlugFromUrl(link.url)
+  if (educationSlug) {
+    const title = educationTitles?.[educationSlug]
+    if (title) return title
+  }
 
   let parsed: URL
   try {

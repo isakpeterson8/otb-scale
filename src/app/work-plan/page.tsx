@@ -11,7 +11,7 @@ export default async function WorkPlanPage() {
   // Visibility is publication, not tier: no ACCESS_MATRIX entry and no proxy
   // route block. A studio sees this page exactly when it has a published,
   // active plan — which is also precisely when the sidebar link appears.
-  const { plan, tasks, viewOnly, extraPublishedCount, error } = await loadClientWorkPlan()
+  const { plan, tasks, viewOnly, extraPublishedCount, educationTitles, error } = await loadClientWorkPlan()
 
   if (!plan) redirect('/dashboard')
 
@@ -23,6 +23,7 @@ export default async function WorkPlanPage() {
           tasks={tasks}
           viewOnly={viewOnly}
           extraPublishedCount={extraPublishedCount}
+          educationTitles={educationTitles}
           loadError={error}
         />
       </main>

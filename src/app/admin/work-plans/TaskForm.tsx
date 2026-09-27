@@ -229,7 +229,7 @@ export default function TaskForm({
                       onChange={e => setLink(i, { internal: e.target.checked })}
                       className="rounded"
                     />
-                    Internal (opens in the app, no ↗)
+                    Internal (opens in the app, not a new tab)
                   </label>
                   <button
                     type="button"

@@ -441,11 +441,12 @@ function TaskEditorSheet({
 // ── Detail sheet / drawer ────────────────────────────────────────────────────
 
 function TaskSheet({
-  task, viewOnly, pending, onMove, onToggleItem, onEdit, onClose,
+  task, viewOnly, pending, educationTitles, onMove, onToggleItem, onEdit, onClose,
 }: {
   task: Task
   viewOnly: boolean
   pending: boolean
+  educationTitles: Record<string, string>
   onMove: (task: Task, status: WorkPlanTaskStatus) => void
   onToggleItem: (task: Task, item: ClientWorkPlanTaskItem) => void
   onEdit: (task: Task) => void
@@ -541,7 +542,7 @@ function TaskSheet({
                   title={l.url}
                   className="block text-sm text-[var(--accent-text)] hover:underline break-words"
                 >
-                  {linkLabel(l)}{l.internal ? '' : ' ↗'}
+                  {linkLabel(l, educationTitles)} ↗
                 </a>
               ))}
             </div>
@@ -592,12 +593,14 @@ function TaskSheet({
 // ── Board ────────────────────────────────────────────────────────────────────
 
 export default function WorkPlanBoardClient({
-  plan, tasks: initialTasks, viewOnly, extraPublishedCount, loadError,
+  plan, tasks: initialTasks, viewOnly, extraPublishedCount, educationTitles, loadError,
 }: {
   plan: ClientWorkPlan
   tasks: Task[]
   viewOnly: boolean
   extraPublishedCount: number
+  /** Resolved once per board load in lib/work-plans-data.ts, not per link. */
+  educationTitles: Record<string, string>
   loadError: string | null
 }) {
   const router = useRouter()
@@ -849,6 +852,7 @@ export default function WorkPlanBoardClient({
           task={tasks.find(t => t.id === open.id) ?? open}
           viewOnly={viewOnly}
           pending={isPending}
+          educationTitles={educationTitles}
           onMove={(task, status) => moveTask(task, status, true)}
           onToggleItem={toggleItem}
           onEdit={task => { setOpen(null); setEditing(task) }}

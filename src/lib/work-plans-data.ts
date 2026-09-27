@@ -26,7 +26,9 @@
 
 import { adminClient } from '@/lib/supabase/admin'
 import { getStudioId } from '@/app/actions/_shared'
-import { CLIENT_PLAN_COLUMNS, CLIENT_TASK_COLUMNS, CLIENT_TASK_ITEM_COLUMNS } from '@/lib/work-plans'
+import {
+  CLIENT_PLAN_COLUMNS, CLIENT_TASK_COLUMNS, CLIENT_TASK_ITEM_COLUMNS, educationSlugFromUrl,
+} from '@/lib/work-plans'
 import type {
   ClientWorkPlan, ClientWorkPlanTask, ClientWorkPlanTaskItem, ClientWorkPlanTaskWithItems,
 } from '@/types/database'
@@ -39,11 +41,13 @@ export interface ClientWorkPlanData {
   /** Published active plans beyond the one shown. Surfaced so a studio that
    *  somehow has several is visible rather than silently truncated. */
   extraPublishedCount: number
+  /** education_library_items slug → title, for links that carry no label. */
+  educationTitles: Record<string, string>
   error: string | null
 }
 
 const EMPTY: ClientWorkPlanData = {
-  plan: null, tasks: [], viewOnly: false, extraPublishedCount: 0, error: null,
+  plan: null, tasks: [], viewOnly: false, extraPublishedCount: 0, educationTitles: {}, error: null,
 }
 
 /** Published + active plans visible to this viewer, most recently updated first. */
@@ -106,7 +110,7 @@ export async function loadClientWorkPlan(): Promise<ClientWorkPlanData> {
 
   const tasks = (taskRows ?? []) as unknown as ClientWorkPlanTask[]
   if (tasks.length === 0) {
-    return { plan, tasks: [], viewOnly, extraPublishedCount, error: taskError?.message ?? null }
+    return { plan, tasks: [], viewOnly, extraPublishedCount, educationTitles: {}, error: taskError?.message ?? null }
   }
 
   // Checklist items for exactly these tasks. One query, then grouped in memory —
@@ -136,6 +140,42 @@ export async function loadClientWorkPlan(): Promise<ClientWorkPlanData> {
     tasks: tasks.map(t => ({ ...t, items: byTask.get(t.id) ?? [] })),
     viewOnly,
     extraPublishedCount,
+    educationTitles: await loadEducationTitles(tasks),
     error: taskError?.message ?? itemError?.message ?? null,
   }
+}
+
+/**
+ * Real titles for every education deep link in the plan, in ONE query keyed by
+ * slug — not one lookup per link.
+ *
+ * Reads through adminClient rather than the member's session: this table
+ * predates the migrations in this repo and carries no member SELECT policy, so
+ * a member-scoped read returns nothing. What crosses the boundary is only the
+ * title of an item their own plan already links to, and the slug is visible in
+ * the URL regardless.
+ */
+async function loadEducationTitles(
+  tasks: ClientWorkPlanTask[],
+): Promise<Record<string, string>> {
+  const slugs = new Set<string>()
+  for (const task of tasks) {
+    for (const link of task.links ?? []) {
+      if (link.label && link.label.trim()) continue
+      const slug = educationSlugFromUrl(link.url)
+      if (slug) slugs.add(slug)
+    }
+  }
+  if (slugs.size === 0) return {}
+
+  const { data } = await adminClient
+    .from('education_library_items')
+    .select('slug, title')
+    .in('slug', [...slugs])
+
+  const titles: Record<string, string> = {}
+  for (const row of (data ?? []) as { slug: string | null; title: string }[]) {
+    if (row.slug) titles[row.slug] = row.title
+  }
+  return titles
 }

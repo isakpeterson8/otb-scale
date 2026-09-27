@@ -131,7 +131,7 @@ function TaskRow({
                 rel={l.internal ? undefined : 'noreferrer'}
                 className="text-xs text-[var(--accent-text)] hover:underline truncate max-w-[240px]"
               >
-                {l.label ?? l.url}{l.internal ? '' : ' ↗'}
+                {l.label ?? l.url} ↗
               </a>
             ))}
           </div>
