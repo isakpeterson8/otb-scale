@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStaffContext } from '@/lib/staff'
+import { syncChecklist } from '@/lib/work-plan-checklist'
 import type { TaskInput } from '@/app/actions/work-plans'
 
 /**
@@ -76,10 +77,19 @@ export async function createTemplateTask(templateId: string, input: TaskInput): 
     .limit(1)
     .maybeSingle()
 
-  const { error } = await ctx.supabase
+  // items is not a column — reconciled separately below.
+  const { items, ...row } = input
+  const { data: created, error } = await ctx.supabase
     .from('work_plan_template_tasks')
-    .insert({ ...input, template_id: templateId, sort_order: (last?.sort_order ?? 0) + 1 })
+    .insert({ ...row, template_id: templateId, sort_order: (last?.sort_order ?? 0) + 1 })
+    .select('id')
+    .single()
   if (error) return { error: error.message }
+
+  const checklistError = await syncChecklist(
+    ctx.supabase, 'work_plan_template_task_items', 'template_task_id', created.id as string, items,
+  )
+  if (checklistError) return { error: checklistError }
 
   revalidatePath(TEMPLATES_PATH)
   return { error: null }
@@ -89,8 +99,14 @@ export async function updateTemplateTask(taskId: string, input: TaskInput): Prom
   const ctx = await getStaffContext()
   if (!ctx) return { error: 'Unauthorized' }
 
-  const { error } = await ctx.supabase.from('work_plan_template_tasks').update(input).eq('id', taskId)
+  const { items, ...row } = input
+  const { error } = await ctx.supabase.from('work_plan_template_tasks').update(row).eq('id', taskId)
   if (error) return { error: error.message }
+
+  const checklistError = await syncChecklist(
+    ctx.supabase, 'work_plan_template_task_items', 'template_task_id', taskId, items,
+  )
+  if (checklistError) return { error: checklistError }
 
   revalidatePath(TEMPLATES_PATH)
   return { error: null }
@@ -146,3 +162,11 @@ export async function reorderTemplateTasks(
   revalidatePath(TEMPLATES_PATH)
   return { error: null }
 }
+
+// ── Template checklist items ─────────────────────────────────────────────────
+// Mirrors the per-plan checklist actions. Template items have no completion
+// columns — a template is not worked, it is cloned.
+
+
+
+

@@ -22,24 +22,29 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   deleteWorkPlan, deleteWorkPlanTask, createWorkPlanTask, moveWorkPlanTaskToGroup,
-  reorderWorkPlanTasks, setWorkPlanTaskDone, updateWorkPlan, updateWorkPlanTask,
+  reorderWorkPlanTasks, setWorkPlanTaskStatus, updateWorkPlan, updateWorkPlanTask,
 } from '@/app/actions/work-plans'
-import { completionPercent, groupTasksByTimeframe, TIMEFRAME_ORDER } from '@/lib/work-plans'
-import { MILESTONE_TAGS, type WorkPlan, type WorkPlanStatus, type WorkPlanTask } from '@/types/database'
+import { BRAIN_DUMP_GROUP, completionPercent, groupTasksByTimeframe, TIMEFRAME_ORDER } from '@/lib/work-plans'
+import {
+  CATEGORY_TAGS, TASK_STATUSES,
+  type WorkPlan, type WorkPlanStatus, type WorkPlanTask, type WorkPlanTaskItem,
+  type WorkPlanTaskStatus,
+} from '@/types/database'
 
 import TaskForm, { emptyInput, toInput } from '../TaskForm'
 
 // ── Task row ─────────────────────────────────────────────────────────────────
 
 function TaskRow({
-  task, onToggleDone, onEdit,
+  task, items, onSetStatus, onEdit,
 }: {
   task: WorkPlanTask
-  onToggleDone: (task: WorkPlanTask) => void
+  items: WorkPlanTaskItem[]
+  onSetStatus: (task: WorkPlanTask, status: WorkPlanTaskStatus) => void
   onEdit: (task: WorkPlanTask) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
-  const tagLabel = MILESTONE_TAGS.find(t => t.value === task.milestone_tag)?.label ?? task.milestone_tag
+  const tagLabel = CATEGORY_TAGS.find(t => t.value === task.milestone_tag)?.label ?? task.milestone_tag
 
   return (
     <div
@@ -59,13 +64,18 @@ function TaskRow({
         </svg>
       </button>
 
-      <input
-        type="checkbox"
-        checked={task.is_done}
-        onChange={() => onToggleDone(task)}
-        aria-label={`Mark ${task.title} ${task.is_done ? 'not done' : 'done'}`}
-        className="mt-1 shrink-0 rounded"
-      />
+      {/* Three-state, so staff can see what the client has moved — not just
+          whether it is finished. Writes through the same RPC the board uses. */}
+      <select
+        value={task.status}
+        onChange={e => onSetStatus(task, e.target.value as WorkPlanTaskStatus)}
+        aria-label={`Status for ${task.title}`}
+        className="mt-0.5 shrink-0 px-2 py-1 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-xs text-[var(--ink-2)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+      >
+        {TASK_STATUSES.map(({ value, label }) => (
+          <option key={value} value={value} className="bg-[var(--surface)]">{label}</option>
+        ))}
+      </select>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -75,6 +85,14 @@ function TaskRow({
           {task.milestone_tag !== 'general' && (
             <span className="px-1.5 py-0.5 rounded-full text-xs bg-[var(--accent-light)] text-[var(--accent-text)]">{tagLabel}</span>
           )}
+          {task.is_client_added && (
+            <span
+              className="px-1.5 py-0.5 rounded-full text-xs"
+              style={{ background: 'var(--green-l)', color: 'var(--green)' }}
+            >
+              Added by client
+            </span>
+          )}
           {task.is_recurring && (
             <span className="px-1.5 py-0.5 rounded-full text-xs bg-white/8 text-[var(--ink-3)]">
               recurring{task.starts_after_week ? ` · after wk ${task.starts_after_week}` : ''}
@@ -82,8 +100,26 @@ function TaskRow({
           )}
         </div>
         {task.description && <p className="text-xs text-[var(--ink-3)] mt-0.5">{task.description}</p>}
+        {items.length > 0 && (
+          <p className="text-xs text-[var(--ink-3)] mt-1 tabular-nums">
+            Checklist {items.filter(i => i.is_done).length}/{items.length}
+            {' · '}
+            {items.map(i => i.title).join(' · ').slice(0, 90)}
+            {items.map(i => i.title).join(' · ').length > 90 ? '…' : ''}
+          </p>
+        )}
         {task.internal_note && (
           <p className="text-xs text-[var(--amber)] mt-1">🔒 Team only: {task.internal_note}</p>
+        )}
+        {/* The client's own notes. Read-only here: it is their writing, and staff
+            editing it silently would be surprising. Never internal_note. */}
+        {task.client_note && (
+          <div className="mt-1.5 px-2.5 py-2 rounded-lg" style={{ background: 'var(--accent-light)' }}>
+            <p className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--accent-text)' }}>
+              Client&apos;s notes
+            </p>
+            <p className="text-xs text-[var(--ink-2)] whitespace-pre-wrap mt-0.5">{task.client_note}</p>
+          </div>
         )}
         {(task.links ?? []).length > 0 && (
           <div className="flex flex-wrap gap-2 mt-1">
@@ -95,7 +131,7 @@ function TaskRow({
                 rel={l.internal ? undefined : 'noreferrer'}
                 className="text-xs text-[var(--accent-text)] hover:underline truncate max-w-[240px]"
               >
-                {l.label ?? l.url}{l.internal ? '' : ' ↗'}
+                {l.label ?? l.url} ↗
               </a>
             ))}
           </div>
@@ -131,11 +167,12 @@ function GroupDropZone({ group, children }: { group: string; children: React.Rea
 // ── Editor ───────────────────────────────────────────────────────────────────
 
 export default function WorkPlanEditorClient({
-  plan, studioName, tasks: initialTasks, loadError,
+  plan, studioName, tasks: initialTasks, itemsByTask, loadError,
 }: {
   plan: WorkPlan
   studioName: string
   tasks: WorkPlanTask[]
+  itemsByTask: Record<string, WorkPlanTaskItem[]>
   loadError: string | null
 }) {
   const router = useRouter()
@@ -167,11 +204,15 @@ export default function WorkPlanEditorClient({
     })
   }
 
-  function handleToggleDone(task: WorkPlanTask) {
-    const next = !task.is_done
+  function handleSetStatus(task: WorkPlanTask, status: WorkPlanTaskStatus) {
+    if (status === task.status) return
     const previous = tasks
-    setTasks(ts => ts.map(t => (t.id === task.id ? { ...t, is_done: next } : t)))
-    run(() => setWorkPlanTaskDone(plan.id, task.id, next), () => setTasks(previous))
+    // Mirror the DB trigger optimistically, so the strikethrough and the
+    // completion counts move with the select rather than after the round trip.
+    setTasks(ts =>
+      ts.map(t => (t.id === task.id ? { ...t, status, is_done: status === 'done' } : t)),
+    )
+    run(() => setWorkPlanTaskStatus(plan.id, task.id, status), () => setTasks(previous))
   }
 
   const orderedGroup = (source: WorkPlanTask[], group: string) =>
@@ -184,6 +225,7 @@ export default function WorkPlanEditorClient({
     if (group === 'Weekly' || group === 'Monthly' || group === 'Semester') {
       return { week_number: null, is_recurring: true }
     }
+    if (group === BRAIN_DUMP_GROUP) return { week_number: null, is_recurring: false }
     return {}
   }
 
@@ -269,7 +311,10 @@ export default function WorkPlanEditorClient({
               <option value="active" className="bg-[var(--surface)]">Active</option>
               <option value="archived" className="bg-[var(--surface)]">Archived</option>
             </select>
-            <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]" title="Phase 2: flips client visibility on. Leave off for now.">
+            <label
+              className="flex items-center gap-2 text-sm text-[var(--ink-2)]"
+              title="Shows this plan on the client's Work Plan board and adds the sidebar link."
+            >
               <input
                 type="checkbox"
                 checked={plan.is_published}
@@ -317,7 +362,7 @@ export default function WorkPlanEditorClient({
                 <SortableContext items={groupTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                   <div className="divide-y divide-[var(--ink)]/6">
                     {groupTasks.map(task => (
-                      <TaskRow key={task.id} task={task} onToggleDone={handleToggleDone} onEdit={setEditing} />
+                      <TaskRow key={task.id} task={task} items={itemsByTask[task.id] ?? []} onSetStatus={handleSetStatus} onEdit={setEditing} />
                     ))}
                   </div>
                 </SortableContext>
@@ -355,7 +400,11 @@ export default function WorkPlanEditorClient({
 
       {editing && (
         <TaskForm
-          initial={toInput(editing)}
+          initial={toInput(editing, itemsByTask[editing.id] ?? [])}
+          clientNote={editing.client_note}
+          itemDoneById={Object.fromEntries(
+            (itemsByTask[editing.id] ?? []).map(i => [i.id, i.is_done]),
+          )}
           isPending={isPending}
           onClose={() => setEditing(null)}
           onSave={input => { run(() => updateWorkPlanTask(plan.id, editing.id, input)); setEditing(null) }}

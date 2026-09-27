@@ -2,7 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStaffContext } from '@/lib/staff'
-import type { MilestoneTag, WorkPlanLink, WorkPlanStatus } from '@/types/database'
+import { BRAIN_DUMP_GROUP } from '@/lib/work-plans'
+import { syncChecklist } from '@/lib/work-plan-checklist'
+import type {
+  CategoryTag, ChecklistInput, WorkPlanLink, WorkPlanStatus, WorkPlanTaskStatus,
+} from '@/types/database'
 
 /**
  * Every action here runs on the staff member's own request-scoped client, so
@@ -19,9 +23,16 @@ export interface TaskInput {
   week_number: number | null
   is_recurring: boolean
   starts_after_week: number | null
-  milestone_tag: MilestoneTag
+  milestone_tag: CategoryTag
   links: WorkPlanLink[]
+  /**
+   * The task's checklist, in display order. An entry with id === null is new.
+   * Ids are carried through so a save DIFFS rather than replaces: members tick
+   * these items, and delete-then-reinsert would silently discard their progress.
+   */
+  items: ChecklistInput[]
 }
+
 
 function revalidatePlan(planId?: string) {
   revalidatePath('/admin/work-plans')
@@ -109,10 +120,19 @@ export async function createWorkPlanTask(planId: string, input: TaskInput): Prom
     .limit(1)
     .maybeSingle()
 
-  const { error } = await ctx.supabase
+  // items is not a column — it is reconciled separately below.
+  const { items, ...row } = input
+  const { data: created, error } = await ctx.supabase
     .from('work_plan_tasks')
-    .insert({ ...input, work_plan_id: planId, sort_order: (last?.sort_order ?? 0) + 1 })
+    .insert({ ...row, work_plan_id: planId, sort_order: (last?.sort_order ?? 0) + 1 })
+    .select('id')
+    .single()
   if (error) return { error: error.message }
+
+  const checklistError = await syncChecklist(
+    ctx.supabase, 'work_plan_task_items', 'task_id', created.id as string, items,
+  )
+  if (checklistError) return { error: checklistError }
 
   revalidatePlan(planId)
   return { error: null }
@@ -126,8 +146,14 @@ export async function updateWorkPlanTask(
   const ctx = await getStaffContext()
   if (!ctx) return { error: 'Unauthorized' }
 
-  const { error } = await ctx.supabase.from('work_plan_tasks').update(input).eq('id', taskId)
+  const { items, ...row } = input
+  const { error } = await ctx.supabase.from('work_plan_tasks').update(row).eq('id', taskId)
   if (error) return { error: error.message }
+
+  const checklistError = await syncChecklist(
+    ctx.supabase, 'work_plan_task_items', 'task_id', taskId, items,
+  )
+  if (checklistError) return { error: checklistError }
 
   revalidatePlan(planId)
   return { error: null }
@@ -144,23 +170,27 @@ export async function deleteWorkPlanTask(planId: string, taskId: string): Promis
   return { error: null }
 }
 
-/** Team check-in toggle. Phase 1 stamps the staff member into done_by. */
-export async function setWorkPlanTaskDone(
+/**
+ * Move a task between board columns.
+ *
+ * Goes through the same set_work_plan_task_status RPC the member board calls,
+ * rather than updating the table directly, so staff and members share one write
+ * path and one set of rules. The RPC writes only `status`; is_done, done_at and
+ * done_by are derived by the work_plan_tasks_sync_done trigger, which also
+ * keeps completionPercent() and the admin list's is_done count honest.
+ */
+export async function setWorkPlanTaskStatus(
   planId: string,
   taskId: string,
-  isDone: boolean,
+  status: WorkPlanTaskStatus,
 ): Promise<Result> {
   const ctx = await getStaffContext()
   if (!ctx) return { error: 'Unauthorized' }
 
-  const { error } = await ctx.supabase
-    .from('work_plan_tasks')
-    .update({
-      is_done: isDone,
-      done_at: isDone ? new Date().toISOString() : null,
-      done_by: isDone ? ctx.userId : null,
-    })
-    .eq('id', taskId)
+  const { error } = await ctx.supabase.rpc('set_work_plan_task_status', {
+    p_task_id: taskId,
+    p_status: status,
+  })
   if (error) return { error: error.message }
 
   revalidatePlan(planId)
@@ -179,6 +209,8 @@ function shapeForGroup(group: string): { week_number: number | null; is_recurrin
   if (group === 'Weekly' || group === 'Monthly' || group === 'Semester') {
     return { week_number: null, is_recurring: true }
   }
+  // Brain dump is a capture area, not a scheduled slot: no week, not recurring.
+  if (group === BRAIN_DUMP_GROUP) return { week_number: null, is_recurring: false }
   return null
 }
 
@@ -284,6 +316,35 @@ export async function reorderWorkPlanTasks(
   )
   const failed = results.find(r => r.error)
   if (failed?.error) return { error: failed.error.message }
+
+  revalidatePlan(planId)
+  return { error: null }
+}
+
+// ── Checklist items ──────────────────────────────────────────────────────────
+// Staff own the checklist: members may only toggle an item, through the RPC.
+
+
+
+
+
+/**
+ * Tick an item as staff. Goes through the same RPC the member board calls, so
+ * there is one write path and one set of rules.
+ */
+export async function setWorkPlanTaskItemDone(
+  planId: string,
+  itemId: string,
+  isDone: boolean,
+): Promise<Result> {
+  const ctx = await getStaffContext()
+  if (!ctx) return { error: 'Unauthorized' }
+
+  const { error } = await ctx.supabase.rpc('set_work_plan_task_item_done', {
+    p_item_id: itemId,
+    p_is_done: isDone,
+  })
+  if (error) return { error: error.message }
 
   revalidatePlan(planId)
   return { error: null }

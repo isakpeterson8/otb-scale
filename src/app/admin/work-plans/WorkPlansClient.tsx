@@ -48,7 +48,7 @@ export default function WorkPlansClient({
             Work Plans
           </h2>
           <p className="text-sm text-[var(--ink-3)] mt-0.5">
-            {plans.length} plan{plans.length === 1 ? '' : 's'} · staff only, clients cannot see these yet
+            {plans.length} plan{plans.length === 1 ? '' : 's'} · a plan is visible to its studio once Published
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">

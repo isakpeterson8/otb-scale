@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getStaffContext } from '@/lib/staff'
 import AdminShell from '../../AdminShell'
 import WorkPlanEditorClient from './WorkPlanEditorClient'
-import type { WorkPlan, WorkPlanTask } from '@/types/database'
+import type { WorkPlan, WorkPlanTask, WorkPlanTaskItem } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Work Plan' }
@@ -34,6 +34,22 @@ export default async function WorkPlanEditorPage({
 
   if (!planRes.data) notFound()
 
+  // Checklist items for this plan's tasks: one query, grouped below, rather than
+  // an items-per-task fan-out across a 49-step plan.
+  const taskIds = (tasksRes.data ?? []).map(t => t.id as string)
+  const { data: itemRows } = taskIds.length
+    ? await ctx.supabase
+        .from('work_plan_task_items')
+        .select('*')
+        .in('task_id', taskIds)
+        .order('sort_order', { ascending: true })
+    : { data: [] }
+
+  const itemsByTask: Record<string, WorkPlanTaskItem[]> = {}
+  for (const row of (itemRows ?? []) as WorkPlanTaskItem[]) {
+    ;(itemsByTask[row.task_id] ??= []).push(row)
+  }
+
   const studio = planRes.data.studios as unknown as { name: string } | null
 
   return (
@@ -43,6 +59,7 @@ export default async function WorkPlanEditorPage({
           plan={planRes.data as unknown as WorkPlan}
           studioName={studio?.name ?? '—'}
           tasks={(tasksRes.data ?? []) as WorkPlanTask[]}
+          itemsByTask={itemsByTask}
           loadError={tasksRes.error?.message ?? null}
         />
       </main>

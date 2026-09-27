@@ -11,8 +11,8 @@
 
 import { useState } from 'react'
 import type { TaskInput } from '@/app/actions/work-plans'
-import { TIMEFRAME_ORDER } from '@/lib/work-plans'
-import { MILESTONE_TAGS, type MilestoneTag, type WorkPlanLink } from '@/types/database'
+import { linkLabel, TIMEFRAME_ORDER } from '@/lib/work-plans'
+import { CATEGORY_TAGS, type CategoryTag, type ChecklistInput, type WorkPlanLink } from '@/types/database'
 
 export const INPUT =
   'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
@@ -21,36 +21,58 @@ export function emptyInput(group: string): TaskInput {
   return {
     title: '', description: null, internal_note: null,
     timeframe_group: group, week_number: null, is_recurring: false,
-    starts_after_week: null, milestone_tag: 'general', links: [],
+    starts_after_week: null, milestone_tag: 'general', links: [], items: [],
   }
 }
 
 export function toInput(task: {
   title: string; description: string | null; internal_note: string | null
   timeframe_group: string; week_number: number | null; is_recurring: boolean
-  starts_after_week: number | null; milestone_tag: MilestoneTag; links: WorkPlanLink[] | null
-}): TaskInput {
+  starts_after_week: number | null; milestone_tag: CategoryTag; links: WorkPlanLink[] | null
+}, items: { id: string; title: string }[] = []): TaskInput {
   return {
     title: task.title, description: task.description, internal_note: task.internal_note,
     timeframe_group: task.timeframe_group, week_number: task.week_number,
     is_recurring: task.is_recurring, starts_after_week: task.starts_after_week,
     milestone_tag: task.milestone_tag, links: task.links ?? [],
+    items: items.map(i => ({ id: i.id, title: i.title })),
   }
 }
 
 // ── Task form ────────────────────────────────────────────────────────────────
 
 export default function TaskForm({
-  initial, onSave, onDelete, onClose, isPending,
+  initial, onSave, onDelete, onClose, isPending, clientNote, itemDoneById,
 }: {
   initial: TaskInput
   onSave: (input: TaskInput) => void
   onDelete?: () => void
   onClose: () => void
   isPending: boolean
+  /**
+   * Read-only context from the client's side. Passed by the per-plan editor only
+   * — a template has no client, so both are undefined there.
+   */
+  clientNote?: string | null
+  itemDoneById?: Record<string, boolean>
 }) {
   const [form, setForm] = useState<TaskInput>(initial)
   const set = <K extends keyof TaskInput>(k: K, v: TaskInput[K]) => setForm(f => ({ ...f, [k]: v }))
+
+  const unlabelledLinks = form.links.filter(l => !(l.label ?? '').trim() && l.url.trim() !== '').length
+
+  function setItem(i: number, patch: Partial<ChecklistInput>) {
+    set('items', form.items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
+  }
+
+  /** Reorder within the form; sort_order is written from array position on save. */
+  function moveItem(i: number, delta: number) {
+    const next = [...form.items]
+    const j = i + delta
+    if (j < 0 || j >= next.length) return
+    ;[next[i], next[j]] = [next[j], next[i]]
+    set('items', next)
+  }
 
   function setLink(i: number, patch: Partial<WorkPlanLink>) {
     set('links', form.links.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
@@ -84,13 +106,13 @@ export default function TaskForm({
             </select>
           </div>
           <div>
-            <label className="block text-xs text-[var(--ink-3)] mb-1">Milestone</label>
+            <label className="block text-xs text-[var(--ink-3)] mb-1">Category</label>
             <select
               value={form.milestone_tag}
-              onChange={e => set('milestone_tag', e.target.value as MilestoneTag)}
+              onChange={e => set('milestone_tag', e.target.value as CategoryTag)}
               className={INPUT}
             >
-              {MILESTONE_TAGS.map(t => (
+              {CATEGORY_TAGS.map(t => (
                 <option key={t.value} value={t.value} className="bg-[var(--surface)]">{t.label}</option>
               ))}
             </select>
@@ -146,7 +168,7 @@ export default function TaskForm({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="block text-xs text-[var(--ink-3)]">Links</label>
+            <label className="block text-xs text-[var(--ink-2)]">Links</label>
             <button
               type="button"
               onClick={() => set('links', [...form.links, { url: '', label: null, internal: false }])}
@@ -155,32 +177,149 @@ export default function TaskForm({
               + Add link
             </button>
           </div>
-          {form.links.map((link, i) => (
-            <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-              <div className="space-y-1">
-                <input
-                  value={link.url}
-                  onChange={e => setLink(i, { url: e.target.value })}
-                  placeholder="https://…"
-                  className={INPUT}
-                />
-                <input
-                  value={link.label ?? ''}
-                  onChange={e => setLink(i, { label: e.target.value || null })}
-                  placeholder="Label (optional)"
-                  className={INPUT}
-                />
+          {unlabelledLinks > 0 && (
+            <p className="text-xs px-2.5 py-2 rounded-lg" style={{ color: 'var(--amber)', background: 'var(--amber-l)' }}>
+              {unlabelledLinks} link{unlabelledLinks === 1 ? '' : 's'} without a label will show the client
+              a generic name instead of the document title.
+            </p>
+          )}
+          {form.links.map((link, i) => {
+            const missingLabel = !(link.label ?? '').trim()
+            return (
+              <div
+                key={i}
+                className="rounded-lg border p-2.5 space-y-2"
+                style={{ borderColor: missingLabel ? 'var(--amber)' : 'var(--border)' }}
+              >
+                <div>
+                  <label className="block text-[11px] text-[var(--ink-2)] mb-1">URL</label>
+                  <input
+                    value={link.url}
+                    onChange={e => setLink(i, { url: e.target.value })}
+                    placeholder="https://…"
+                    className={INPUT}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[var(--ink-2)] mb-1">
+                    Label <span className="text-[var(--ink-3)]">— what the client sees</span>
+                  </label>
+                  <input
+                    value={link.label ?? ''}
+                    onChange={e => setLink(i, { label: e.target.value || null })}
+                    placeholder="Document title clients will see"
+                    className={INPUT}
+                    style={missingLabel ? { borderColor: 'var(--amber)' } : undefined}
+                  />
+                  {/* Show the exact fallback the client would get, so the cost of
+                      leaving this blank is visible rather than theoretical. */}
+                  {missingLabel && link.url.trim() !== '' && (
+                    <p className="text-[11px] mt-1" style={{ color: 'var(--amber)' }}>
+                      No label — clients will see “{linkLabel({ url: link.url, label: null })}”
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-xs text-[var(--ink-2)]">
+                    <input
+                      type="checkbox"
+                      checked={link.internal}
+                      onChange={e => setLink(i, { internal: e.target.checked })}
+                      className="rounded"
+                    />
+                    Internal (opens in the app, not a new tab)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => set('links', form.links.filter((_, idx) => idx !== i))}
+                    className="text-xs text-[var(--ink-3)] hover:text-[var(--red)]"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
-              <label className="flex items-center gap-1 text-xs text-[var(--ink-3)]">
-                <input type="checkbox" checked={link.internal} onChange={e => setLink(i, { internal: e.target.checked })} className="rounded" />
-                internal
-              </label>
+            )
+          })}
+        </div>
+
+        {/* The client's own notes. Read-only here: it is their writing, and staff
+            editing it silently would be surprising. Never internal_note. */}
+        {clientNote && (
+          <div className="px-3 py-2.5 rounded-lg" style={{ background: 'var(--accent-light)' }}>
+            <p className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--accent-text)' }}>
+              Client&apos;s notes
+            </p>
+            <p className="text-sm text-[var(--ink-2)] whitespace-pre-wrap mt-1">{clientNote}</p>
+          </div>
+        )}
+
+        {/* Checklist. Ids travel with existing rows so saving DIFFS rather than
+            replacing — members tick these, and a rebuild would wipe that. */}
+        <div className="space-y-2 pt-2 border-t border-[var(--ink)]/8">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs text-[var(--ink-3)]">Checklist (sub-steps)</label>
+            <button
+              type="button"
+              onClick={() => set('items', [...form.items, { id: null, title: '' }])}
+              className="text-xs text-[var(--accent-text)] hover:underline"
+            >
+              + Add item
+            </button>
+          </div>
+          {form.items.length === 0 && (
+            <p className="text-xs text-[var(--ink-3)]">No sub-steps. The client sees a plain task.</p>
+          )}
+          {itemDoneById && form.items.length > 0 && (
+            <p className="text-xs text-[var(--ink-2)] tabular-nums">
+              Client has ticked {form.items.filter(i => i.id && itemDoneById[i.id]).length} of {form.items.length}
+            </p>
+          )}
+          {form.items.map((item, i) => (
+            <div key={item.id ?? `new-${i}`} className="flex items-center gap-1.5">
+              {/* What the client has ticked. Read-only: staff edit the wording,
+                  the client owns the state. */}
+              <span
+                aria-hidden
+                title={item.id && itemDoneById?.[item.id] ? 'Client has ticked this' : 'Not ticked by the client'}
+                className="shrink-0 w-4 text-center text-xs"
+                style={{ color: item.id && itemDoneById?.[item.id] ? 'var(--green)' : 'var(--ink-3)' }}
+              >
+                {item.id && itemDoneById?.[item.id] ? '✓' : '○'}
+              </span>
+              <input
+                value={item.title}
+                maxLength={300}
+                onChange={e => setItem(i, { title: e.target.value })}
+                placeholder={`Step ${i + 1}`}
+                className={INPUT}
+              />
               <button
                 type="button"
-                onClick={() => set('links', form.links.filter((_, idx) => idx !== i))}
-                className="text-xs text-[var(--ink-3)] hover:text-[var(--red)]"
+                aria-label="Move up"
+                disabled={i === 0}
+                onClick={() => moveItem(i, -1)}
+                className="px-1.5 py-1 text-xs text-[var(--ink-3)] hover:text-[var(--ink)] disabled:opacity-30"
               >
-                remove
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label="Move down"
+                disabled={i === form.items.length - 1}
+                onClick={() => moveItem(i, 1)}
+                className="px-1.5 py-1 text-xs text-[var(--ink-3)] hover:text-[var(--ink)] disabled:opacity-30"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                aria-label="Remove item"
+                onClick={() => set('items', form.items.filter((_, idx) => idx !== i))}
+                className="px-1.5 py-1 text-xs text-[var(--ink-3)] hover:text-[var(--red)]"
+              >
+                ✕
               </button>
             </div>
           ))}

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { adminClient } from '@/lib/supabase/admin'
 import { getCachedUser, getCachedProfile, getCachedStudioTier } from '@/lib/supabase/cached'
 import { isDesignerEmail } from '@/lib/designer'
+import { hasPublishedWorkPlan } from '@/lib/work-plans-data'
 import AppShellClient from './AppShellClient'
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,11 @@ export default async function AppShell({ children }: { children: React.ReactNode
     viewAsStudioName = studio?.name ?? viewAsEmail
   }
 
+  // Gates the Work Plan nav item. One indexed id-only lookup, and it resolves
+  // against the VIEWED studio under View As, so the item appears and disappears
+  // for an impersonated member exactly as it would for the real one.
+  const hasWorkPlan = await hasPublishedWorkPlan()
+
   return (
     <AppShellClient
       displayName={displayName}
@@ -54,6 +60,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       viewOnly={!!viewAsStudioId}
       viewAsStudioName={viewAsStudioName}
       viewAsTier={viewAsTier}
+      hasWorkPlan={hasWorkPlan}
     >
       {children}
     </AppShellClient>

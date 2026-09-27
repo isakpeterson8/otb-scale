@@ -21,11 +21,11 @@ import {
 } from '@/app/actions/work-plan-templates'
 import TaskForm, { INPUT, emptyInput, toInput } from '../TaskForm'
 import { groupTasksByTimeframe, TIMEFRAME_ORDER } from '@/lib/work-plans'
-import { MILESTONE_TAGS, type WorkPlanTemplate, type WorkPlanTemplateTask } from '@/types/database'
+import { CATEGORY_TAGS, type WorkPlanTemplate, type WorkPlanTemplateTask } from '@/types/database'
 
 function TaskRow({ task, onEdit }: { task: WorkPlanTemplateTask; onEdit: (t: WorkPlanTemplateTask) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
-  const tag = MILESTONE_TAGS.find(t => t.value === task.milestone_tag)?.label ?? task.milestone_tag
+  const tag = CATEGORY_TAGS.find(t => t.value === task.milestone_tag)?.label ?? task.milestone_tag
 
   return (
     <div
@@ -70,11 +70,12 @@ function TaskRow({ task, onEdit }: { task: WorkPlanTemplateTask; onEdit: (t: Wor
 }
 
 export default function TemplatesClient({
-  templates, selectedId, tasks: initialTasks, loadError,
+  templates, selectedId, tasks: initialTasks, itemsByTask, loadError,
 }: {
   templates: WorkPlanTemplate[]
   selectedId: string | null
   tasks: WorkPlanTemplateTask[]
+  itemsByTask: Record<string, { id: string; title: string }[]>
   loadError: string | null
 }) {
   const router = useRouter()
@@ -271,7 +272,7 @@ export default function TemplatesClient({
 
       {editing && (
         <TaskForm
-          initial={toInput(editing)}
+          initial={toInput(editing, itemsByTask[editing.id] ?? [])}
           isPending={isPending}
           onClose={() => setEditing(null)}
           onSave={input => { run(() => updateTemplateTask(editing.id, input)); setEditing(null) }}
