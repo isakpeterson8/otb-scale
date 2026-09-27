@@ -6,13 +6,106 @@ import { normalizeWebsite } from '@/lib/school-outreach'
 import { nextStepLabel } from '@/lib/school-outreach'
 import type { SchoolActivityType, SchoolNextStepOption } from '@/types/database'
 
+
+/**
+ * school_outreach.contact_name / email / phone are legacy duplicates of the
+ * primary contact. Sending reads school_contacts now, but other code and older
+ * exports still read the columns, so they are kept in lockstep with the primary
+ * rather than left to drift.
+ *
+ * Called after anything that can change which contact is primary. Verbatim copy:
+ * a backfilled primary named 'Main contact' (2 schools) writes that placeholder
+ * into contact_name, which is what the UI shows for them anyway.
+ */
+async function syncSchoolFromPrimary(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  studioId: string,
+  schoolId: string,
+): Promise<void> {
+  const { data: primary } = await supabase
+    .from('school_contacts')
+    .select('name, email, phone')
+    .eq('school_id', schoolId)
+    .eq('studio_id', studioId)
+    .eq('is_primary', true)
+    .maybeSingle()
+
+  await supabase
+    .from('school_outreach')
+    .update({
+      contact_name: primary?.name ?? null,
+      email: primary?.email ?? null,
+      phone: primary?.phone ?? null,
+    })
+    .eq('id', schoolId)
+    .eq('studio_id', studioId)
+}
+
+/**
+ * Write the school form's contact fields onto the primary contact, creating one
+ * if the school has none. Does nothing when all three are blank, so a school can
+ * still be recorded before anyone at it is known.
+ *
+ * title and subject_area are deliberately untouched — the school form does not
+ * offer them, and clearing them here would discard what was set in the contacts
+ * panel.
+ */
+async function upsertPrimaryFromForm(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  studioId: string,
+  schoolId: string,
+  fields: { name: string | null; email: string | null; phone: string | null },
+): Promise<void> {
+  const hasAnything = [fields.name, fields.email, fields.phone].some(v => (v ?? '') !== '')
+  if (!hasAnything) return
+
+  const { data: primary } = await supabase
+    .from('school_contacts')
+    .select('id')
+    .eq('school_id', schoolId)
+    .eq('studio_id', studioId)
+    .eq('is_primary', true)
+    .maybeSingle()
+
+  if (primary) {
+    await supabase
+      .from('school_contacts')
+      .update({
+        // name is NOT NULL in the database, so a cleared name keeps the
+        // placeholder rather than failing the write.
+        name: fields.name ?? 'Main contact',
+        email: fields.email,
+        phone: fields.phone,
+      })
+      .eq('id', primary.id)
+    return
+  }
+
+  await supabase.from('school_contacts').insert({
+    studio_id: studioId,
+    school_id: schoolId,
+    name: fields.name ?? 'Main contact',
+    email: fields.email,
+    phone: fields.phone,
+    is_primary: true,
+  })
+}
+
 export async function createSchoolOutreach(formData: FormData) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
   if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
-  const { error } = await supabase.from('school_outreach').insert({
+  const contactFields = {
+    name:  ((formData.get('contact_name') as string) || '').trim() || null,
+    email: ((formData.get('email') as string) || '').trim() || null,
+    phone: ((formData.get('phone') as string) || '').trim() || null,
+  }
+
+  const { data: created, error } = await supabase.from('school_outreach').insert({
     studio_id: studioId,
     school_name: formData.get('school_name') as string,
     contact_name: (formData.get('contact_name') as string) || null,
@@ -27,8 +120,17 @@ export async function createSchoolOutreach(formData: FormData) {
     website: normalizeWebsite(formData.get('website') as string | null),
     notes: (formData.get('notes') as string) || null,
   })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
+
+  // The form's contact fields ARE the primary contact, not a separate copy.
+  if (created) {
+    await upsertPrimaryFromForm(supabase, studioId, created.id as string, contactFields)
+    await syncSchoolFromPrimary(supabase, studioId, created.id as string)
+  }
+
   revalidatePath('/school-outreach')
   return { error: null }
 }
@@ -67,6 +169,15 @@ export async function updateSchoolOutreach(id: string, formData: FormData) {
     .eq('id', id)
 
   if (error) return { error: error.message }
+
+  // Edits to the form's contact fields land on the primary contact, then the
+  // legacy columns are re-derived from it so the two cannot diverge.
+  await upsertPrimaryFromForm(supabase, studioId, id, {
+    name:  ((formData.get('contact_name') as string) || '').trim() || null,
+    email: ((formData.get('email') as string) || '').trim() || null,
+    phone: ((formData.get('phone') as string) || '').trim() || null,
+  })
+  await syncSchoolFromPrimary(supabase, studioId, id)
 
   // Timeline entry, only when the option actually moved. Best-effort: a failed
   // history write must not fail the edit the user asked for.
@@ -156,6 +267,7 @@ export async function createSchoolContact(schoolId: string, formData: FormData) 
   })
 
   if (error) return { error: error.message }
+  await syncSchoolFromPrimary(supabase, studioId, schoolId)
   revalidatePath('/school-outreach')
   return { error: null }
 }
@@ -200,6 +312,7 @@ export async function updateSchoolContact(contactId: string, formData: FormData)
     .eq('studio_id', studioId)
 
   if (error) return { error: error.message }
+  await syncSchoolFromPrimary(supabase, studioId, existing.school_id as string)
   revalidatePath('/school-outreach')
   return { error: null }
 }
@@ -247,6 +360,10 @@ export async function deleteSchoolContact(contactId: string) {
     }
   }
 
+  // Runs whether or not a replacement was promoted: with no contacts left, the
+  // legacy columns are cleared rather than left pointing at a deleted person.
+  await syncSchoolFromPrimary(supabase, studioId, target.school_id as string)
+
   revalidatePath('/school-outreach')
   return { error: null }
 }
@@ -281,6 +398,7 @@ export async function setPrimarySchoolContact(contactId: string) {
     .eq('studio_id', studioId)
 
   if (error) return { error: error.message }
+  await syncSchoolFromPrimary(supabase, studioId, target.school_id as string)
   revalidatePath('/school-outreach')
   return { error: null }
 }

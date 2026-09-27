@@ -138,7 +138,20 @@ function HighlightedBody({ text }: { text: string }) {
   )
 }
 
-function SchoolForm({ school, onClose }: { school?: SchoolOutreach; onClose: () => void }) {
+const SCHOOL_FIELD =
+  'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm ' +
+  'text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
+
+function SchoolForm({
+  school, primary, onClose,
+}: {
+  school?: SchoolOutreach
+  /** The contact these three fields edit. Pre-filling from here rather than from
+   *  school_outreach's legacy columns matters: 18 schools currently disagree
+   *  between the two, and the contact row is the one that receives mail. */
+  primary?: SchoolContact | null
+  onClose: () => void
+}) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   // Free text is only shown for "Other", but is never cleared: the original
@@ -173,11 +186,47 @@ function SchoolForm({ school, onClose }: { school?: SchoolOutreach; onClose: () 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 pr-1">
       {textField('School Name', 'school_name', 'text', 'Lincoln Elementary', true)}
-      <div className="grid grid-cols-2 gap-3">
-        {textField('Contact Name', 'contact_name', 'text', 'Ms. Johnson')}
-        {textField('Phone', 'phone', 'tel', '(555) 000-0000')}
+
+      <div className="rounded-lg border border-[var(--ink)]/10 p-3 space-y-3">
+        <div>
+          <p className="text-xs font-medium text-[var(--ink-2)]">Primary contact</p>
+          <p className="text-[11px] text-[var(--ink-3)] mt-0.5">
+            Receives outreach and cadence emails. Add more people, roles and subject
+            areas from “Contacts &amp; history” on the school.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-[var(--ink-3)] mb-1">Name</label>
+            <input
+              name="contact_name"
+              defaultValue={primary?.name ?? school?.contact_name ?? ''}
+              placeholder="Ms. Johnson"
+              className={SCHOOL_FIELD}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-[var(--ink-3)] mb-1">Phone</label>
+            <input
+              name="phone"
+              type="tel"
+              defaultValue={primary?.phone ?? school?.phone ?? ''}
+              placeholder="(555) 000-0000"
+              className={SCHOOL_FIELD}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs text-[var(--ink-3)] mb-1">Email</label>
+          <input
+            name="email"
+            type="email"
+            defaultValue={primary?.email ?? school?.email ?? ''}
+            placeholder="principal@school.edu"
+            className={SCHOOL_FIELD}
+          />
+        </div>
       </div>
-      {textField('Email', 'email', 'email', 'principal@school.edu')}
       {textField('Website', 'website', 'text', 'lincolnelementary.org')}
       <p className="text-[11px] text-[var(--ink-3)] -mt-2">
         https:// is added automatically if you leave it off.
@@ -1219,6 +1268,7 @@ export default function SchoolOutreachClient({
             </div>
             <SchoolForm
               school={editSchool ?? undefined}
+              primary={editSchool ? primaryContact(contactsFor(editSchool.id)) : null}
               onClose={() => { setShowForm(false); setEditSchool(null) }}
             />
           </div>
