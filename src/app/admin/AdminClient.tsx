@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation'
 import { approveUser, rejectUser, enterViewAs, updateStudioTier, approveTierRequest, getWatchHistory, createAccessGrant, revokeAccessGrant, listAccessGrants } from '@/app/actions/admin'
 import type { WatchHistoryEntry, AccessGrant } from '@/app/actions/admin'
 import { sendAdminReminder } from '@/app/actions/reminders'
-import CanvaRequestsTab from './CanvaRequestsTab'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
 import { TIER_LABELS } from '@/lib/features'
 import type { UserRole } from '@/types/database'
@@ -337,7 +336,7 @@ function WatchHistoryModal({ profile, onClose }: { profile: AdminProfile; onClos
   )
 }
 
-const VALID_TABS = ['pending', 'users', 'tiers', 'canva', 'grants'] as const
+const VALID_TABS = ['pending', 'users', 'tiers', 'grants'] as const
 type Tab = (typeof VALID_TABS)[number]
 
 // Module-level: survives tab switches within the same page session
@@ -520,10 +519,14 @@ export default function AdminClient({
   pendingProfiles: AdminProfile[]
 }) {
   const searchParams = useSearchParams()
-  const urlTab = searchParams.get('tab') as Tab | null
-  const [tab, setTab] = useState<Tab>(
-    urlTab && (VALID_TABS as readonly string[]).includes(urlTab) ? urlTab : 'pending'
-  )
+  // DERIVED, not state. Reading the URL once on mount was the root cause of the
+  // stale-tab bug: nothing re-read it afterwards. Next patches
+  // history.pushState to update useSearchParams, so a shallow tab switch and a
+  // full navigation both land here.
+  const urlTab = searchParams.get('tab')
+  const tab: Tab = urlTab && (VALID_TABS as readonly string[]).includes(urlTab)
+    ? (urlTab as Tab)
+    : 'pending'
   const [search, setSearch] = useState('')
   const [tierFilter, setTierFilter] = useState<TierFilter>('all')
   const [watchHistoryProfile, setWatchHistoryProfile] = useState<AdminProfile | null>(null)
@@ -533,15 +536,6 @@ export default function AdminClient({
 
   const pendingUpgradeCount = profiles.filter(p => p.requested_tier).length
 
-  // Listen for client-side tab changes dispatched by AdminNav (no server round-trip)
-  useEffect(() => {
-    function onAdminTabChange(e: Event) {
-      const key = (e as CustomEvent<string>).detail as Tab
-      if ((VALID_TABS as readonly string[]).includes(key)) setTab(key)
-    }
-    window.addEventListener('admin-tab-change', onAdminTabChange)
-    return () => window.removeEventListener('admin-tab-change', onAdminTabChange)
-  }, [])
 
   const filteredProfiles = search.trim()
     ? profiles.filter(p =>
@@ -706,8 +700,6 @@ export default function AdminClient({
         )
       })()}
 
-      {/* Canva Requests tab */}
-      {tab === 'canva' && <CanvaRequestsTab />}
 
       {/* Access Grants tab */}
       {tab === 'grants' && <AccessGrantsTab />}

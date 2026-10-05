@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import AdminShell from './AdminShell'
 import AdminClient from './AdminClient'
-import CanvaRequestsTab from './CanvaRequestsTab'
 import { isDesignerEmail } from '@/lib/designer'
 import type { UserRole } from '@/types/database'
 
@@ -56,16 +55,11 @@ export default async function AdminPage() {
   const callerRole = (callerProfile?.role ?? 'studio_owner') as UserRole
   const callerIsAdmin = callerRole === 'otb_admin' || callerRole === 'otb_staff'
 
-  // Designers get ONLY the Canva requests view — no member data is fetched
+  // Designers get ONLY the Canva requests view, which is its own route now, so
+  // there is one place that renders it rather than two.
   if (!callerIsAdmin) {
     if (!isDesignerEmail(user.email)) redirect('/dashboard')
-    return (
-      <AdminShell canvaOnly>
-        <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
-          <CanvaRequestsTab />
-        </main>
-      </AdminShell>
-    )
+    redirect('/admin/requests/canva')
   }
 
   const [profilesRes, settingsRes, studiosRes, authUsers] = await Promise.all([

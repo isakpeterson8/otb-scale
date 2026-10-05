@@ -2,11 +2,11 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getAllRequests, getAllSites } from '@/app/actions/squarespace-concierge'
-import AdminShell from '../AdminShell'
+import AdminShell from '../../AdminShell'
 import ConciergeAdminClient from './ConciergeAdminClient'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'Concierge Pipeline' }
+export const metadata: Metadata = { title: 'Squarespace Requests' }
 
 export default async function ConciergePipelinePage() {
   const supabase = await createClient()

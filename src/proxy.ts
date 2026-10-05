@@ -47,6 +47,22 @@ export async function proxy(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
+  // ── Legacy admin Requests URLs ───────────────────────────────────────────
+  // The two Requests sub-tabs used to be a path and a query param on a
+  // different page. Both are routes under /admin/requests now; these keep old
+  // bookmarks and the links in already-sent notification emails working.
+  if (pathname === '/admin/concierge' || pathname.startsWith('/admin/concierge/')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/admin/requests/squarespace'
+    return NextResponse.redirect(url)
+  }
+  if (pathname === '/admin' && request.nextUrl.searchParams.get('tab') === 'canva') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/admin/requests/canva'
+    url.searchParams.delete('tab')
+    return NextResponse.redirect(url)
+  }
+
   if (!user && !pathname.startsWith('/auth')) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'

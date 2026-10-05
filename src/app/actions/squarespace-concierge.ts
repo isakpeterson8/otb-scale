@@ -178,7 +178,7 @@ export async function submitSquarespaceRequest(
         input.owner_name  ? `Owner: ${input.owner_name}` : '',
         input.city_state  ? `Location: ${input.city_state}` : '',
         ``,
-        `Review: https://studio.outsidethebachs.com/admin/concierge`,
+        `Review: https://studio.outsidethebachs.com/admin/requests/squarespace`,
       ].filter(Boolean).join('\n'),
       html: emailShell(`
         <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">New Squarespace Request</h2>
@@ -189,7 +189,7 @@ export async function submitSquarespaceRequest(
           ${input.city_state  ? `<tr><td style="padding:4px 0;color:#6b7280;">Location</td><td>${input.city_state}</td></tr>` : ''}
         </table>
         <div style="margin-top:24px;">
-          <a href="https://studio.outsidethebachs.com/admin/concierge"
+          <a href="https://studio.outsidethebachs.com/admin/requests/squarespace"
              style="display:inline-block;padding:10px 20px;background:#0284a8;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
             View in pipeline →
           </a>
@@ -257,7 +257,7 @@ export async function updateRequestStatus(
     .eq('id', id)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/concierge')
+  revalidatePath('/admin/requests/squarespace')
   return {}
 }
 
@@ -295,7 +295,7 @@ export async function createSiteFromRequest(
     .update({ site_id: site.id, updated_at: new Date().toISOString() })
     .eq('id', requestId)
 
-  revalidatePath('/admin/concierge')
+  revalidatePath('/admin/requests/squarespace')
   revalidatePath('/admin/squarespace')
   return { siteId: site.id }
 }
@@ -370,7 +370,7 @@ export async function generateCopyPack(
 
   if (updateErr) return { error: updateErr.message }
 
-  revalidatePath('/admin/concierge')
+  revalidatePath('/admin/requests/squarespace')
   return { copyPack }
 }
 
