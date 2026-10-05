@@ -1,5 +1,5 @@
 // Designer access: emails granted access to ONLY the admin Canva tab
-// (/admin?tab=canva). Server-side only — mirrors the ADMIN_EMAILS pattern.
+// (/admin/requests/canva). Server-side only — mirrors the ADMIN_EMAILS pattern.
 // Override the default list with a comma-separated DESIGNER_EMAILS env var.
 export function getDesignerEmails(): string[] {
   return (process.env.DESIGNER_EMAILS ?? 'design@outsidethebachs.com')

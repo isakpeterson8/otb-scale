@@ -88,7 +88,7 @@ export async function submitCanvaRequest(formData: {
         `Canva link: ${formData.canva_link}`,
         `Submitted: ${submittedAt}`,
         ``,
-        `Review: https://studio.outsidethebachs.com/admin?tab=canva`,
+        `Review: https://studio.outsidethebachs.com/admin/requests/canva`,
       ].join('\n'),
       html: `<!DOCTYPE html>
 <html lang="en">
@@ -110,7 +110,7 @@ export async function submitCanvaRequest(formData: {
             <tr><td style="padding:4px 0;color:#6b7280;">Submitted</td><td>${submittedAt}</td></tr>
           </table>
           <div style="margin-top:24px;">
-            <a href="https://studio.outsidethebachs.com/admin?tab=canva"
+            <a href="https://studio.outsidethebachs.com/admin/requests/canva"
                style="display:inline-block;padding:10px 20px;background:#0284a8;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
               View in admin →
             </a>
