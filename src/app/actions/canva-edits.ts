@@ -7,6 +7,8 @@ import { getStudioId } from '@/app/actions/_shared'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
 import { graduateBlockedRoute } from '@/lib/features'
 import { getDesignerEmails, isDesignerEmail } from '@/lib/designer'
+import { canvaTypeLabel, isCanvaRequestType } from '@/lib/canva-requests'
+import type { CanvaRequestType } from '@/types/database'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -23,6 +25,8 @@ export interface CanvaRequest {
   id: string
   studio_id: string
   user_id: string
+  /** Null on requests submitted before the type picker shipped. */
+  request_type: CanvaRequestType | null
   asset_type: string
   instructions: string
   canva_link: string
@@ -33,11 +37,15 @@ export interface CanvaRequest {
   completed_at: string | null
 }
 
+const REQUEST_COLUMNS =
+  'id, studio_id, user_id, request_type, asset_type, instructions, canva_link, reference_url, status, assigned_to, created_at, completed_at'
+
 export interface AdminCanvaRequest extends CanvaRequest {
   studio_name: string | null
 }
 
 export async function submitCanvaRequest(formData: {
+  request_type: CanvaRequestType
   asset_type: string
   instructions: string
   canva_link: string
@@ -46,6 +54,12 @@ export async function submitCanvaRequest(formData: {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Not authenticated' }
   if (ctx.viewOnly) return { error: 'Cannot submit requests in View As mode' }
+
+  // Required, and checked here rather than only in the form: this action is a
+  // public endpoint, so the client-side guard is not a boundary.
+  if (!isCanvaRequestType(formData.request_type)) {
+    return { error: 'Please select a request type.' }
+  }
 
   // Same boundary the proxy enforces on /canva-edits: route gating alone
   // would not stop this action being invoked from another page.
@@ -58,6 +72,7 @@ export async function submitCanvaRequest(formData: {
   const { error } = await supabase.from('canva_requests').insert({
     studio_id: studioId,
     user_id: userId,
+    request_type: formData.request_type,
     asset_type: formData.asset_type,
     instructions: formData.instructions,
     canva_link: formData.canva_link,
@@ -73,16 +88,18 @@ export async function submitCanvaRequest(formData: {
       adminClient.from('settings').select('display_name').eq('user_id', userId).maybeSingle(),
     ])
     const requesterName = setting?.display_name || studio?.name || 'A member'
+    const typeLabel = canvaTypeLabel(formData.request_type)
     const submittedAt = new Date().toLocaleString('en-US', {
       dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Chicago',
     })
     await resend.emails.send({
       from: 'Outside The Bachs <noreply@outsidethebachs.com>',
       to: getDesignerEmails(),
-      subject: `New Canva request: ${formData.asset_type}`,
+      subject: `New Canva request: ${typeLabel} — ${formData.asset_type}`,
       text: [
         `New Canva edit request`,
         `From: ${requesterName}${userEmail ? ` (${userEmail})` : ''}`,
+        `Request type: ${typeLabel}`,
         `Asset type: ${formData.asset_type}`,
         `Instructions: ${formData.instructions}`,
         `Canva link: ${formData.canva_link}`,
@@ -104,6 +121,7 @@ export async function submitCanvaRequest(formData: {
           <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">New Canva Request</h2>
           <table style="width:100%;font-size:14px;color:#374151;border-collapse:collapse;">
             <tr><td style="padding:4px 0;color:#6b7280;width:120px;">From</td><td>${esc(requesterName)}${userEmail ? ` (${esc(userEmail)})` : ''}</td></tr>
+            <tr><td style="padding:4px 0;color:#6b7280;">Request type</td><td>${esc(typeLabel)}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;">Asset type</td><td>${esc(formData.asset_type)}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;vertical-align:top;">Instructions</td><td>${esc(formData.instructions)}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;">Canva link</td><td><a href="${esc(formData.canva_link)}" style="color:#0284a8;">${esc(formData.canva_link)}</a></td></tr>
@@ -140,7 +158,7 @@ export async function getMyCanvaRequests(): Promise<CanvaRequest[]> {
 
   const { data } = await supabase
     .from('canva_requests')
-    .select('id, studio_id, user_id, asset_type, instructions, canva_link, reference_url, status, assigned_to, created_at, completed_at')
+    .select(REQUEST_COLUMNS)
     .eq('studio_id', studioId)
     .order('created_at', { ascending: false })
 
@@ -184,7 +202,7 @@ export async function getAdminCanvaRequests(): Promise<AdminCanvaRequest[]> {
 
   const { data: requests } = await adminClient
     .from('canva_requests')
-    .select('id, studio_id, user_id, asset_type, instructions, canva_link, reference_url, status, assigned_to, created_at, completed_at')
+    .select(REQUEST_COLUMNS)
     .order('created_at', { ascending: false })
 
   if (!requests || requests.length === 0) return []

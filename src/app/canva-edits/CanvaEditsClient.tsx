@@ -3,6 +3,9 @@
 import { useState, useTransition } from 'react'
 import { submitCanvaRequest } from '@/app/actions/canva-edits'
 import type { CanvaRequest } from '@/app/actions/canva-edits'
+import type { CanvaRequestType } from '@/types/database'
+import { CANVA_TYPE_OPTIONS, canvaTypeLabel } from '@/lib/canva-requests'
+import RequestTypePicker from '@/components/ui/RequestTypePicker'
 import { formatDate } from '@/lib/utils'
 
 const ASSET_TYPES = [
@@ -25,6 +28,7 @@ interface Props {
 }
 
 export default function CanvaEditsClient({ existingRequests }: Props) {
+  const [requestType, setRequestType] = useState<CanvaRequestType | ''>('')
   const [assetType, setAssetType] = useState(ASSET_TYPES[0])
   const [instructions, setInstructions] = useState('')
   const [canvaLink, setCanvaLink] = useState('')
@@ -38,9 +42,11 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!requestType) { setError('Please select a request type.'); return }
     setError(null)
     startTransition(async () => {
       const result = await submitCanvaRequest({
+        request_type: requestType,
         asset_type: assetType,
         instructions,
         canva_link: canvaLink,
@@ -48,6 +54,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
       })
       if (result.error) { setError(result.error); return }
       setSubmitted(true)
+      setRequestType('')
       setInstructions('')
       setCanvaLink('')
       setReferenceUrl('')
@@ -76,6 +83,12 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
         className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 p-6 flex flex-col gap-5"
       >
         <h3 className="text-sm font-semibold text-[var(--ink)]">New Request</h3>
+
+        <RequestTypePicker
+          options={CANVA_TYPE_OPTIONS}
+          value={requestType}
+          onChange={setRequestType}
+        />
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-[var(--ink-3)]">Asset type</label>
@@ -161,7 +174,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
 
         <button
           type="submit"
-          disabled={isPending || !confirmed || !sharedAccess}
+          disabled={isPending || !requestType || !confirmed || !sharedAccess}
           className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
           style={{ background: 'var(--accent-text)', color: 'var(--canvas)' }}
         >
@@ -180,7 +193,13 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
                 <div key={r.id} className="px-5 py-4 flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-[var(--ink)]">{r.asset_type}</span>
+                      <span className="text-sm font-medium text-[var(--ink)]">
+                        {/* Pre-picker requests show the asset type alone — there is
+                            nothing for the member to do about a missing type. */}
+                        {r.request_type
+                          ? `${canvaTypeLabel(r.request_type)} — ${r.asset_type}`
+                          : r.asset_type}
+                      </span>
                       <span
                         className="inline-block px-1.5 py-px rounded text-[10px] font-semibold leading-tight"
                         style={{ background: badge.bg, color: badge.color }}
