@@ -6,6 +6,16 @@ import {
 } from '@/app/actions/squarespace-concierge'
 import type { SquarespaceRequest, SquaresspaceSite, RequestType } from '@/types/database'
 import { formatDate } from '@/lib/utils'
+import RequestTypePicker, { type RequestTypeOption } from '@/components/ui/RequestTypePicker'
+
+/** billing_transfer is admin-set only — it is never offered on the form. */
+type SelectableRequestType = Exclude<RequestType, 'billing_transfer'>
+
+const TYPE_OPTIONS: readonly RequestTypeOption<SelectableRequestType>[] = [
+  { value: 'new_build', label: 'New website build',     description: 'I need a brand-new site built from scratch' },
+  { value: 'refresh',   label: 'Refresh existing site', description: 'Update an already live site' },
+  { value: 'support',   label: 'Support / fix',         description: 'Something on my site needs fixing' },
+]
 
 const STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   requested:           { label: 'Requested',           bg: 'rgba(180,83,9,0.12)',    color: '#b45309' },
@@ -42,7 +52,7 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
   const [requests, setRequests] = useState(existingRequests)
 
   // Form state
-  const [requestType, setRequestType] = useState<RequestType | ''>('')
+  const [requestType, setRequestType] = useState<SelectableRequestType | ''>('')
   // new_build fields
   const [studioName, setStudioName]   = useState('')
   const [ownerName, setOwnerName]     = useState('')
@@ -192,31 +202,11 @@ export default function SquarespaceConciergClient({ existingRequests, mySites }:
       <form onSubmit={handleSubmit} className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 p-6 flex flex-col gap-6">
 
         {/* Request type */}
-        <div className={fieldClass}>
-          <label className={labelClass}>Request type <span style={{ color: 'var(--red)' }}>*</span></label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {([
-              ['new_build', 'New website build',    'I need a brand-new site built from scratch'],
-              ['refresh',   'Refresh existing site', 'Update an already live site'],
-              ['support',   'Support / fix',         'Something on my site needs fixing'],
-            ] as const).map(([val, label, desc]) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setRequestType(val)}
-                className={[
-                  'text-left px-4 py-3 rounded-lg border transition-all',
-                  requestType === val
-                    ? 'border-[var(--accent-text)] bg-[var(--accent-text)]/5'
-                    : 'border-[var(--ink)]/12 hover:border-[var(--ink)]/25',
-                ].join(' ')}
-              >
-                <p className="text-sm font-medium text-[var(--ink)]">{label}</p>
-                <p className="text-xs text-[var(--ink-3)] mt-0.5">{desc}</p>
-              </button>
-            ))}
-          </div>
-        </div>
+        <RequestTypePicker
+          options={TYPE_OPTIONS}
+          value={requestType}
+          onChange={setRequestType}
+        />
 
         {/* ── New build: full intake ──────────────────────────────────────── */}
         {isNewBuild && (

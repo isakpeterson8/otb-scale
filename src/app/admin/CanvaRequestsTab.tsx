@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from 'react'
 import { getAdminCanvaRequests, updateCanvaRequest } from '@/app/actions/canva-edits'
 import type { AdminCanvaRequest } from '@/app/actions/canva-edits'
+import { canvaTypeLabel } from '@/lib/canva-requests'
 import { formatDate } from '@/lib/utils'
 
 const CANVA_STATUS_BADGE: Record<AdminCanvaRequest['status'], { label: string; bg: string; color: string }> = {
@@ -39,6 +40,13 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
         className="hover:bg-[var(--canvas)] transition-colors cursor-pointer"
       >
         <td className="px-4 py-3 text-sm text-[var(--ink)]">{request.studio_name ?? '—'}</td>
+        <td
+          className={`px-4 py-3 text-sm whitespace-nowrap ${
+            request.request_type ? 'text-[var(--ink-2)]' : 'text-[var(--ink-3)] italic'
+          }`}
+        >
+          {canvaTypeLabel(request.request_type)}
+        </td>
         <td className="px-4 py-3 text-sm text-[var(--ink-2)] whitespace-nowrap">{request.asset_type}</td>
         <td className="px-4 py-3 text-sm text-[var(--ink-2)] max-w-[220px]">
           <span className="flex items-center gap-1.5">
@@ -86,7 +94,7 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
       </tr>
       {expanded && (
         <tr className="bg-[var(--canvas)]">
-          <td colSpan={7} className="px-4 py-3">
+          <td colSpan={8} className="px-4 py-3">
             <p className="text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide mb-1">Full instructions</p>
             <p className="text-sm text-[var(--ink-2)] whitespace-pre-wrap leading-relaxed">{request.instructions}</p>
             {request.reference_url && (
@@ -155,6 +163,7 @@ export default function CanvaRequestsTab() {
               <thead>
                 <tr className="border-b border-[var(--ink)]/8">
                   <Th>Studio</Th>
+                  <Th>Request Type</Th>
                   <Th>Asset Type</Th>
                   <Th>Instructions</Th>
                   <Th>Canva Link</Th>

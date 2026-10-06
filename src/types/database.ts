@@ -393,6 +393,18 @@ export interface UserSettings {
   updated_at: string
 }
 
+// ── Canva Edits ───────────────────────────────────────────────────────────────
+
+/**
+ * Mirrors public.canva_request_type. Deliberately a separate enum from the
+ * Squarespace RequestType below: same three values, but the two pipelines are
+ * free to diverge, and Canva has no 'billing_transfer'.
+ *
+ * The column is nullable — requests submitted before the picker existed have
+ * no type, and we do not guess one for them.
+ */
+export type CanvaRequestType = 'new_build' | 'refresh' | 'support'
+
 // ── Squarespace Concierge ─────────────────────────────────────────────────────
 
 export type SiteStatus = 'active_paid' | 'active_trial' | 'trial_expired' | 'expired_paid'
