@@ -31,6 +31,11 @@ export interface CanvaRequest {
   instructions: string
   canva_link: string
   reference_url: string | null
+  /**
+   * The "My AI flyer is not generated" attestation. Required to submit, so
+   * false only on requests that predate the checkbox.
+   */
+  ai_flyer_not_generated: boolean
   status: 'pending' | 'in_progress' | 'complete'
   assigned_to: string | null
   created_at: string
@@ -38,7 +43,7 @@ export interface CanvaRequest {
 }
 
 const REQUEST_COLUMNS =
-  'id, studio_id, user_id, request_type, asset_type, instructions, canva_link, reference_url, status, assigned_to, created_at, completed_at'
+  'id, studio_id, user_id, request_type, asset_type, instructions, canva_link, reference_url, ai_flyer_not_generated, status, assigned_to, created_at, completed_at'
 
 export interface AdminCanvaRequest extends CanvaRequest {
   studio_name: string | null
@@ -50,6 +55,7 @@ export async function submitCanvaRequest(formData: {
   instructions: string
   canva_link: string
   reference_url?: string
+  ai_flyer_not_generated: boolean
 }): Promise<{ error?: string }> {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Not authenticated' }
@@ -59,6 +65,9 @@ export async function submitCanvaRequest(formData: {
   // public endpoint, so the client-side guard is not a boundary.
   if (!isCanvaRequestType(formData.request_type)) {
     return { error: 'Please select a request type.' }
+  }
+  if (formData.ai_flyer_not_generated !== true) {
+    return { error: 'Please confirm your AI flyer is not generated.' }
   }
 
   // Same boundary the proxy enforces on /canva-edits: route gating alone
@@ -77,6 +86,7 @@ export async function submitCanvaRequest(formData: {
     instructions: formData.instructions,
     canva_link: formData.canva_link,
     reference_url: formData.reference_url?.trim() || null,
+    ai_flyer_not_generated: formData.ai_flyer_not_generated,
   })
 
   if (error) return { error: error.message }
@@ -103,6 +113,7 @@ export async function submitCanvaRequest(formData: {
         `Asset type: ${formData.asset_type}`,
         `Instructions: ${formData.instructions}`,
         `Canva link: ${formData.canva_link}`,
+        `AI flyer not generated: ${formData.ai_flyer_not_generated ? 'Yes' : 'No'}`,
         `Submitted: ${submittedAt}`,
         ``,
         `Review: https://studio.outsidethebachs.com/admin/requests/canva`,
@@ -125,6 +136,7 @@ export async function submitCanvaRequest(formData: {
             <tr><td style="padding:4px 0;color:#6b7280;">Asset type</td><td>${esc(formData.asset_type)}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;vertical-align:top;">Instructions</td><td>${esc(formData.instructions)}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;">Canva link</td><td><a href="${esc(formData.canva_link)}" style="color:#0284a8;">${esc(formData.canva_link)}</a></td></tr>
+            <tr><td style="padding:4px 0;color:#6b7280;">AI flyer not generated</td><td>${formData.ai_flyer_not_generated ? 'Yes' : 'No'}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;">Submitted</td><td>${submittedAt}</td></tr>
           </table>
           <div style="margin-top:24px;">
