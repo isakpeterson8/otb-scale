@@ -60,15 +60,20 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
           </span>
         </td>
         <td className="px-4 py-3">
-          <a
-            href={request.canva_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            className="text-xs text-[var(--accent-text)] hover:underline"
-          >
-            Open link
-          </a>
+          {request.canva_link ? (
+            <a
+              href={request.canva_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="text-xs text-[var(--accent-text)] hover:underline"
+            >
+              Open link
+            </a>
+          ) : (
+            // new_build requests have no existing project to open.
+            <span className="text-xs text-[var(--ink-3)]">—</span>
+          )}
         </td>
         <td className="px-4 py-3">
           <span
@@ -110,6 +115,16 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
                 </a>
               </p>
             )}
+            {/* The form's two older checkboxes are never stored, so this is the
+                only attestation there is to show. It lives in the detail panel
+                rather than as a ninth column, which would read "Yes" on every
+                row submitted after the checkbox shipped. */}
+            <p className="text-xs mt-2">
+              <span className="text-[var(--ink-3)]">AI flyer not generated: </span>
+              <span className={request.ai_flyer_not_generated ? 'text-[var(--ink-2)]' : 'text-[var(--ink-3)] italic'}>
+                {request.ai_flyer_not_generated ? 'Yes' : 'Not confirmed'}
+              </span>
+            </p>
           </td>
         </tr>
       )}
