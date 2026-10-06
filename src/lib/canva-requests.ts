@@ -31,3 +31,15 @@ export function isCanvaRequestType(value: unknown): value is CanvaRequestType {
 export function canvaTypeLabel(value: CanvaRequestType | null | undefined): string {
   return isCanvaRequestType(value) ? CANVA_TYPE_LABELS[value] : NO_CANVA_TYPE_LABEL
 }
+
+/**
+ * A brand-new flyer has no Canva project to link to yet, so new_build is the
+ * one type that may omit it. Shared by the form and the server action so the
+ * two cannot drift.
+ *
+ * '' (nothing picked yet) counts as required: that is true of two of the three
+ * types, so the field does not advertise itself as optional and then tighten.
+ */
+export function canvaLinkRequired(type: CanvaRequestType | '' | null | undefined): boolean {
+  return type !== 'new_build'
+}

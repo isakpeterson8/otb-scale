@@ -7,7 +7,7 @@ import { getStudioId } from '@/app/actions/_shared'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
 import { graduateBlockedRoute } from '@/lib/features'
 import { getDesignerEmails, isDesignerEmail } from '@/lib/designer'
-import { canvaTypeLabel, isCanvaRequestType } from '@/lib/canva-requests'
+import { canvaTypeLabel, isCanvaRequestType, canvaLinkRequired } from '@/lib/canva-requests'
 import type { CanvaRequestType } from '@/types/database'
 import { Resend } from 'resend'
 
@@ -29,11 +29,12 @@ export interface CanvaRequest {
   request_type: CanvaRequestType | null
   asset_type: string
   instructions: string
-  canva_link: string
+  /** Null on new_build requests — there is no existing Canva project to link. */
+  canva_link: string | null
   reference_url: string | null
   /**
-   * The "My AI flyer is not generated" attestation. Required to submit, so
-   * false only on requests that predate the checkbox.
+   * The "My AI flyer is not generated" attestation. Optional, so false means
+   * the member left it unticked, or the request predates the checkbox.
    */
   ai_flyer_not_generated: boolean
   status: 'pending' | 'in_progress' | 'complete'
@@ -53,7 +54,7 @@ export async function submitCanvaRequest(formData: {
   request_type: CanvaRequestType
   asset_type: string
   instructions: string
-  canva_link: string
+  canva_link?: string
   reference_url?: string
   ai_flyer_not_generated: boolean
 }): Promise<{ error?: string }> {
@@ -66,8 +67,13 @@ export async function submitCanvaRequest(formData: {
   if (!isCanvaRequestType(formData.request_type)) {
     return { error: 'Please select a request type.' }
   }
-  if (formData.ai_flyer_not_generated !== true) {
-    return { error: 'Please confirm your AI flyer is not generated.' }
+
+  // ai_flyer_not_generated is deliberately unvalidated — it is an optional
+  // attestation, so an unticked box is a legitimate submission.
+
+  const canvaLink = formData.canva_link?.trim() || null
+  if (canvaLinkRequired(formData.request_type) && !canvaLink) {
+    return { error: 'A link to your Canva project is required for this request type.' }
   }
 
   // Same boundary the proxy enforces on /canva-edits: route gating alone
@@ -84,7 +90,7 @@ export async function submitCanvaRequest(formData: {
     request_type: formData.request_type,
     asset_type: formData.asset_type,
     instructions: formData.instructions,
-    canva_link: formData.canva_link,
+    canva_link: canvaLink,
     reference_url: formData.reference_url?.trim() || null,
     ai_flyer_not_generated: formData.ai_flyer_not_generated,
   })
@@ -112,7 +118,7 @@ export async function submitCanvaRequest(formData: {
         `Request type: ${typeLabel}`,
         `Asset type: ${formData.asset_type}`,
         `Instructions: ${formData.instructions}`,
-        `Canva link: ${formData.canva_link}`,
+        `Canva link: ${canvaLink ?? '— (new build, no existing project)'}`,
         `AI flyer not generated: ${formData.ai_flyer_not_generated ? 'Yes' : 'No'}`,
         `Submitted: ${submittedAt}`,
         ``,
@@ -135,7 +141,11 @@ export async function submitCanvaRequest(formData: {
             <tr><td style="padding:4px 0;color:#6b7280;">Request type</td><td>${esc(typeLabel)}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;">Asset type</td><td>${esc(formData.asset_type)}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;vertical-align:top;">Instructions</td><td>${esc(formData.instructions)}</td></tr>
-            <tr><td style="padding:4px 0;color:#6b7280;">Canva link</td><td><a href="${esc(formData.canva_link)}" style="color:#0284a8;">${esc(formData.canva_link)}</a></td></tr>
+            <tr><td style="padding:4px 0;color:#6b7280;">Canva link</td><td>${
+              canvaLink
+                ? `<a href="${esc(canvaLink)}" style="color:#0284a8;">${esc(canvaLink)}</a>`
+                : '<span style="color:#9ca3af;">— new build, no existing project</span>'
+            }</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;">AI flyer not generated</td><td>${formData.ai_flyer_not_generated ? 'Yes' : 'No'}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;">Submitted</td><td>${submittedAt}</td></tr>
           </table>
