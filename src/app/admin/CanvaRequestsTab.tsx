@@ -60,15 +60,20 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
           </span>
         </td>
         <td className="px-4 py-3">
-          <a
-            href={request.canva_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            className="text-xs text-[var(--accent-text)] hover:underline"
-          >
-            Open link
-          </a>
+          {request.canva_link ? (
+            <a
+              href={request.canva_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="text-xs text-[var(--accent-text)] hover:underline"
+            >
+              Open link
+            </a>
+          ) : (
+            // new_build requests have no existing project to open.
+            <span className="text-xs text-[var(--ink-3)]">—</span>
+          )}
         </td>
         <td className="px-4 py-3">
           <span

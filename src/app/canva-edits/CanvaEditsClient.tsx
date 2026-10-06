@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { submitCanvaRequest } from '@/app/actions/canva-edits'
 import type { CanvaRequest } from '@/app/actions/canva-edits'
 import type { CanvaRequestType } from '@/types/database'
-import { CANVA_TYPE_OPTIONS, canvaTypeLabel } from '@/lib/canva-requests'
+import { CANVA_TYPE_OPTIONS, canvaTypeLabel, canvaLinkRequired } from '@/lib/canva-requests'
 import RequestTypePicker from '@/components/ui/RequestTypePicker'
 import { formatDate } from '@/lib/utils'
 
@@ -41,9 +41,16 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [requests, setRequests] = useState<CanvaRequest[]>(existingRequests)
 
+  // A brand-new flyer has no Canva project yet, so new_build may omit the link.
+  const linkRequired = canvaLinkRequired(requestType)
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!requestType) { setError('Please select a request type.'); return }
+    if (linkRequired && !canvaLink.trim()) {
+      setError('A link to your Canva project is required for this request type.')
+      return
+    }
     setError(null)
     startTransition(async () => {
       const result = await submitCanvaRequest({
@@ -120,9 +127,12 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[var(--ink-3)]">Paste your Canva edit link</label>
+          <label className="text-xs font-medium text-[var(--ink-3)]">
+            Paste your Canva edit link{' '}
+            {!linkRequired && <span className="opacity-50 font-normal">(optional)</span>}
+          </label>
           <input
-            required
+            required={linkRequired}
             type="url"
             value={canvaLink}
             onChange={e => setCanvaLink(e.target.value)}
@@ -187,9 +197,11 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
           </p>
         )}
 
+        {/* aiNotGenerated is deliberately not in the disabled check: it is an
+            optional attestation, not a gate like the two checkboxes above it. */}
         <button
           type="submit"
-          disabled={isPending || !requestType || !confirmed || !sharedAccess || !aiNotGenerated}
+          disabled={isPending || !requestType || !confirmed || !sharedAccess}
           className="self-start px-5 py-2.5 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
           style={{ background: 'var(--accent-text)', color: 'var(--canvas)' }}
         >
