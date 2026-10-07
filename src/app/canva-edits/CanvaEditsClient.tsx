@@ -186,7 +186,7 @@ export default function CanvaEditsClient({ existingRequests }: Props) {
             className="mt-0.5 shrink-0 accent-[var(--accent-text)]"
           />
           <span className="text-xs text-[var(--ink-3)] leading-relaxed">
-            My AI flyer is not generated
+            My flyer is not AI generated
           </span>
         </label>
 
