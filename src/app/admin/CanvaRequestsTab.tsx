@@ -120,7 +120,7 @@ function CanvaRequestRow({ request }: { request: AdminCanvaRequest }) {
                 rather than as a ninth column, which would read "Yes" on every
                 row submitted after the checkbox shipped. */}
             <p className="text-xs mt-2">
-              <span className="text-[var(--ink-3)]">AI flyer not generated: </span>
+              <span className="text-[var(--ink-3)]">Flyer is not AI generated: </span>
               <span className={request.ai_flyer_not_generated ? 'text-[var(--ink-2)]' : 'text-[var(--ink-3)] italic'}>
                 {request.ai_flyer_not_generated ? 'Yes' : 'Not confirmed'}
               </span>

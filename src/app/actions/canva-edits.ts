@@ -33,7 +33,7 @@ export interface CanvaRequest {
   canva_link: string | null
   reference_url: string | null
   /**
-   * The "My AI flyer is not generated" attestation. Optional, so false means
+   * The "My flyer is not AI generated" attestation. Optional, so false means
    * the member left it unticked, or the request predates the checkbox.
    */
   ai_flyer_not_generated: boolean
@@ -119,7 +119,7 @@ export async function submitCanvaRequest(formData: {
         `Asset type: ${formData.asset_type}`,
         `Instructions: ${formData.instructions}`,
         `Canva link: ${canvaLink ?? '— (new build, no existing project)'}`,
-        `AI flyer not generated: ${formData.ai_flyer_not_generated ? 'Yes' : 'No'}`,
+        `Flyer is not AI generated: ${formData.ai_flyer_not_generated ? 'Yes' : 'No'}`,
         `Submitted: ${submittedAt}`,
         ``,
         `Review: https://studio.outsidethebachs.com/admin/requests/canva`,
@@ -146,7 +146,7 @@ export async function submitCanvaRequest(formData: {
                 ? `<a href="${esc(canvaLink)}" style="color:#0284a8;">${esc(canvaLink)}</a>`
                 : '<span style="color:#9ca3af;">— new build, no existing project</span>'
             }</td></tr>
-            <tr><td style="padding:4px 0;color:#6b7280;">AI flyer not generated</td><td>${formData.ai_flyer_not_generated ? 'Yes' : 'No'}</td></tr>
+            <tr><td style="padding:4px 0;color:#6b7280;">Flyer is not AI generated</td><td>${formData.ai_flyer_not_generated ? 'Yes' : 'No'}</td></tr>
             <tr><td style="padding:4px 0;color:#6b7280;">Submitted</td><td>${submittedAt}</td></tr>
           </table>
           <div style="margin-top:24px;">
