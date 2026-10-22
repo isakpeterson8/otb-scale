@@ -51,6 +51,27 @@ export async function setMyWorkPlanTaskStatus(
   return done()
 }
 
+// ── Moving a step to another week ────────────────────────────────────────────
+
+/**
+ * Any non-recurring step, coach-set included, into Week 1-6. The RPC rejects
+ * other targets and recurring steps, and writes only the group and week.
+ */
+export async function moveMyWorkPlanTask(
+  taskId: string,
+  targetGroup: string,
+): Promise<Result> {
+  const { ctx, error } = await memberContext()
+  if (!ctx) return { error }
+
+  const { error: rpcError } = await ctx.supabase.rpc('move_client_work_plan_task', {
+    p_task_id: taskId,
+    p_target_group: targetGroup,
+  })
+  if (rpcError) return { error: rpcError.message }
+  return done()
+}
+
 // ── Checklist ────────────────────────────────────────────────────────────────
 
 export async function setMyWorkPlanTaskItemDone(

@@ -38,11 +38,21 @@ export const CLIENT_TASK_ITEM_COLUMNS =
  */
 export const BRAIN_DUMP_GROUP = 'Brain dump'
 
-export const TIMEFRAME_ORDER = [
-  BRAIN_DUMP_GROUP,
-  'Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6',
-  'Weekly', 'Monthly', 'Semester',
-]
+/** The launch-sprint weeks — also the only targets a member may move a step to. */
+export const WEEK_GROUPS = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6']
+
+/** Recurring cadences. Steps here stay put: they have no single week. */
+export const RECURRING_GROUPS = ['Weekly', 'Monthly', 'Semester']
+
+export const TIMEFRAME_ORDER = [BRAIN_DUMP_GROUP, ...WEEK_GROUPS, ...RECURRING_GROUPS]
+
+/**
+ * Whether a member may move this step to another week. Mirrors the refusal in
+ * move_client_work_plan_task, which is the real gate.
+ */
+export function canMoveToWeek(task: Pick<WorkPlanTaskShape, 'timeframe_group' | 'is_recurring'>): boolean {
+  return !task.is_recurring && !RECURRING_GROUPS.includes(task.timeframe_group)
+}
 
 /**
  * Standard groups in fixed order, then custom groups. Unrecognised groups sort
