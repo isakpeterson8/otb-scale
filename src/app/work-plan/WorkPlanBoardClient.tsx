@@ -11,8 +11,12 @@
  *               detail in a bottom sheet whose Move-to buttons replace dragging.
  *
  * Every write goes through a server action wrapping a SECURITY DEFINER RPC. The
- * member may: move any task, tick any checklist item, write their own note, and
+ * member may: move any task between columns, move any non-recurring task to
+ * another week (Week 1-6), tick any checklist item, write their own note, and
  * create / edit / delete only tasks they added themselves.
+ *
+ * Moving between weeks is a menu, never a drag: dragging already means "change
+ * column", and one gesture with two meanings would misfire.
  */
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
@@ -23,13 +27,13 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import {
-  createMyWorkPlanTask, deleteMyWorkPlanTask, setMyWorkPlanTaskClientNote,
+  createMyWorkPlanTask, deleteMyWorkPlanTask, moveMyWorkPlanTask, setMyWorkPlanTaskClientNote,
   setMyWorkPlanTaskItemDone, setMyWorkPlanTaskStatus, updateMyWorkPlanTask,
 } from '@/app/actions/work-plan-board'
 import Toast, { useToast } from '@/components/ui/Toast'
 import {
-  BRAIN_DUMP_GROUP, completionPercent, groupTasksByTimeframe, linkLabel,
-  orderTimeframeGroups, TIMEFRAME_ORDER,
+  BRAIN_DUMP_GROUP, canMoveToWeek, completionPercent, groupTasksByTimeframe, linkLabel,
+  orderTimeframeGroups, TIMEFRAME_ORDER, WEEK_GROUPS,
 } from '@/lib/work-plans'
 import {
   CATEGORY_TAGS, TASK_STATUSES,
@@ -69,13 +73,51 @@ const INPUT =
   'w-full px-3 py-2 rounded-lg border border-[var(--border-s)] bg-[var(--canvas)] text-sm ' +
   'text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
 
+type MoveWeek = (task: Task, group: string) => void
+
+/** Provisional rows have no server id yet, so nothing can act on them. */
+function isProvisional(task: Task) {
+  return task.id.startsWith('temp-')
+}
+
+// ── Move to week ─────────────────────────────────────────────────────────────
+
+/**
+ * A native select so phones get their own picker. It sits inside a draggable,
+ * clickable card, so every event that would start a drag or open the detail
+ * sheet is stopped here.
+ */
+function MoveWeekSelect({ task, onMoveWeek }: { task: Task; onMoveWeek: MoveWeek }) {
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation()
+  return (
+    <select
+      value=""
+      onChange={e => { if (e.target.value) onMoveWeek(task, e.target.value) }}
+      onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop} onKeyDown={stop}
+      aria-label={`Move "${task.title}" to another week`}
+      className={[
+        'shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface-2)] cursor-pointer',
+        'px-2 py-1.5 md:py-0.5 text-[11px] text-[var(--ink-2)]',
+        'focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]',
+      ].join(' ')}
+    >
+      <option value="" disabled hidden>Move week</option>
+      {WEEK_GROUPS.filter(g => g !== task.timeframe_group).map(g => (
+        <option key={g} value={g} className="bg-[var(--surface)]">{g}</option>
+      ))}
+    </select>
+  )
+}
+
 // ── Card ─────────────────────────────────────────────────────────────────────
 
 function CardShell({
-  task, onOpen, dragging = false,
+  task, onOpen, onMoveWeek, dragging = false,
 }: {
   task: Task
   onOpen?: (task: Task) => void
+  /** Absent under View As and on the drag overlay. */
+  onMoveWeek?: MoveWeek
   dragging?: boolean
 }) {
   const itemsDone = task.items.filter(i => i.is_done).length
@@ -96,6 +138,9 @@ function CardShell({
         ].join(' ')}>
           {task.title}
         </p>
+        {onMoveWeek && canMoveToWeek(task) && !isProvisional(task) && (
+          <MoveWeekSelect task={task} onMoveWeek={onMoveWeek} />
+        )}
         <svg
           width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden
           className="shrink-0 mt-0.5 text-[var(--ink-3)] md:hidden"
@@ -129,7 +174,13 @@ function CardShell({
   )
 }
 
-function DraggableCard({ task, onOpen }: { task: Task; onOpen: (task: Task) => void }) {
+function DraggableCard({
+  task, onOpen, onMoveWeek,
+}: {
+  task: Task
+  onOpen: (task: Task) => void
+  onMoveWeek?: MoveWeek
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
   return (
     <div
@@ -139,7 +190,7 @@ function DraggableCard({ task, onOpen }: { task: Task; onOpen: (task: Task) => v
       style={{ touchAction: 'manipulation' }}
       className={isDragging ? 'opacity-40 cursor-grabbing' : 'cursor-grab'}
     >
-      <CardShell task={task} onOpen={onOpen} />
+      <CardShell task={task} onOpen={onOpen} onMoveWeek={onMoveWeek} />
     </div>
   )
 }
@@ -200,13 +251,14 @@ function GroupedTasks({
 }
 
 function DesktopColumn({
-  status, tasks, isExpanded, onToggleGroup, onOpen,
+  status, tasks, isExpanded, onToggleGroup, onOpen, onMoveWeek,
 }: {
   status: WorkPlanTaskStatus
   tasks: Task[]
   isExpanded: (status: WorkPlanTaskStatus, group: string) => boolean
   onToggleGroup: (status: WorkPlanTaskStatus, group: string, next: boolean) => void
   onOpen: (task: Task) => void
+  onMoveWeek?: MoveWeek
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` })
   const style = STATUS_STYLE[status]
@@ -229,7 +281,7 @@ function DesktopColumn({
           tasks={tasks}
           isExpanded={isExpanded}
           onToggleGroup={onToggleGroup}
-          renderCard={task => <DraggableCard key={task.id} task={task} onOpen={onOpen} />}
+          renderCard={task => <DraggableCard key={task.id} task={task} onOpen={onOpen} onMoveWeek={onMoveWeek} />}
         />
       </div>
     </section>
@@ -441,13 +493,14 @@ function TaskEditorSheet({
 // ── Detail sheet / drawer ────────────────────────────────────────────────────
 
 function TaskSheet({
-  task, viewOnly, pending, educationTitles, onMove, onToggleItem, onEdit, onClose,
+  task, viewOnly, pending, educationTitles, onMove, onMoveWeek, onToggleItem, onEdit, onClose,
 }: {
   task: Task
   viewOnly: boolean
   pending: boolean
   educationTitles: Record<string, string>
   onMove: (task: Task, status: WorkPlanTaskStatus) => void
+  onMoveWeek: MoveWeek
   onToggleItem: (task: Task, item: ClientWorkPlanTaskItem) => void
   onEdit: (task: Task) => void
   onClose: () => void
@@ -549,6 +602,24 @@ function TaskSheet({
           )}
 
           <ClientNotes task={task} disabled={viewOnly} />
+
+          {!viewOnly && canMoveToWeek(task) && (
+            <div className="pt-2 border-t border-[var(--border)] space-y-2">
+              <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">Move to week</p>
+              <div className="grid grid-cols-3 gap-2">
+                {WEEK_GROUPS.filter(g => g !== task.timeframe_group).map(g => (
+                  <button
+                    key={g}
+                    disabled={pending}
+                    onClick={() => onMoveWeek(task, g)}
+                    className="py-2.5 rounded-xl text-sm border border-[var(--border)] bg-[var(--surface)] text-[var(--ink-2)] hover:border-[var(--border-s)] transition-colors disabled:cursor-not-allowed min-h-[44px]"
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="pt-2 border-t border-[var(--border)] space-y-2">
             <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">Move to</p>
@@ -685,6 +756,20 @@ export default function WorkPlanBoardClient({
     )
   }
 
+  function moveWeek(task: Task, target: string) {
+    if (task.timeframe_group === target) return
+    // Open the destination group, or the card would vanish into a collapsed one.
+    groupOverrides[`${task.status}:${target}`] = true
+    setOverrides({ ...groupOverrides })
+    run(
+      () => setTasks(ts => ts.map(t => (
+        t.id === task.id ? { ...t, timeframe_group: target, week_number: Number(target.slice(5)) } : t
+      ))),
+      () => moveMyWorkPlanTask(task.id, target),
+      `Moved to ${target}`,
+    )
+  }
+
   function toggleItem(task: Task, item: ClientWorkPlanTaskItem) {
     const next = !item.is_done
     run(
@@ -699,7 +784,7 @@ export default function WorkPlanBoardClient({
 
   /** Provisional rows have no server id yet, so they are not openable. */
   function openTask(task: Task) {
-    if (task.id.startsWith('temp-')) return
+    if (isProvisional(task)) return
     setOpen(task)
   }
 
@@ -727,6 +812,7 @@ export default function WorkPlanBoardClient({
           isExpanded={isExpanded}
           onToggleGroup={onToggleGroup}
           onOpen={openTask}
+          onMoveWeek={viewOnly ? undefined : moveWeek}
         />
       ))}
     </div>
@@ -828,7 +914,9 @@ export default function WorkPlanBoardClient({
                 tasks={byStatus(activeTab)}
                 isExpanded={isExpanded}
                 onToggleGroup={onToggleGroup}
-                renderCard={task => <CardShell key={task.id} task={task} onOpen={openTask} />}
+                renderCard={task => (
+                  <CardShell key={task.id} task={task} onOpen={openTask} onMoveWeek={viewOnly ? undefined : moveWeek} />
+                )}
               />
             </div>
           </div>
@@ -854,6 +942,7 @@ export default function WorkPlanBoardClient({
           pending={isPending}
           educationTitles={educationTitles}
           onMove={(task, status) => moveTask(task, status, true)}
+          onMoveWeek={moveWeek}
           onToggleItem={toggleItem}
           onEdit={task => { setOpen(null); setEditing(task) }}
           onClose={() => setOpen(null)}
