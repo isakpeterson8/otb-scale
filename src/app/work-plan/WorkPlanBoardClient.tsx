@@ -82,16 +82,33 @@ function isProvisional(task: Task) {
 
 // ── Move to week ─────────────────────────────────────────────────────────────
 
+/** Done steps have nowhere useful to go, so the week control is not offered. */
+function showMoveWeek(task: Task) {
+  return task.status !== 'done' && canMoveToWeek(task) && !isProvisional(task)
+}
+
 /**
- * A native select so phones get their own picker. It sits inside a draggable,
- * clickable card, so every event that would start a drag or open the detail
- * sheet is stopped here.
+ * A native select so phones get their own picker. On a card it sits inside a
+ * draggable, clickable element, so every event that would start a drag or open
+ * the detail sheet is stopped here.
+ *
+ * `revealOnHover` (cards): with a fine pointer it stays invisible until the
+ * card is hovered or anything in it has focus — still in the tab order, so
+ * keyboard users reach it. Touch devices have no hover, so it always shows.
  */
-function MoveWeekSelect({ task, onMoveWeek }: { task: Task; onMoveWeek: MoveWeek }) {
+function MoveWeekSelect({
+  task, onMoveWeek, disabled = false, revealOnHover = false,
+}: {
+  task: Task
+  onMoveWeek: MoveWeek
+  disabled?: boolean
+  revealOnHover?: boolean
+}) {
   const stop = (e: React.SyntheticEvent) => e.stopPropagation()
   return (
     <select
       value=""
+      disabled={disabled}
       onChange={e => { if (e.target.value) onMoveWeek(task, e.target.value) }}
       onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop} onKeyDown={stop}
       aria-label={`Move "${task.title}" to another week`}
@@ -99,6 +116,10 @@ function MoveWeekSelect({ task, onMoveWeek }: { task: Task; onMoveWeek: MoveWeek
         'shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface-2)] cursor-pointer',
         'px-2 py-1.5 md:py-0.5 text-[11px] text-[var(--ink-2)]',
         'focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]',
+        'disabled:cursor-not-allowed disabled:opacity-60',
+        revealOnHover
+          ? 'transition-opacity [@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+          : '',
       ].join(' ')}
     >
       <option value="" disabled hidden>Move week</option>
@@ -126,7 +147,7 @@ function CardShell({
     <div
       onClick={onOpen ? () => onOpen(task) : undefined}
       className={[
-        'w-full rounded-xl border p-3 transition-colors cursor-pointer',
+        'group w-full rounded-xl border p-3 transition-colors cursor-pointer',
         'bg-[var(--surface)] md:bg-[var(--canvas)]',
         dragging ? 'border-[var(--accent-text)] shadow-lg' : 'border-[var(--border)] hover:border-[var(--border-s)]',
       ].join(' ')}
@@ -138,8 +159,8 @@ function CardShell({
         ].join(' ')}>
           {task.title}
         </p>
-        {onMoveWeek && canMoveToWeek(task) && !isProvisional(task) && (
-          <MoveWeekSelect task={task} onMoveWeek={onMoveWeek} />
+        {onMoveWeek && showMoveWeek(task) && (
+          <MoveWeekSelect task={task} onMoveWeek={onMoveWeek} revealOnHover />
         )}
         <svg
           width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden
@@ -188,7 +209,8 @@ function DraggableCard({
       {...attributes}
       {...listeners}
       style={{ touchAction: 'manipulation' }}
-      className={isDragging ? 'opacity-40 cursor-grabbing' : 'cursor-grab'}
+      // `group` here too: keyboard focus lands on this wrapper, not the card.
+      className={isDragging ? 'group opacity-40 cursor-grabbing' : 'group cursor-grab'}
     >
       <CardShell task={task} onOpen={onOpen} onMoveWeek={onMoveWeek} />
     </div>
@@ -603,26 +625,13 @@ function TaskSheet({
 
           <ClientNotes task={task} disabled={viewOnly} />
 
-          {!viewOnly && canMoveToWeek(task) && (
-            <div className="pt-2 border-t border-[var(--border)] space-y-2">
-              <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">Move to week</p>
-              <div className="grid grid-cols-3 gap-2">
-                {WEEK_GROUPS.filter(g => g !== task.timeframe_group).map(g => (
-                  <button
-                    key={g}
-                    disabled={pending}
-                    onClick={() => onMoveWeek(task, g)}
-                    className="py-2.5 rounded-xl text-sm border border-[var(--border)] bg-[var(--surface)] text-[var(--ink-2)] hover:border-[var(--border-s)] transition-colors disabled:cursor-not-allowed min-h-[44px]"
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="pt-2 border-t border-[var(--border)] space-y-2">
-            <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">Move to</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-[var(--ink-2)] uppercase tracking-wide">Move to</p>
+              {!viewOnly && showMoveWeek(task) && (
+                <MoveWeekSelect task={task} onMoveWeek={onMoveWeek} disabled={pending} />
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-2">
               {TASK_STATUSES.map(({ value }) => {
                 const s = STATUS_STYLE[value]
