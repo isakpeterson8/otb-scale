@@ -93,6 +93,16 @@ function TaskRow({
               Added by client
             </span>
           )}
+          {/* Set only by the member's move RPC, on the first move. Staff moves
+              never write it, so this always means "the client rescheduled it". */}
+          {task.original_timeframe_group && task.original_timeframe_group !== task.timeframe_group && (
+            <span
+              className="px-1.5 py-0.5 rounded-full text-xs"
+              style={{ background: 'var(--amber-l)', color: 'var(--amber)' }}
+            >
+              Moved from {task.original_timeframe_group}
+            </span>
+          )}
           {task.is_recurring && (
             <span className="px-1.5 py-0.5 rounded-full text-xs bg-white/8 text-[var(--ink-3)]">
               recurring{task.starts_after_week ? ` · after wk ${task.starts_after_week}` : ''}

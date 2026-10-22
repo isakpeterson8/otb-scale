@@ -570,6 +570,8 @@ export interface WorkPlanTask extends WorkPlanTaskShape {
   is_client_added: boolean
   created_by: string | null
   template_task_id: string | null
+  /** The group before the member first moved it; null if never moved. Staff-only. */
+  original_timeframe_group: string | null
 }
 
 /** A checklist item on a per-client task. Members may toggle is_done, nothing else. */
@@ -609,7 +611,7 @@ export interface WorkPlanTemplateTaskItem {
 // CLIENT_TASK_COLUMNS / CLIENT_PLAN_COLUMNS constants in lib/work-plans.ts.
 
 export type ClientWorkPlanTask =
-  Omit<WorkPlanTask, 'internal_note' | 'done_by' | 'created_by' | 'template_task_id'>
+  Omit<WorkPlanTask, 'internal_note' | 'done_by' | 'created_by' | 'template_task_id' | 'original_timeframe_group'>
 
 export type ClientWorkPlan = Omit<WorkPlan, 'studio_id' | 'template_id' | 'created_by'>
 
