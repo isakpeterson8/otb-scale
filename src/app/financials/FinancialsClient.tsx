@@ -120,27 +120,44 @@ function parseForm(f: FormState): Omit<StudioSnapshot, 'id' | 'studio_id' | 'cre
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
 const labelCls = 'block text-xs text-[var(--ink-3)] mb-1'
 
+function SectionHeader({ title, hint }: { title: string; hint: string }) {
+  return (
+    <>
+      <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-3)] mb-1 pb-1.5 border-b border-[var(--ink)]/8">
+        {title}
+      </p>
+      <p className="text-xs text-[var(--ink-3)] leading-relaxed mb-2">{hint}</p>
+    </>
+  )
+}
+
 function Field({
   label,
+  hint,
   value,
   onChange,
   placeholder = '',
 }: {
   label: string
+  hint?: string
   value: string
   onChange: (v: string) => void
   placeholder?: string
 }) {
   return (
-    <div>
-      <label className={labelCls}>{label}</label>
+    // flex-col + mt-auto keeps inputs aligned across a row when hints wrap to different heights
+    <div className="flex flex-col">
+      <label className={hint ? 'block text-xs text-[var(--ink-3)]' : labelCls}>{label}</label>
+      {hint && (
+        <p className="text-[11px] leading-snug text-[var(--ink-3)] mb-1">{hint}</p>
+      )}
       <input
         type="text"
         inputMode="decimal"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className={inputCls}
+        className={`${inputCls} mt-auto`}
       />
     </div>
   )
@@ -239,9 +256,7 @@ function SnapshotModal({
           </p>
 
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-3)] mb-2 pb-1.5 border-b border-[var(--ink)]/8">
-              Enrollment
-            </p>
+            <SectionHeader title="Enrollment" hint="Total active students on the last day of the month" />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Current Enrollment (number of students)" value={form.enrollment} onChange={v => set('enrollment', v)} placeholder="—" />
               <Field label="Booked Hours" value={form.booked_hrs} onChange={v => set('booked_hrs', v)} placeholder="—" />
@@ -251,22 +266,18 @@ function SnapshotModal({
           </div>
 
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-3)] mb-2 pb-1.5 border-b border-[var(--ink)]/8">
-              Pipeline
-            </p>
+            <SectionHeader title="Pipeline" hint="Total activity for the month" />
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Leads" value={form.leads} onChange={v => set('leads', v)} placeholder="—" />
-              <Field label="Consults" value={form.consults} onChange={v => set('consults', v)} placeholder="—" />
-              <Field label="Possible Registrations" value={form.poss_reg} onChange={v => set('poss_reg', v)} placeholder="—" />
-              <Field label="New Enrollments" value={form.new_enrollments} onChange={v => set('new_enrollments', v)} placeholder="—" />
-              <Field label="Disenrollments" value={form.disenrollments} onChange={v => set('disenrollments', v)} placeholder="—" />
+              <Field label="Leads" hint="Total leads added this month" value={form.leads} onChange={v => set('leads', v)} placeholder="—" />
+              <Field label="Consults" hint="Total consultations that happened this month" value={form.consults} onChange={v => set('consults', v)} placeholder="—" />
+              <Field label="Possible Registrations" hint="Consults that were a good fit" value={form.poss_reg} onChange={v => set('poss_reg', v)} placeholder="—" />
+              <Field label="New Enrollments" hint="Students who signed up and paid this month" value={form.new_enrollments} onChange={v => set('new_enrollments', v)} placeholder="—" />
+              <Field label="Disenrollments" hint="Students who left this month, including pauses" value={form.disenrollments} onChange={v => set('disenrollments', v)} placeholder="—" />
             </div>
           </div>
 
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--ink-3)] mb-2 pb-1.5 border-b border-[var(--ink)]/8">
-              Revenue
-            </p>
+            <SectionHeader title="Revenue" hint="Total for the month" />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Collected Revenue ($)" value={form.collected_revenue} onChange={v => set('collected_revenue', v)} placeholder="—" />
               <Field label="Expenses ($)" value={form.expenses} onChange={v => set('expenses', v)} placeholder="—" />
