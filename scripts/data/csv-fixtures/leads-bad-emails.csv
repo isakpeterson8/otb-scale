@@ -1,0 +1,5 @@
+name,email,phone,source,status,notes
+Good Email,good@example.com,,Referral,,
+Bad One,not-an-email,,Referral,,
+Bad Two,a@b,,Referral,,
+,missing.name@example.com,,Referral,,name is required

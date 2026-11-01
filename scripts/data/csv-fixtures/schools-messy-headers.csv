@@ -1,0 +1,6 @@
+School,Town,ST,Type,Contact,Role,Email Address,Phone,Primary?,Pipeline Stage,Lead Source
+Roosevelt Middle,Springfield,IL,Middle,Pat Lee,Principal,pat.lee@roosevelt.example,555-1001,,Visit Offered,District list
+roosevelt middle , springfield,il,,Chris Wu,Band Director,chris.wu@roosevelt.example,555-1002,Yes,,
+Roosevelt Middle,Springfield,IL,,Jo Kim,Orchestra Teacher,jo.kim@roosevelt.example,,no,,
+Garfield High,Shelbyville,IL,High,,,front.office@garfield.example,,,mystery stage,
+Hayes K-8,Springfield,IL,K-8,,,,,,,

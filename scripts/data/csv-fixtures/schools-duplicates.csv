@@ -1,0 +1,4 @@
+school_name,city,state,school_type,source,status,contact_name,contact_title,contact_email,contact_phone,is_primary,notes
+Lincoln Elementary,Springfield,IL,,,,Ms. J,Music Teacher,j@x.edu,,,already a contact (match by email)
+LINCOLN ELEMENTARY,springfield,il,,,,New Person,Choir Director,new.person@lincoln.example,,yes,new contact for existing school
+Brand New School,Capital City,IL,Elementary,Referral,Lead,Ann Fox,Principal,ann.fox@new.example,,,

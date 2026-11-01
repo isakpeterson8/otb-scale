@@ -230,6 +230,7 @@ export type LeadSource =
   | 'inbound_online'
   | 'referral'
   | 'organic_outreach'
+  | 'csv_import'
 
 export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
   { value: 'facebook_group', label: 'Facebook Group' },
@@ -237,6 +238,7 @@ export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
   { value: 'inbound_online', label: 'Inbound Online' },
   { value: 'referral', label: 'Referral' },
   { value: 'organic_outreach', label: 'Organic Outreach' },
+  { value: 'csv_import', label: 'CSV Import' },
 ]
 
 export type LeadSubSource = 'self_promo' | 'third_party'

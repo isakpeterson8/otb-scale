@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import CsvImport from '@/components/csv-import/CsvImport'
+import { SCHOOLS_IMPORT } from '@/lib/csv-import/configs'
 import { createSchoolOutreach, updateSchoolOutreach, deleteSchoolOutreach } from '@/app/actions/school-outreach'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast, { useToast } from '@/components/ui/Toast'
@@ -522,7 +525,8 @@ function TemplateViewerModal({
 }
 
 export default function SchoolOutreachClient({ schools, facets, enrollments, settings }: Props) {
-  const { view, isDefault } = useListView(SCHOOLS_VIEW)
+  const { view, isDefault, reset } = useListView(SCHOOLS_VIEW)
+  const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   // Stored by id and looked up in `schools`, so the edit view re-renders with
   // fresh contacts after each add/edit/delete revalidates the page.
@@ -660,6 +664,8 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
           >
             Browse Templates
           </a>
+          {/* After an import, jump to Date added, newest so the new rows are on top. */}
+          <CsvImport config={SCHOOLS_IMPORT} onImported={() => { reset(); router.refresh() }} />
           <button
             onClick={() => { setEditSchoolId(null); setShowForm(true) }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"

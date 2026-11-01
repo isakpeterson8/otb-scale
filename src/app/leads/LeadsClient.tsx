@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatDate, daysAgo } from '@/lib/utils'
 import { createContact, updateContact, deleteContact } from '@/app/actions/contacts'
 import { createOrganicOutreach, updateOrganicOutreach, deleteOrganicOutreach } from '@/app/actions/organic-outreach'
@@ -11,6 +12,8 @@ import GroupedList from '@/components/ui/GroupedList'
 import { useListView } from '@/hooks/useListView'
 import { NONE_VALUE, sourceChipOptions, statusChipOptions, type ListFacets } from '@/lib/list-view'
 import { LEADS_VIEW } from '@/lib/list-view-configs'
+import CsvImport from '@/components/csv-import/CsvImport'
+import { LEADS_IMPORT } from '@/lib/csv-import/configs'
 import LeadsTabBar from './LeadsTabBar'
 
 interface FacebookGroupOption {
@@ -427,7 +430,8 @@ function LeadsTab({
   facets: ListFacets
   facebookGroups: FacebookGroupOption[]
 }) {
-  const { view, isDefault } = useListView(LEADS_VIEW)
+  const { view, isDefault, reset } = useListView(LEADS_VIEW)
+  const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [editContact, setEditContact] = useState<Contact | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -453,6 +457,9 @@ function LeadsTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-3)]">{facets.total} total</p>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+        {/* After an import, jump to Date added, newest so the new rows are on top. */}
+        <CsvImport config={LEADS_IMPORT} onImported={() => { reset(); router.refresh() }} />
         <button
           onClick={() => { setEditContact(null); setShowForm(true) }}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"
@@ -462,6 +469,7 @@ function LeadsTab({
           </svg>
           Add lead
         </button>
+        </div>
       </div>
 
       <ListViewToolbar config={LEADS_VIEW} facets={facets} resultCount={contacts.length} />

@@ -1,0 +1,5 @@
+name,email,phone,source,status,notes
+Existing Person,Existing.Lead@Example.com,555-9999,Referral,Consultation Scheduled,Already in the account (different case)
+Twin One,twin@example.com,555-0201,Referral,To Be Contacted,first copy in file
+Twin Two,TWIN@example.com,555-0202,Referral,To Be Contacted,same email later in file
+No Email Person,,555-0203,Referral,,no email so never a duplicate
