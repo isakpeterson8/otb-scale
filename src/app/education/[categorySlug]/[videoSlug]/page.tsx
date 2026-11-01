@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import AppShell from '@/components/layout/AppShell'
 import UpgradeBanner from '@/components/UpgradeBanner'
@@ -6,6 +6,7 @@ import EducationClient from '../../EducationClient'
 import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
 import { getLibraryItems } from '@/app/actions/library'
+import { HIDDEN_LIBRARY_ITEM_IDS, excludeHiddenLibraryItems } from '@/lib/education-categories'
 
 export default async function VideoDeepLinkPage({
   params,
@@ -37,6 +38,12 @@ export default async function VideoDeepLinkPage({
     redirect('/education/videos?error=not-found')
   }
 
+  // Hidden items 404 for members (and admins in View As); admins can still open them.
+  const isHidden = HIDDEN_LIBRARY_ITEM_IDS.has(video.id)
+  if (isHidden && (ctx.viewOnly || !isAdmin)) {
+    notFound()
+  }
+
   if (!hasAccess) {
     return (
       <AppShell>
@@ -54,7 +61,7 @@ export default async function VideoDeepLinkPage({
     <AppShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <EducationClient
-          items={items ?? []}
+          items={isHidden ? (items ?? []) : excludeHiddenLibraryItems(items ?? [])}
           initialVideoId={video.id}
           initialCategorySlug={categorySlug}
         />

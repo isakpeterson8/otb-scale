@@ -6,6 +6,7 @@ import EducationClient from '../EducationClient'
 import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
 import { getLibraryItems } from '@/app/actions/library'
+import { excludeHiddenLibraryItems } from '@/lib/education-categories'
 
 export default async function EducationVideosPage({
   searchParams,
@@ -46,7 +47,7 @@ export default async function EducationVideosPage({
     <AppShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <EducationClient
-          items={items}
+          items={excludeHiddenLibraryItems(items)}
           errorParam={params?.error}
         />
       </main>
