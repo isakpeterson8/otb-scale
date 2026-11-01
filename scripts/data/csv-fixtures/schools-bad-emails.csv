@@ -1,0 +1,4 @@
+school_name,city,state,school_type,source,status,contact_name,contact_title,contact_email,contact_phone,is_primary,notes
+Polk Elementary,Springfield,IL,,,,Good Contact,,good@polk.example,,,
+Polk Elementary,Springfield,IL,,,,Bad Contact,,bad@@polk,,,
+,Springfield,IL,,,,No School,,x@y.example,,,

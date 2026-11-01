@@ -1,12 +1,19 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatDate, daysAgo } from '@/lib/utils'
 import { createContact, updateContact, deleteContact } from '@/app/actions/contacts'
 import { createOrganicOutreach, updateOrganicOutreach, deleteOrganicOutreach } from '@/app/actions/organic-outreach'
-import type { Contact, LeadStatus, OrganicOutreach, OutreachType, OutreachStatus } from '@/types/database'
+import type { Contact, LeadStatus, OrganicOutreach, OutreachType } from '@/types/database'
 import { LEAD_SOURCES, LEAD_STATUSES, LEAD_SUB_SOURCES, OUTREACH_TYPES, WAITLIST_STATUS } from '@/types/database'
-import FilterTabs from '@/components/ui/FilterTabs'
+import ListViewToolbar from '@/components/ui/ListViewToolbar'
+import GroupedList from '@/components/ui/GroupedList'
+import { useListView } from '@/hooks/useListView'
+import { NONE_VALUE, sourceChipOptions, statusChipOptions, type ListFacets } from '@/lib/list-view'
+import { LEADS_VIEW } from '@/lib/list-view-configs'
+import CsvImport from '@/components/csv-import/CsvImport'
+import { LEADS_IMPORT } from '@/lib/csv-import/configs'
 import LeadsTabBar from './LeadsTabBar'
 
 interface FacebookGroupOption {
@@ -16,7 +23,10 @@ interface FacebookGroupOption {
 }
 
 interface LeadsClientProps {
+  /** Already sorted/filtered by the server per the URL view. */
   contacts: Contact[]
+  /** Studio-wide counts per status/source, for chips and tab counts. */
+  facets: ListFacets
   facebookGroups: FacebookGroupOption[]
   outreachEntries: OrganicOutreach[]
   initialTab?: 'leads' | 'outreach'
@@ -411,36 +421,28 @@ function OutreachForm({
 
 // ── Leads Tab ─────────────────────────────────────────────────────────────────
 
-function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookGroups: FacebookGroupOption[] }) {
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<LeadStatus | 'all'>('all')
+function LeadsTab({
+  contacts,
+  facets,
+  facebookGroups,
+}: {
+  contacts: Contact[]
+  facets: ListFacets
+  facebookGroups: FacebookGroupOption[]
+}) {
+  const { view, isDefault, reset } = useListView(LEADS_VIEW)
+  const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [editContact, setEditContact] = useState<Contact | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  // Search first, then status — so the tab counts describe what each tab shows.
-  // Leads with no status (NULL) match no status tab but stay visible under All.
-  const searched = contacts.filter(c => {
-    const q = search.toLowerCase()
-    return (
-      c.name.toLowerCase().includes(q) ||
-      (c.email ?? '').toLowerCase().includes(q) ||
-      (c.phone ?? '').toLowerCase().includes(q)
-    )
-  })
-
-  const filtered =
-    filterStatus === 'all' ? searched : searched.filter(c => c.status === filterStatus)
-
-  const statusTabs = [
-    { value: 'all' as const, label: 'All', count: searched.length },
-    ...LEAD_STATUSES.map(({ value, label }) => ({
-      value,
-      label,
-      count: searched.filter(c => c.status === value).length,
-    })),
-  ]
+  const groupOf =
+    view.group === 'status' ? (c: Contact) => c.status ?? NONE_VALUE
+    : view.group === 'source' ? (c: Contact) => c.lead_source ?? NONE_VALUE
+    : null
+  const groupOptions = view.group === 'source' ? sourceChipOptions(LEADS_VIEW, facets) : statusChipOptions(LEADS_VIEW)
+  const groupLabel = (key: string) => groupOptions.find(o => o.value === key)?.label ?? key
 
   function handleDelete(id: string) {
     if (!confirm('Delete this lead? This cannot be undone.')) return
@@ -454,7 +456,10 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-[var(--ink-3)]">{contacts.length} total</p>
+        <p className="text-sm text-[var(--ink-3)]">{facets.total} total</p>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+        {/* After an import, jump to Date added, newest so the new rows are on top. */}
+        <CsvImport config={LEADS_IMPORT} onImported={() => { reset(); router.refresh() }} />
         <button
           onClick={() => { setEditContact(null); setShowForm(true) }}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"
@@ -464,24 +469,10 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
           </svg>
           Add lead
         </button>
+        </div>
       </div>
 
-      <div className="relative">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-3)]" aria-hidden>
-          <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
-        <input
-          type="search"
-          placeholder="Search leads…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[var(--ink)]/15 bg-[var(--surface)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
-        />
-      </div>
-
-      {/* Status filter tabs — second-level filter inside the Leads tab */}
-      <FilterTabs tabs={statusTabs} active={filterStatus} onChange={setFilterStatus} />
+      <ListViewToolbar config={LEADS_VIEW} facets={facets} resultCount={contacts.length} />
 
       {(showForm || editContact) && (
         <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
@@ -509,17 +500,22 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
       )}
 
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-        {filtered.length === 0 ? (
+        {contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <p className="text-sm text-[var(--ink-3)]">
-              {search || filterStatus !== 'all' ? 'No leads match this view.' : 'No leads yet.'}
+              {!isDefault ? 'No leads match this view.' : 'No leads yet.'}
             </p>
           </div>
         ) : (
+          <GroupedList
+            items={contacts}
+            groupOf={groupOf}
+            labelFor={groupLabel}
+            renderList={items => (
           <>
             {/* Mobile card list */}
             <div className="md:hidden divide-y divide-[var(--ink)]/6">
-              {filtered.map(contact => {
+              {items.map(contact => {
                 const sourceLabel = formatLeadSource(contact, facebookGroups)
                 return (
                   <div key={contact.id} className="flex items-center gap-3 px-4 py-3.5">
@@ -570,7 +566,7 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--ink)]/6">
-                  {filtered.map(contact => {
+                  {items.map(contact => {
                     const sourceLabel = formatLeadSource(contact, facebookGroups)
                     return (
                       <tr key={contact.id} className="hover:bg-[var(--canvas)] transition-colors group">
@@ -616,6 +612,8 @@ function LeadsTab({ contacts, facebookGroups }: { contacts: Contact[]; facebookG
               </table>
             </div>
           </>
+            )}
+          />
         )}
       </div>
     </div>
@@ -819,6 +817,7 @@ type LeadsTab = 'leads' | 'outreach'
 
 export default function LeadsClient({
   contacts: initial,
+  facets,
   facebookGroups,
   outreachEntries,
   initialTab = 'leads',
@@ -837,15 +836,15 @@ export default function LeadsClient({
       <LeadsTabBar
         active={activeTab}
         counts={{
-          leads: initial.length,
+          leads: facets.total,
           outreach: outreachEntries.length,
-          waitlist: initial.filter(c => c.status === WAITLIST_STATUS).length,
+          waitlist: facets.status[WAITLIST_STATUS] ?? 0,
         }}
         onSelect={setActiveTab}
       />
 
       {activeTab === 'leads' && (
-        <LeadsTab contacts={initial} facebookGroups={facebookGroups} />
+        <LeadsTab contacts={initial} facets={facets} facebookGroups={facebookGroups} />
       )}
 
       {activeTab === 'outreach' && (

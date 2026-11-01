@@ -1,6 +1,7 @@
 'use server'
 
 import { getStudioId } from './_shared'
+import type { SchoolContact, SchoolOutreach } from '@/types/database'
 
 function cell(v: unknown): string {
   if (v === null || v === undefined) return ''
@@ -40,6 +41,14 @@ export async function exportContacts(): Promise<{ csv: string | null; error: str
   return { csv: [headers, ...rows].join('\n'), error: null }
 }
 
+type SchoolExportRow = Pick<
+  SchoolOutreach,
+  'id' | 'school_name' | 'city' | 'state' | 'school_type' | 'source' | 'stage'
+  | 'first_contact_date' | 'last_interacted_date' | 'next_step' | 'next_step_due_date' | 'notes'
+> & {
+  school_contacts: Pick<SchoolContact, 'name' | 'title' | 'email' | 'phone' | 'is_primary'>[] | null
+}
+
 export async function exportSchoolOutreach(): Promise<{ csv: string | null; error: string | null }> {
   const ctx = await getStudioId()
   if (!ctx) return { csv: null, error: 'Unauthorized' }
@@ -48,7 +57,7 @@ export async function exportSchoolOutreach(): Promise<{ csv: string | null; erro
   const [schoolsRes, cadenceRes] = await Promise.all([
     supabase
       .from('school_outreach')
-      .select('id, school_name, contact_name, email, phone, stage, first_contact_date, last_interacted_date, next_step, next_step_due_date, notes')
+      .select('id, school_name, city, state, school_type, source, stage, first_contact_date, last_interacted_date, next_step, next_step_due_date, notes, school_contacts(name, title, email, phone, is_primary)')
       .eq('studio_id', studioId)
       .order('school_name'),
     supabase
@@ -69,15 +78,21 @@ export async function exportSchoolOutreach(): Promise<{ csv: string | null; erro
   }
 
   const headers = row([
-    'School Name', 'Contact Name', 'Email', 'Phone', 'Stage',
+    'School Name', 'City', 'State', 'School Type', 'Source',
+    'Primary Contact', 'Contact Title', 'Email', 'Phone', 'Other Contacts', 'Stage',
     'Cadence Status', 'Emails Sent',
     'First Contact Date', 'Last Interacted Date',
     'Next Step', 'Next Step Due', 'Notes',
   ])
-  const rows = (schoolsRes.data ?? []).map((s: Record<string, unknown>) => {
-    const cad = latestCadence.get(s.id as string)
+  const rows = ((schoolsRes.data ?? []) as SchoolExportRow[]).map(s => {
+    const cad = latestCadence.get(s.id)
+    const contacts = s.school_contacts ?? []
+    const primary = contacts.find(c => c.is_primary) ?? null
     return row([
-      s.school_name, s.contact_name, s.email, s.phone, s.stage,
+      s.school_name, s.city, s.state, s.school_type, s.source,
+      primary?.name, primary?.title, primary?.email, primary?.phone,
+      contacts.filter(c => !c.is_primary).map(c => c.email ? `${c.name} <${c.email}>` : c.name).join('; '),
+      s.stage,
       cad?.status ?? '', cad?.emails_sent ?? '',
       s.first_contact_date, s.last_interacted_date,
       s.next_step, s.next_step_due_date, s.notes,

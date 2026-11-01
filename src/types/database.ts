@@ -130,6 +130,8 @@ export interface Contact {
   email: string | null
   phone: string | null
   status: LeadStatus | null
+  /** Generated from status (pipeline order, 0 = untriaged); read-only. */
+  status_rank: number
   waitlist_rank: number | null
   source: string | null
   lead_source: string | null
@@ -228,6 +230,7 @@ export type LeadSource =
   | 'inbound_online'
   | 'referral'
   | 'organic_outreach'
+  | 'csv_import'
 
 export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
   { value: 'facebook_group', label: 'Facebook Group' },
@@ -235,6 +238,7 @@ export const LEAD_SOURCES: { value: LeadSource; label: string }[] = [
   { value: 'inbound_online', label: 'Inbound Online' },
   { value: 'referral', label: 'Referral' },
   { value: 'organic_outreach', label: 'Organic Outreach' },
+  { value: 'csv_import', label: 'CSV Import' },
 ]
 
 export type LeadSubSource = 'self_promo' | 'third_party'
@@ -316,10 +320,19 @@ export interface SchoolOutreach {
   id: string
   studio_id: string
   school_name: string
+  source: string | null
+  city: string | null
+  state: string | null
+  school_type: string | null
+  /** @deprecated Superseded by school_contacts; kept until the columns are dropped. Do not read or write. */
   contact_name: string | null
+  /** @deprecated Superseded by school_contacts. Do not read or write. */
   email: string | null
+  /** @deprecated Superseded by school_contacts. Do not read or write. */
   phone: string | null
   stage: SchoolOutreachStage
+  /** Generated from stage (pipeline order); read-only. */
+  stage_rank: number
   first_contact_date: string | null
   last_interacted_date: string | null
   next_step: string | null
@@ -329,6 +342,27 @@ export interface SchoolOutreach {
   notes: string | null
   created_at: string
 }
+
+/** Placeholder name given to migrated contacts that had an email/phone but no name. */
+export const CONTACT_NAME_PLACEHOLDER = '(name needed)'
+
+export interface SchoolContact {
+  id: string
+  school_id: string
+  studio_id: string
+  name: string
+  title: string | null
+  subject_area: string | null
+  email: string | null
+  phone: string | null
+  notes: string | null
+  is_primary: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** A school row with its contacts embedded (oldest first). */
+export type SchoolWithContacts = SchoolOutreach & { school_contacts: SchoolContact[] }
 
 export type CadenceStatus = 'active' | 'completed' | 'removed' | 'replied'
 export type OpeningTemplateKey = 'initial_contact' | 'familiar_teacher' | 'shared_student' | 'virtual'

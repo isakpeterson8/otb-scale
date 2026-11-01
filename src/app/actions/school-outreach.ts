@@ -9,21 +9,48 @@ export async function createSchoolOutreach(formData: FormData) {
   if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
-  const { error } = await supabase.from('school_outreach').insert({
+  // Optional first contact, entered on the Add school form. Validated before
+  // the school is created so a bad email doesn't leave a half-made record.
+  const contact = {
+    name: (formData.get('contact_name') as string)?.trim() || null,
+    title: (formData.get('contact_title') as string)?.trim() || null,
+    email: (formData.get('contact_email') as string)?.trim() || null,
+    phone: (formData.get('contact_phone') as string)?.trim() || null,
+  }
+  const hasContact = !!(contact.name || contact.email || contact.phone)
+  if (hasContact && !contact.name) return { error: 'Add a name for the contact, or leave the contact fields empty.' }
+  if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
+    return { error: `“${contact.email}” is not a valid email address.` }
+  }
+
+  const { data: created, error } = await supabase.from('school_outreach').insert({
     studio_id: studioId,
     school_name: formData.get('school_name') as string,
-    contact_name: (formData.get('contact_name') as string) || null,
-    email: (formData.get('email') as string) || null,
-    phone: (formData.get('phone') as string) || null,
+    source: (formData.get('source') as string)?.trim() || null,
+    city: (formData.get('city') as string)?.trim() || null,
+    state: (formData.get('state') as string)?.trim() || null,
+    school_type: (formData.get('school_type') as string)?.trim() || null,
     stage: (formData.get('stage') as string) || 'lead',
     first_contact_date: (formData.get('first_contact_date') as string) || null,
     last_interacted_date: (formData.get('last_interacted_date') as string) || null,
     next_step: (formData.get('next_step') as string) || null,
     next_step_due_date: (formData.get('next_step_due_date') as string) || null,
     notes: (formData.get('notes') as string) || null,
-  })
+  }).select('id').single()
 
   if (error) return { error: error.message }
+
+  if (hasContact) {
+    // The school_contacts insert trigger marks the first contact primary.
+    const { error: contactError } = await supabase
+      .from('school_contacts')
+      .insert({ ...contact, school_id: created.id, studio_id: studioId })
+    if (contactError) {
+      revalidatePath('/school-outreach')
+      return { error: `School added, but the contact could not be saved: ${contactError.message}` }
+    }
+  }
+
   revalidatePath('/school-outreach')
   return { error: null }
 }
@@ -38,9 +65,10 @@ export async function updateSchoolOutreach(id: string, formData: FormData) {
     .from('school_outreach')
     .update({
       school_name: formData.get('school_name') as string,
-      contact_name: (formData.get('contact_name') as string) || null,
-      email: (formData.get('email') as string) || null,
-      phone: (formData.get('phone') as string) || null,
+      source: (formData.get('source') as string)?.trim() || null,
+      city: (formData.get('city') as string)?.trim() || null,
+      state: (formData.get('state') as string)?.trim() || null,
+      school_type: (formData.get('school_type') as string)?.trim() || null,
       stage: (formData.get('stage') as string) || 'lead',
       first_contact_date: (formData.get('first_contact_date') as string) || null,
       last_interacted_date: (formData.get('last_interacted_date') as string) || null,

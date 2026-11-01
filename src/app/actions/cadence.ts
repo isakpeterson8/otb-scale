@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import type { CadenceEnrollment } from '@/types/database'
+import { CONTACT_NAME_PLACEHOLDER, type CadenceEnrollment, type SchoolContact } from '@/types/database'
 
 async function isViewOnly(): Promise<boolean> {
   const cookieStore = await cookies()
@@ -107,23 +107,76 @@ function buildRfc2822(to: string, from: string, subject: string, body: string): 
     .replace(/=+$/, '')
 }
 
+/**
+ * One RFC 5322 mailbox ("Name" <addr>). CR/LF are stripped so a contact name
+ * can't inject headers; names with specials are quoted, non-ASCII names are
+ * encoded-word so Gmail renders them intact.
+ */
+function formatMailbox(name: string | null, email: string): string {
+  const addr = email.replace(/[\r\n<>]/g, '').trim()
+  const display = (name ?? '').replace(/[\r\n]/g, ' ').trim()
+  if (!display || display === CONTACT_NAME_PLACEHOLDER) return addr
+  if (/[^\x20-\x7e]/.test(display)) {
+    return `=?UTF-8?B?${Buffer.from(display, 'utf8').toString('base64')}?= <${addr}>`
+  }
+  return `"${display.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" <${addr}>`
+}
+
+/**
+ * Sends the next cadence email to one or more of the school's contacts and
+ * logs each recipient in outreach_email_recipients.
+ *
+ * Recipients are passed as contact ids and re-read here, scoped to the
+ * enrollment's school, so the client can't redirect mail to an arbitrary
+ * address.
+ */
 export async function sendCadenceEmail({
   enrollmentId,
-  toEmail,
-  toName,
+  contactIds,
+  emailNumber,
   subject,
   body,
 }: {
   enrollmentId: string
-  toEmail: string
-  toName: string | null
+  contactIds: string[]
+  emailNumber: number
   subject: string
   body: string
 }): Promise<{ error: string | null; threadId: string | null }> {
   if (await isViewOnly()) return { error: 'View only mode', threadId: null }
+  if (contactIds.length === 0) return { error: 'Choose at least one recipient.', threadId: null }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', threadId: null }
+
+  const { data: enrollment } = await supabase
+    .from('cadence_enrollments')
+    .select('id, school_id')
+    .eq('id', enrollmentId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!enrollment) return { error: 'Cadence not found.', threadId: null }
+
+  const { data: school } = await supabase
+    .from('school_outreach')
+    .select('studio_id')
+    .eq('id', enrollment.school_id)
+    .maybeSingle()
+  if (!school) return { error: 'School not found.', threadId: null }
+  const studioId = school.studio_id as string
+
+  const { data: contactRows, error: contactsError } = await supabase
+    .from('school_contacts')
+    .select('id, name, email')
+    .eq('school_id', enrollment.school_id)
+    .in('id', contactIds)
+  if (contactsError) return { error: contactsError.message, threadId: null }
+
+  const recipients = ((contactRows ?? []) as Pick<SchoolContact, 'id' | 'name' | 'email'>[])
+    .filter((c): c is { id: string; name: string; email: string } => !!c.email?.trim())
+  if (recipients.length === 0) {
+    return { error: 'None of the selected contacts has an email address.', threadId: null }
+  }
 
   const accessToken = await getValidAccessToken(supabase, user.id)
   if (!accessToken) return { error: 'Gmail not connected. Connect your account in Settings.', threadId: null }
@@ -136,7 +189,7 @@ export async function sendCadenceEmail({
 
   const fromName = settingsRow?.sender_name || user.email!
   const fromHeader = settingsRow?.sender_name ? `${fromName} <${user.email}>` : user.email!
-  const toHeader = toName ? `${toName} <${toEmail}>` : toEmail
+  const toHeader = recipients.map(r => formatMailbox(r.name, r.email)).join(', ')
 
   const raw = buildRfc2822(toHeader, fromHeader, subject, body)
 
@@ -164,6 +217,22 @@ export async function sendCadenceEmail({
       .eq('id', enrollmentId)
       .eq('user_id', user.id)
   }
+
+  // The email is already sent, so a logging failure is reported in the server
+  // log rather than surfaced as a send error.
+  const { error: logError } = await supabase.from('outreach_email_recipients').insert(
+    recipients.map(r => ({
+      studio_id: studioId,
+      school_id: enrollment.school_id,
+      enrollment_id: enrollmentId,
+      school_contact_id: r.id,
+      email: r.email,
+      name: r.name,
+      email_number: emailNumber,
+      gmail_thread_id: threadId,
+    })),
+  )
+  if (logError) console.error('[sendCadenceEmail] recipient log insert failed:', logError.message)
 
   revalidatePath('/school-outreach')
   return { error: null, threadId }
