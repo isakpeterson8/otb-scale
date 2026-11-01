@@ -11,8 +11,9 @@ import {
   checkGmailReplies,
   sendCadenceEmail,
 } from '@/app/actions/cadence'
-import type { SchoolOutreach, SchoolOutreachStage, CadenceEnrollment, UserSettings } from '@/types/database'
-import { SCHOOL_STAGES } from '@/types/database'
+import type { SchoolOutreach, SchoolOutreachStage, SchoolWithContacts, CadenceEnrollment, UserSettings } from '@/types/database'
+import { CONTACT_NAME_PLACEHOLDER, SCHOOL_STAGES } from '@/types/database'
+import { ContactsSection, PrimaryContactSummary, RecipientPicker, contactName, primaryContact } from './SchoolContacts'
 import ListViewToolbar from '@/components/ui/ListViewToolbar'
 import GroupedList from '@/components/ui/GroupedList'
 import { useListView } from '@/hooks/useListView'
@@ -27,7 +28,7 @@ import { applyAutoFills } from '@/lib/utils'
 
 interface Props {
   /** Already sorted/filtered by the server per the URL view. */
-  schools: SchoolOutreach[]
+  schools: SchoolWithContacts[]
   /** Studio-wide counts per stage/source, for chips and the stats row. */
   facets: ListFacets
   enrollments: CadenceEnrollment[]
@@ -164,11 +165,21 @@ function SchoolForm({ school, onClose }: { school?: SchoolOutreach; onClose: () 
         {textField('School Type', 'school_type', 'text', 'Elementary')}
         {textField('Source', 'source', 'text', 'District directory')}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {textField('Contact Name', 'contact_name', 'text', 'Ms. Johnson')}
-        {textField('Phone', 'phone', 'tel', '(555) 000-0000')}
-      </div>
-      {textField('Email', 'email', 'email', 'principal@school.edu')}
+      {/* New schools can start with one contact; existing schools manage
+          contacts in the Contacts section below the form. */}
+      {!school && (
+        <fieldset className="space-y-3 pt-1">
+          <legend className="text-xs text-[var(--ink-3)] uppercase tracking-wide font-medium mb-2">Primary contact (optional)</legend>
+          <div className="grid grid-cols-2 gap-3">
+            {textField('Contact Name', 'contact_name', 'text', 'Ms. Johnson')}
+            {textField('Title', 'contact_title', 'text', 'Band Director')}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {textField('Email', 'contact_email', 'email', 'director@school.edu')}
+            {textField('Phone', 'contact_phone', 'tel', '(555) 000-0000')}
+          </div>
+        </fieldset>
+      )}
       <div>
         <label className="block text-xs text-[var(--ink-3)] mb-1">Stage</label>
         <select
@@ -318,18 +329,19 @@ function TemplateViewerModal({
   settings,
   onClose,
 }: {
-  school: SchoolOutreach
+  school: SchoolWithContacts
   enrollment: CadenceEnrollment
   settings: UserSettings | null
   onClose: () => void
 }) {
   const rawContent = getNextEmailContent(enrollment)
+  const primary = primaryContact(school)
 
   const capitalize = (s: string) =>
     s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 
   const fills: Record<string, string> = {
-    Name: school.contact_name || '$Name',
+    Name: primary && primary.name !== CONTACT_NAME_PLACEHOLDER ? primary.name : '$Name',
     MyName: settings?.display_name ? capitalize(settings.display_name) : '',
     StudioName: settings?.studio_name ? capitalize(settings.studio_name) : '',
     Location: settings?.location ?? '',
@@ -348,6 +360,11 @@ function TemplateViewerModal({
   const [copiedBody, setCopiedBody] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  // Default recipient: the primary contact, or the first contact with an email.
+  const [recipientIds, setRecipientIds] = useState<string[]>(() => {
+    const first = primary?.email ? primary : school.school_contacts.find(c => c.email)
+    return first ? [first.id] : []
+  })
 
   if (!resolved) return null
 
@@ -370,16 +387,16 @@ function TemplateViewerModal({
   }
 
   async function handleSend() {
-    if (!school.email) {
-      setSendError('No email address on this school record. Add one before sending.')
+    if (recipientIds.length === 0) {
+      setSendError('Choose at least one recipient with an email address.')
       return
     }
     setSending(true)
     setSendError(null)
     const result = await sendCadenceEmail({
       enrollmentId: enrollment.id,
-      toEmail: school.email,
-      toName: school.contact_name,
+      contactIds: recipientIds,
+      emailNumber: resolved!.emailNumber,
       subject,
       body,
     })
@@ -399,7 +416,7 @@ function TemplateViewerModal({
           <div>
             <h3 className="text-base font-medium text-[var(--ink)]">Email {resolved.emailNumber} — {school.school_name}</h3>
             <p className="text-xs text-[var(--ink-3)] mt-0.5">
-              {school.contact_name ? `To: ${school.contact_name}` : 'Fill in $variables before sending'}
+              {primary ? `Greeting uses ${contactName(primary)}` : 'Fill in $variables before sending'}
             </p>
           </div>
           <button onClick={onClose} className="text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors">
@@ -417,6 +434,10 @@ function TemplateViewerModal({
             ⚠️ Note: This email will be sent as a new thread, not as a reply to your previous email. To send as a true reply, copy the body and reply manually from your email client.
           </div>
         )}
+
+        <div className="mb-3">
+          <RecipientPicker contacts={school.school_contacts} selected={recipientIds} onChange={setRecipientIds} />
+        </div>
 
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
@@ -503,12 +524,15 @@ function TemplateViewerModal({
 export default function SchoolOutreachClient({ schools, facets, enrollments, settings }: Props) {
   const { view, isDefault } = useListView(SCHOOLS_VIEW)
   const [showForm, setShowForm] = useState(false)
-  const [editSchool, setEditSchool] = useState<SchoolOutreach | null>(null)
+  // Stored by id and looked up in `schools`, so the edit view re-renders with
+  // fresh contacts after each add/edit/delete revalidates the page.
+  const [editSchoolId, setEditSchoolId] = useState<string | null>(null)
+  const editSchool = editSchoolId ? schools.find(s => s.id === editSchoolId) ?? null : null
   const [enrollModal, setEnrollModal] = useState<SchoolOutreach | null>(null)
-  const [templateViewer, setTemplateViewer] = useState<{ school: SchoolOutreach; enrollment: CadenceEnrollment } | null>(null)
+  const [templateViewer, setTemplateViewer] = useState<{ school: SchoolWithContacts; enrollment: CadenceEnrollment } | null>(null)
   const [showPhoneScript, setShowPhoneScript] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [deleteTarget, setDeleteTarget] = useState<SchoolOutreach | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<SchoolWithContacts | null>(null)
   const [isDeleting, startDelete] = useTransition()
   const { toast, showToast } = useToast()
 
@@ -529,9 +553,11 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
 
   // What a delete would cascade away — cadence_enrollments is ON DELETE CASCADE,
   // so name the email history explicitly before confirming.
-  function deleteConsequences(school: SchoolOutreach): string[] {
+  function deleteConsequences(school: SchoolWithContacts): string[] {
+    const contactCount = school.school_contacts.length
+    const contactLine = contactCount > 0 ? [`${contactCount} contact${contactCount === 1 ? '' : 's'}`] : []
     const related = enrollments.filter(e => e.school_id === school.id)
-    if (related.length === 0) return []
+    if (related.length === 0) return contactLine
 
     const sentCount = related.reduce((n, e) => {
       return n +
@@ -542,6 +568,7 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
     }, 0)
 
     const out = [
+      ...contactLine,
       `${related.length} email cadence${related.length === 1 ? '' : 's'}` +
       (sentCount > 0 ? ` — including the record of ${sentCount} email${sentCount === 1 ? '' : 's'} already sent` : ''),
     ]
@@ -563,7 +590,7 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
         showToast(`“${name}” deleted`, 'success')
         setDeleteTarget(null)
         // Any modal may be open on the row we just removed
-        setEditSchool(null)
+        setEditSchoolId(null)
         setEnrollModal(null)
         setTemplateViewer(null)
       }
@@ -634,7 +661,7 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
             Browse Templates
           </a>
           <button
-            onClick={() => { setEditSchool(null); setShowForm(true) }}
+            onClick={() => { setEditSchoolId(null); setShowForm(true) }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -723,7 +750,7 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                 {editSchool ? 'Edit school' : 'Add school'}
               </h3>
               <button
-                onClick={() => { setShowForm(false); setEditSchool(null) }}
+                onClick={() => { setShowForm(false); setEditSchoolId(null) }}
                 className="text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
               >
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -732,9 +759,11 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
               </button>
             </div>
             <SchoolForm
+              key={editSchool?.id ?? 'new'}
               school={editSchool ?? undefined}
-              onClose={() => { setShowForm(false); setEditSchool(null) }}
+              onClose={() => { setShowForm(false); setEditSchoolId(null) }}
             />
+            {editSchool && <ContactsSection school={editSchool} />}
           </div>
         </div>
       )}
@@ -784,14 +813,14 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-medium text-[var(--ink)] truncate">{school.school_name}</p>
-                        <p className="text-xs text-[var(--ink-3)] mt-0.5 truncate">
-                          {school.contact_name ?? '—'}{school.email ? ` · ${school.email}` : ''}
-                        </p>
-                        {school.phone && <p className="text-xs text-[var(--ink-3)]">{school.phone}</p>}
+                        {(school.city || school.state) && (
+                          <p className="text-xs text-[var(--ink-3)]">{[school.city, school.state].filter(Boolean).join(', ')}</p>
+                        )}
+                        <PrimaryContactSummary school={school} layout="card" />
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
                         <button
-                          onClick={() => setEditSchool(school)}
+                          onClick={() => setEditSchoolId(school.id)}
                           className="p-1.5 rounded-lg transition-colors"
                           style={{ color: '#04ADEF' }}
                           title="Edit"
@@ -887,15 +916,15 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                       <tr key={school.id} className="hover:bg-[var(--canvas)] transition-colors">
                         <td className="px-4 py-3">
                           <p className="font-medium text-[var(--ink)] truncate max-w-[180px]">{school.school_name}</p>
+                          {(school.city || school.state) && (
+                            <p className="text-xs text-[var(--ink-3)]">{[school.city, school.state].filter(Boolean).join(', ')}</p>
+                          )}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="space-y-0.5">
-                            <p className="text-[var(--ink-2)] whitespace-nowrap">{school.contact_name ?? '—'}</p>
-                            <p className="text-xs text-[var(--ink-3)]">{school.email ?? ''}</p>
-                          </div>
+                          <PrimaryContactSummary school={school} layout="cell" />
                         </td>
                         <td className="px-4 py-3 text-[var(--ink-3)] text-xs whitespace-nowrap">
-                          {school.phone ?? '—'}
+                          {primaryContact(school)?.phone ?? '—'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <StageBadge stage={school.stage} />
@@ -951,7 +980,7 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-0.5">
                             <button
-                              onClick={() => setEditSchool(school)}
+                              onClick={() => setEditSchoolId(school.id)}
                               className="p-1.5 rounded-lg transition-colors"
                               style={{ color: '#04ADEF' }}
                               title="Edit"

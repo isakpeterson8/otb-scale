@@ -19,7 +19,11 @@ export const LEADS_VIEW: ListViewConfig = {
   followUp: { kind: 'equals', column: 'status', value: 'future follow-up' },
 }
 
-/** /school-outreach. School source is free text, so its chips come from the data. */
+/**
+ * /school-outreach. School source is free text, so its chips come from the data.
+ * Search also matches contact name/email: the page looks those up in
+ * school_contacts and passes the school ids to applyListView.
+ */
 export const SCHOOLS_VIEW: ListViewConfig = {
   storageKey: 'listView:school-outreach',
   nameColumn: 'school_name',
@@ -30,7 +34,7 @@ export const SCHOOLS_VIEW: ListViewConfig = {
   statusOptions: SCHOOL_STAGES.map(({ value, label }) => ({ value, label })),
   sourceColumn: 'source',
   sourceNoneLabel: 'No source',
-  searchColumns: ['school_name', 'email'],
-  searchPlaceholder: 'Search school or email…',
+  searchColumns: ['school_name'],
+  searchPlaceholder: 'Search school or contact…',
   followUp: { kind: 'due_by_today', column: 'next_step_due_date' },
 }

@@ -322,8 +322,11 @@ export interface SchoolOutreach {
   city: string | null
   state: string | null
   school_type: string | null
+  /** @deprecated Superseded by school_contacts; kept until the columns are dropped. Do not read or write. */
   contact_name: string | null
+  /** @deprecated Superseded by school_contacts. Do not read or write. */
   email: string | null
+  /** @deprecated Superseded by school_contacts. Do not read or write. */
   phone: string | null
   stage: SchoolOutreachStage
   /** Generated from stage (pipeline order); read-only. */
@@ -337,6 +340,27 @@ export interface SchoolOutreach {
   notes: string | null
   created_at: string
 }
+
+/** Placeholder name given to migrated contacts that had an email/phone but no name. */
+export const CONTACT_NAME_PLACEHOLDER = '(name needed)'
+
+export interface SchoolContact {
+  id: string
+  school_id: string
+  studio_id: string
+  name: string
+  title: string | null
+  subject_area: string | null
+  email: string | null
+  phone: string | null
+  notes: string | null
+  is_primary: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** A school row with its contacts embedded (oldest first). */
+export type SchoolWithContacts = SchoolOutreach & { school_contacts: SchoolContact[] }
 
 export type CadenceStatus = 'active' | 'completed' | 'removed' | 'replied'
 export type OpeningTemplateKey = 'initial_contact' | 'familiar_teacher' | 'shared_student' | 'virtual'

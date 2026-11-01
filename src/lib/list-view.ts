@@ -204,11 +204,27 @@ function todayIso(now: Date): string {
   return now.toISOString().slice(0, 10)
 }
 
+/** Search text with wildcard/quoting characters removed; '' when there's nothing to search. */
+export function searchTerm(view: ListView): string {
+  return view.q.replace(/[%*"\\]/g, '').trim()
+}
+
+/** A PostgREST `ilike` condition for a search term, for use inside or(). */
+export function ilikeCondition(column: string, term: string): string {
+  return `${column}.ilike.${quote(`%${term}%`)}`
+}
+
+/**
+ * @param extraSearchMatch  An extra PostgREST condition OR-ed into the text
+ *   search, for matches the base table's columns can't express — e.g.
+ *   `id.in.(…)` for schools whose contacts match.
+ */
 export function applyListView<Q extends FilterableQuery<Q>>(
   query: Q,
   view: ListView,
   config: ListViewConfig,
   now: Date = new Date(),
+  extraSearchMatch?: string,
 ): Q {
   let q = query
   const orGroups: string[] = []
@@ -218,9 +234,11 @@ export function applyListView<Q extends FilterableQuery<Q>>(
 
   // Wildcards and quoting characters are stripped rather than escaped: a search
   // box has no use for them, and it keeps the or() string unambiguous.
-  const term = view.q.replace(/[%*"\\]/g, '').trim()
+  const term = searchTerm(view)
   if (term) {
-    orGroups.push(config.searchColumns.map(col => `${col}.ilike.${quote(`%${term}%`)}`).join(','))
+    const conditions = config.searchColumns.map(col => ilikeCondition(col, term))
+    if (extraSearchMatch) conditions.push(extraSearchMatch)
+    orGroups.push(conditions.join(','))
   }
 
   // supabase-js appends a separate `or=` param per .or() call; rather than rely

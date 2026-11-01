@@ -7,9 +7,9 @@ import SchoolOutreachClient from './SchoolOutreachClient'
 import { checkGmailReplies } from '@/app/actions/cadence'
 import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
-import { applyListView, parseListView, toFacets } from '@/lib/list-view'
+import { applyListView, ilikeCondition, parseListView, searchTerm, toFacets } from '@/lib/list-view'
 import { SCHOOLS_VIEW } from '@/lib/list-view-configs'
-import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/database'
+import type { SchoolWithContacts, CadenceEnrollment, UserSettings } from '@/types/database'
 
 export const metadata: Metadata = { title: 'School Outreach' }
 
@@ -44,14 +44,32 @@ export default async function SchoolOutreachPage({
 
   const view = parseListView(params, SCHOOLS_VIEW)
 
+  // Contact name/email matches can't be expressed on school_outreach itself,
+  // so find those schools first and OR their ids into the search.
+  let contactMatch: string | undefined
+  const term = searchTerm(view)
+  if (term) {
+    const { data: matches } = await supabase
+      .from('school_contacts')
+      .select('school_id')
+      .eq('studio_id', studioId)
+      .or(`${ilikeCondition('name', term)},${ilikeCondition('email', term)}`)
+      .limit(500)
+    const ids = [...new Set(((matches ?? []) as { school_id: string }[]).map(m => m.school_id))]
+    if (ids.length) contactMatch = `id.in.(${ids.join(',')})`
+  }
+
   const [{ data: schools }, { data: facetRows }, { data: settings }] = await Promise.all([
     applyListView(
       supabase
         .from('school_outreach')
-        .select('*')
-        .eq('studio_id', studioId),
+        .select('*, school_contacts(*)')
+        .eq('studio_id', studioId)
+        .order('created_at', { referencedTable: 'school_contacts', ascending: true }),
       view,
       SCHOOLS_VIEW,
+      new Date(),
+      contactMatch,
     ),
     supabase.rpc('school_outreach_list_facets', { p_studio_id: studioId }),
     viewOnly
@@ -75,7 +93,7 @@ export default async function SchoolOutreachPage({
     <AppShell>
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <SchoolOutreachClient
-          schools={(schools ?? []) as SchoolOutreach[]}
+          schools={(schools ?? []) as SchoolWithContacts[]}
           facets={toFacets(facetRows)}
           enrollments={enrollments}
           settings={(settings ?? null) as UserSettings | null}
