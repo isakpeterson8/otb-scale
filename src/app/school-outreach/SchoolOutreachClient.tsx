@@ -13,7 +13,11 @@ import {
 } from '@/app/actions/cadence'
 import type { SchoolOutreach, SchoolOutreachStage, CadenceEnrollment, UserSettings } from '@/types/database'
 import { SCHOOL_STAGES } from '@/types/database'
-import FilterTabs from '@/components/ui/FilterTabs'
+import ListViewToolbar from '@/components/ui/ListViewToolbar'
+import GroupedList from '@/components/ui/GroupedList'
+import { useListView } from '@/hooks/useListView'
+import { NONE_VALUE, sourceChipOptions, statusChipOptions, type ListFacets } from '@/lib/list-view'
+import { SCHOOLS_VIEW } from '@/lib/list-view-configs'
 import {
   OPENING_TEMPLATES,
   FOLLOWUP_EMAILS,
@@ -22,14 +26,12 @@ import {
 import { applyAutoFills } from '@/lib/utils'
 
 interface Props {
+  /** Already sorted/filtered by the server per the URL view. */
   schools: SchoolOutreach[]
+  /** Studio-wide counts per stage/source, for chips and the stats row. */
+  facets: ListFacets
   enrollments: CadenceEnrollment[]
   settings: UserSettings | null
-}
-
-function formatDate(d: string | null) {
-  if (!d) return '—'
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function fmtShort(d: string) {
@@ -154,6 +156,14 @@ function SchoolForm({ school, onClose }: { school?: SchoolOutreach; onClose: () 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 pr-1">
       {textField('School Name', 'school_name', 'text', 'Lincoln Elementary', true)}
+      <div className="grid grid-cols-2 gap-3">
+        {textField('City', 'city', 'text', 'Springfield')}
+        {textField('State', 'state', 'text', 'IL')}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {textField('School Type', 'school_type', 'text', 'Elementary')}
+        {textField('Source', 'source', 'text', 'District directory')}
+      </div>
       <div className="grid grid-cols-2 gap-3">
         {textField('Contact Name', 'contact_name', 'text', 'Ms. Johnson')}
         {textField('Phone', 'phone', 'tel', '(555) 000-0000')}
@@ -490,8 +500,8 @@ function TemplateViewerModal({
   )
 }
 
-export default function SchoolOutreachClient({ schools, enrollments, settings }: Props) {
-  const [filterStage, setFilterStage] = useState<SchoolOutreachStage | 'all'>('all')
+export default function SchoolOutreachClient({ schools, facets, enrollments, settings }: Props) {
+  const { view, isDefault } = useListView(SCHOOLS_VIEW)
   const [showForm, setShowForm] = useState(false)
   const [editSchool, setEditSchool] = useState<SchoolOutreach | null>(null)
   const [enrollModal, setEnrollModal] = useState<SchoolOutreach | null>(null)
@@ -584,10 +594,17 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
   }
 
   const activeStages: SchoolOutreachStage[] = ['lead', 'initial_contact', 'replied', 'classroom_visit_offered', 'visit_scheduled']
-  const totalSchools = schools.length
-  const activeOutreach = schools.filter((s) => activeStages.includes(s.stage)).length
-  const visitsCompleted = schools.filter((s) => s.stage === 'visit_completed').length
-  const filtered = filterStage === 'all' ? schools : schools.filter((s) => s.stage === filterStage)
+  // Stats describe the whole pipeline, not the current filtered view.
+  const totalSchools = facets.total
+  const activeOutreach = activeStages.reduce((n, stage) => n + (facets.status[stage] ?? 0), 0)
+  const visitsCompleted = facets.status['visit_completed'] ?? 0
+
+  const groupOf =
+    view.group === 'status' ? (s: SchoolOutreach) => s.stage
+    : view.group === 'source' ? (s: SchoolOutreach) => s.source ?? NONE_VALUE
+    : null
+  const groupOptions = view.group === 'source' ? sourceChipOptions(SCHOOLS_VIEW, facets) : statusChipOptions(SCHOOLS_VIEW)
+  const groupLabel = (key: string) => groupOptions.find(o => o.value === key)?.label ?? key
 
   return (
     <div className="space-y-5">
@@ -675,19 +692,19 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
               <div className="bg-[var(--canvas)] rounded-lg px-4 py-3 border border-[var(--ink)]/8">
                 <p className="text-xs font-medium text-[var(--ink)] mb-1">Looking for email address:</p>
                 <p className="text-sm text-[var(--ink-2)] italic">
-                  "Hello, I'm trying to reach the [teacher/director] with a volunteer question. Can you share their email?"
+                  &ldquo;Hello, I&apos;m trying to reach the [teacher/director] with a volunteer question. Can you share their email?&rdquo;
                 </p>
               </div>
               <div className="bg-[var(--canvas)] rounded-lg px-4 py-3 border border-[var(--ink)]/8">
                 <p className="text-xs font-medium text-[var(--ink)] mb-1">Looking for phone number:</p>
                 <p className="text-sm text-[var(--ink-2)] italic">
-                  "Hello, I'm trying to reach the [teacher/director] with a volunteer question. Is it possible to be forwarded to them?"
+                  &ldquo;Hello, I&apos;m trying to reach the [teacher/director] with a volunteer question. Is it possible to be forwarded to them?&rdquo;
                 </p>
               </div>
               <div className="bg-[var(--canvas)] rounded-lg px-4 py-3 border border-[var(--ink)]/8">
                 <p className="text-xs font-medium text-[var(--ink)] mb-1">If they ask your purpose:</p>
                 <p className="text-sm text-[var(--ink-2)] italic">
-                  "My name is [name], and I am also a local private music instructor. I was trying to get in contact about volunteering in their classroom."
+                  &ldquo;My name is [name], and I am also a local private music instructor. I was trying to get in contact about volunteering in their classroom.&rdquo;
                 </p>
               </div>
             </div>
@@ -695,19 +712,7 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
         )}
       </div>
 
-      {/* Stage filter tabs */}
-      <FilterTabs
-        tabs={[
-          { value: 'all' as const, label: 'All', count: schools.length },
-          ...SCHOOL_STAGES.map(({ value, label }) => ({
-            value,
-            label,
-            count: schools.filter((s) => s.stage === value).length,
-          })),
-        ]}
-        active={filterStage}
-        onChange={setFilterStage}
-      />
+      <ListViewToolbar config={SCHOOLS_VIEW} facets={facets} resultCount={schools.length} />
 
       {/* Modals */}
       {(showForm || editSchool) && (
@@ -754,15 +759,22 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
 
       {/* School list */}
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
-        {filtered.length === 0 ? (
+        {schools.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <p className="text-sm text-[var(--ink-3)]">No schools yet. Add your first school outreach record.</p>
+            <p className="text-sm text-[var(--ink-3)]">
+              {!isDefault ? 'No schools match this view.' : 'No schools yet. Add your first school outreach record.'}
+            </p>
           </div>
         ) : (
+          <GroupedList
+            items={schools}
+            groupOf={groupOf}
+            labelFor={groupLabel}
+            renderList={items => (
           <>
             {/* Mobile card list */}
             <div className="md:hidden divide-y divide-[var(--ink)]/6">
-              {filtered.map((school) => {
+              {items.map((school) => {
                 const enrollment = getEnrollment(school.id)
                 const badge = getCadenceBadge(enrollment, todayStr)
                 const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
@@ -865,7 +877,7 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--ink)]/6">
-                  {filtered.map((school) => {
+                  {items.map((school) => {
                     const enrollment = getEnrollment(school.id)
                     const badge = getCadenceBadge(enrollment, todayStr)
                     const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
@@ -968,6 +980,8 @@ export default function SchoolOutreachClient({ schools, enrollments, settings }:
               </table>
             </div>
           </>
+            )}
+          />
         )}
       </div>
 

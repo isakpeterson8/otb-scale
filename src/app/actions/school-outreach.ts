@@ -12,6 +12,10 @@ export async function createSchoolOutreach(formData: FormData) {
   const { error } = await supabase.from('school_outreach').insert({
     studio_id: studioId,
     school_name: formData.get('school_name') as string,
+    source: (formData.get('source') as string)?.trim() || null,
+    city: (formData.get('city') as string)?.trim() || null,
+    state: (formData.get('state') as string)?.trim() || null,
+    school_type: (formData.get('school_type') as string)?.trim() || null,
     contact_name: (formData.get('contact_name') as string) || null,
     email: (formData.get('email') as string) || null,
     phone: (formData.get('phone') as string) || null,
@@ -38,6 +42,10 @@ export async function updateSchoolOutreach(id: string, formData: FormData) {
     .from('school_outreach')
     .update({
       school_name: formData.get('school_name') as string,
+      source: (formData.get('source') as string)?.trim() || null,
+      city: (formData.get('city') as string)?.trim() || null,
+      state: (formData.get('state') as string)?.trim() || null,
+      school_type: (formData.get('school_type') as string)?.trim() || null,
       contact_name: (formData.get('contact_name') as string) || null,
       email: (formData.get('email') as string) || null,
       phone: (formData.get('phone') as string) || null,

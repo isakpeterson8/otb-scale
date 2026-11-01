@@ -130,6 +130,8 @@ export interface Contact {
   email: string | null
   phone: string | null
   status: LeadStatus | null
+  /** Generated from status (pipeline order, 0 = untriaged); read-only. */
+  status_rank: number
   waitlist_rank: number | null
   source: string | null
   lead_source: string | null
@@ -316,10 +318,16 @@ export interface SchoolOutreach {
   id: string
   studio_id: string
   school_name: string
+  source: string | null
+  city: string | null
+  state: string | null
+  school_type: string | null
   contact_name: string | null
   email: string | null
   phone: string | null
   stage: SchoolOutreachStage
+  /** Generated from stage (pipeline order); read-only. */
+  stage_rank: number
   first_contact_date: string | null
   last_interacted_date: string | null
   next_step: string | null

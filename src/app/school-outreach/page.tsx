@@ -7,11 +7,18 @@ import SchoolOutreachClient from './SchoolOutreachClient'
 import { checkGmailReplies } from '@/app/actions/cadence'
 import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
+import { applyListView, parseListView, toFacets } from '@/lib/list-view'
+import { SCHOOLS_VIEW } from '@/lib/list-view-configs'
 import type { SchoolOutreach, CadenceEnrollment, UserSettings } from '@/types/database'
 
 export const metadata: Metadata = { title: 'School Outreach' }
 
-export default async function SchoolOutreachPage() {
+export default async function SchoolOutreachPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const params = await searchParams
   const ctx = await getStudioId()
   if (!ctx) redirect('/auth/login')
   const { supabase, studioId, userId, viewOnly, isAdmin: ctxIsAdmin, userEmail } = ctx
@@ -35,12 +42,18 @@ export default async function SchoolOutreachPage() {
     )
   }
 
-  const [{ data: schools }, { data: settings }] = await Promise.all([
-    supabase
-      .from('school_outreach')
-      .select('*')
-      .eq('studio_id', studioId)
-      .order('next_step_due_date', { ascending: true, nullsFirst: false }),
+  const view = parseListView(params, SCHOOLS_VIEW)
+
+  const [{ data: schools }, { data: facetRows }, { data: settings }] = await Promise.all([
+    applyListView(
+      supabase
+        .from('school_outreach')
+        .select('*')
+        .eq('studio_id', studioId),
+      view,
+      SCHOOLS_VIEW,
+    ),
+    supabase.rpc('school_outreach_list_facets', { p_studio_id: studioId }),
     viewOnly
       ? Promise.resolve({ data: null, error: null })
       : supabase.from('settings').select('*').eq('user_id', userId).maybeSingle(),
@@ -63,6 +76,7 @@ export default async function SchoolOutreachPage() {
       <main className="flex-1 px-4 md:px-8 py-5 md:py-7">
         <SchoolOutreachClient
           schools={(schools ?? []) as SchoolOutreach[]}
+          facets={toFacets(facetRows)}
           enrollments={enrollments}
           settings={(settings ?? null) as UserSettings | null}
         />

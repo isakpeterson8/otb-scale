@@ -33,6 +33,11 @@ function BannerIcon() {
 export default function UpgradeBanner({ feature, tier }: Props) {
   // Graduate: explain the plan, no upgrade CTA. Returns before the shared
   // upgrade markup below, which is left exactly as it was for every other tier.
+  // Hooks first: they must run in the same order on every render, so they
+  // cannot sit below the Graduate early return.
+  const [isPending, startTransition] = useTransition()
+  const [sent, setSent] = useState(false)
+
   if (tier === 'graduate') {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[360px] px-4">
@@ -45,9 +50,6 @@ export default function UpgradeBanner({ feature, tier }: Props) {
       </div>
     )
   }
-
-  const [isPending, startTransition] = useTransition()
-  const [sent, setSent] = useState(false)
 
   function handleRequest() {
     startTransition(async () => {
