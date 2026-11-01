@@ -26,3 +26,14 @@ export const EDUCATION_CATEGORIES = [
 ] as const
 
 export type EducationCategorySlug = typeof EDUCATION_CATEGORIES[number]['slug']
+
+// Library items hidden from the member-facing Education Library (grid, search,
+// category counts, deep links). Still visible and editable in /admin/library.
+// Remove an ID here to unhide it.
+export const HIDDEN_LIBRARY_ITEM_IDS: ReadonlySet<string> = new Set([
+  '18e2ab1e-cfd8-44e6-83ab-75e79cdf54b4', // "Your Work Plan" (orientation, slug: your-work-plan)
+])
+
+export function excludeHiddenLibraryItems<T extends { id: string }>(items: T[]): T[] {
+  return items.filter(i => !HIDDEN_LIBRARY_ITEM_IDS.has(i.id))
+}
