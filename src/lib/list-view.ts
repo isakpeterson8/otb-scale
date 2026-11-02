@@ -24,6 +24,7 @@ export type SortKey =
   | 'name_desc'
   | 'source_asc'
   | 'status_pipeline'
+  | 'due_asc'
 
 export type GroupKey = 'none' | 'status' | 'source'
 
@@ -82,20 +83,36 @@ export interface ListViewConfig {
   /** Columns matched by the text search box. */
   searchColumns: string[]
   searchPlaceholder: string
+  /**
+   * Column (or PostgREST computed field) holding each row's next due date,
+   * NULL when nothing is due. Omit to leave out the "Next due date" sort.
+   */
+  dueDateColumn?: string
   /** What the "Needs follow-up" preset filters on. */
   followUp:
     | { kind: 'equals'; column: string; value: string }
     | { kind: 'due_by_today'; column: string }
 }
 
-export const SORT_OPTIONS: { value: SortKey; label: (c: ListViewConfig) => string }[] = [
+export const SORT_OPTIONS: {
+  value: SortKey
+  label: (c: ListViewConfig) => string
+  /** Omit when every page offers it. */
+  availableFor?: (c: ListViewConfig) => boolean
+}[] = [
   { value: 'created_desc',    label: () => 'Date added, newest' },
   { value: 'created_asc',     label: () => 'Date added, oldest' },
   { value: 'name_asc',        label: c => `${c.nameLabel} A→Z` },
   { value: 'name_desc',       label: c => `${c.nameLabel} Z→A` },
   { value: 'source_asc',      label: () => 'Source A→Z' },
   { value: 'status_pipeline', label: c => `${c.statusLabel} (pipeline order)` },
+  { value: 'due_asc',         label: () => 'Next due date', availableFor: c => !!c.dueDateColumn },
 ]
+
+/** The sort options a page offers, in menu order. */
+export function sortOptionsFor(config: ListViewConfig) {
+  return SORT_OPTIONS.filter(o => !o.availableFor || o.availableFor(config))
+}
 
 export const GROUP_OPTIONS: { value: GroupKey; label: (c: ListViewConfig) => string }[] = [
   { value: 'none',   label: () => 'No grouping' },
@@ -145,7 +162,7 @@ export function parseListView(params: ParamSource, config: ListViewConfig): List
     : null
 
   return {
-    sort: oneOf(readParam(params, 'sort'), SORT_OPTIONS.map(o => o.value), DEFAULT_VIEW.sort),
+    sort: oneOf(readParam(params, 'sort'), sortOptionsFor(config).map(o => o.value), DEFAULT_VIEW.sort),
     status: readList(params, 'status').filter(v => allowedStatus.has(v)),
     source: Array.from(new Set(readList(params, 'source').map(v => v.toLowerCase())))
       .filter(v => (allowedSource ? allowedSource.has(v) : v.length <= 100)),
@@ -281,6 +298,14 @@ export function applyListView<Q extends FilterableQuery<Q>>(
       break
     case 'status_pipeline':
       q = q.order(config.statusRankColumn, { ascending: true }).order('created_at', { ascending: false })
+      break
+    case 'due_asc':
+      // Ascending dates already run overdue (oldest first) → today → upcoming;
+      // rows with nothing due go last. Same-day ties and the no-date rows
+      // are ordered by name.
+      if (config.dueDateColumn) {
+        q = q.order(config.dueDateColumn, { ascending: true, nullsFirst: false }).order(config.nameColumn, { ascending: true })
+      }
       break
     case 'created_desc':
     default:

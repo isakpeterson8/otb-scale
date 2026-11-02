@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   GROUP_OPTIONS,
   PRESET_OPTIONS,
-  SORT_OPTIONS,
+  sortOptionsFor,
   sourceChipOptions,
   statusChipOptions,
   type FacetOption,
@@ -113,7 +113,7 @@ export default function ListViewToolbar({
           onChange={e => setView({ sort: e.target.value as SortKey })}
           className={SELECT_CLASS}
         >
-          {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label(config)}</option>)}
+          {sortOptionsFor(config).map(o => <option key={o.value} value={o.value}>{o.label(config)}</option>)}
         </select>
         <select
           aria-label="Group by"
