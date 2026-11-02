@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   createFacebookGroup,
   updateFacebookGroup,
@@ -9,6 +10,8 @@ import {
   deletePostAsset,
   deleteFacebookGroup,
 } from '@/app/actions/facebook-groups'
+import CsvImport from '@/components/csv-import/CsvImport'
+import { FACEBOOK_GROUPS_IMPORT } from '@/lib/csv-import/configs'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast, { useToast } from '@/components/ui/Toast'
 import type {
@@ -659,6 +662,7 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
   const [deleteTarget, setDeleteTarget] = useState<FacebookGroup | null>(null)
   const [isDeleting, startDelete] = useTransition()
   const { toast, showToast } = useToast()
+  const router = useRouter()
 
   const weekAgo  = new Date(Date.now() - 7  * 86_400_000).toISOString().slice(0, 10)
   const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)
@@ -730,15 +734,18 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
           </h2>
           <p className="text-sm text-[var(--ink-3)] mt-0.5">Lead generation group tracker</p>
         </div>
-        <button
-          onClick={() => { setEditGroup(null); setShowForm(true) }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-            <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-          Add group
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <CsvImport config={FACEBOOK_GROUPS_IMPORT} onImported={() => router.refresh()} />
+          <button
+            onClick={() => { setEditGroup(null); setShowForm(true) }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--ink)] text-sm font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+              <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Add group
+          </button>
+        </div>
       </div>
 
       {/* Today's To-Do */}

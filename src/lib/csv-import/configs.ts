@@ -10,6 +10,8 @@ const opts = (list: { value: string; label: string }[]) => list.map(({ value, la
 export const LEADS_IMPORT: ImportConfig = {
   entity: 'leads',
   noun: 'lead',
+  nounPlural: 'leads',
+  updateLabel: 'Update the existing leads',
   templateFilename: 'leads-import-template.csv',
   fields: [
     { key: 'name', label: 'Name', kind: 'text', required: true, maxLength: 200,
@@ -38,6 +40,8 @@ export const LEADS_IMPORT: ImportConfig = {
 export const SCHOOLS_IMPORT: ImportConfig = {
   entity: 'schools',
   noun: 'school',
+  nounPlural: 'schools',
+  updateLabel: 'Add new contacts to the existing schools',
   templateFilename: 'schools-import-template.csv',
   fields: [
     { key: 'school_name', label: 'School name', kind: 'text', required: true, maxLength: 200,
@@ -62,5 +66,74 @@ export const SCHOOLS_IMPORT: ImportConfig = {
       aliases: ['primary', 'main contact'], example: 'yes' },
     { key: 'notes', label: 'Notes', kind: 'text', maxLength: 5000,
       aliases: ['note', 'comments', 'comment'], example: 'Met at district music fair' },
+  ],
+}
+
+/**
+ * Facebook groups. Matched on the group URL (see facebookGroupKeys), or on the
+ * group name when a row has no URL. Option fields fall back to the same
+ * defaults as the add-group form.
+ */
+export const FACEBOOK_GROUPS_IMPORT: ImportConfig = {
+  entity: 'facebook_groups',
+  noun: 'group',
+  nounPlural: 'Facebook groups',
+  updateLabel: 'Update the existing groups',
+  templateFilename: 'facebook-groups-import-template.csv',
+  fields: [
+    { key: 'group_name', label: 'Group name', kind: 'text', required: true, maxLength: 300,
+      aliases: ['name', 'group', 'facebook group', 'fb group', 'group title'], example: 'Piano Moms of Austin' },
+    { key: 'group_url', label: 'Group URL', kind: 'fb_group_url', maxLength: 500,
+      aliases: ['url', 'link', 'group link', 'facebook url', 'fb url', 'facebook link'], example: 'https://www.facebook.com/groups/pianomomsaustin' },
+    { key: 'group_location', label: 'Location', kind: 'text', maxLength: 200,
+      aliases: ['city', 'area', 'region', 'town'], example: 'Austin, TX' },
+    { key: 'group_membership_size', label: 'Members', kind: 'integer',
+      aliases: ['member count', 'membership', 'membership size', 'size', 'group size', 'number of members'], example: '8800' },
+    { key: 'post_type', label: 'Post type', kind: 'enum', defaultValue: 'both',
+      options: [
+        { value: 'self_promo', label: 'Self Promo' },
+        { value: 'third_party', label: 'Third Party' },
+        { value: 'both', label: 'Both' },
+      ],
+      aliases: ['type', 'category', 'posting type'], example: 'Self Promo' },
+    { key: 'qualification_status', label: 'Qualification status', kind: 'enum', defaultValue: 'active',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'disqualified_low_engagement', label: 'Disqualified' },
+        { value: 'future_third_party', label: 'Future' },
+      ],
+      aliases: ['qualification', 'qualified', 'status'], example: 'Active' },
+    { key: 'is_active', label: 'Active', kind: 'boolean', defaultValue: true,
+      aliases: ['active group', 'enabled'], example: 'yes' },
+    { key: 'post_frequency', label: 'Frequency', kind: 'enum',
+      options: [
+        { value: 'daily', label: 'Daily' },
+        { value: 'weekly', label: 'Weekly' },
+        { value: 'biweekly', label: 'Biweekly' },
+        { value: 'monthly', label: 'Monthly' },
+        { value: 'bimonthly', label: 'Bimonthly' },
+      ],
+      aliases: ['post frequency', 'posting frequency', 'schedule', 'posting schedule', 'how often'], example: 'Weekly' },
+    { key: 'post_days', label: 'Days', kind: 'days',
+      aliases: ['post days', 'posting days', 'day', 'days of week', 'post day', 'posting day'], example: 'Mon, Thu' },
+    { key: 'post_week_pattern', label: 'Week pattern', kind: 'enum', defaultValue: 'both',
+      options: [
+        { value: 'both', label: 'Both weeks' },
+        { value: 'a_week', label: 'A-Week' },
+        { value: 'b_week', label: 'B-Week' },
+      ],
+      aliases: ['week', 'weeks', 'ab week'], example: 'Both weeks' },
+    { key: 'shared_with', label: 'Shared with', kind: 'text', maxLength: 200,
+      aliases: ['shared', 'partner'], example: 'Jordan (partner studio)' },
+    { key: 'posting_rules', label: 'Posting rules', kind: 'text', maxLength: 5000,
+      aliases: ['rules', 'group rules'], example: 'Promo posts on Fridays only' },
+    { key: 'application_date', label: 'Application date', kind: 'date',
+      aliases: ['applied', 'date applied', 'applied on'], example: '2026-09-01' },
+    { key: 'acceptance_date', label: 'Acceptance date', kind: 'date',
+      aliases: ['accepted', 'date accepted', 'joined', 'date joined', 'accepted on'], example: '2026-09-03' },
+    { key: 'most_recent_post_date', label: 'Last posted', kind: 'date',
+      aliases: ['last post', 'last post date', 'most recent post', 'last posted date'], example: '2026-10-28' },
+    { key: 'notes', label: 'Notes', kind: 'text', maxLength: 5000,
+      aliases: ['note', 'comments', 'comment'], example: 'Admin approves posts within a day' },
   ],
 }

@@ -6,11 +6,15 @@ import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
 import { existingSchoolSourceSpellings } from '@/lib/source-server'
 import { cleanSource } from '@/lib/source'
-import { LEADS_IMPORT, SCHOOLS_IMPORT } from '@/lib/csv-import/configs'
+import { FACEBOOK_GROUPS_IMPORT, LEADS_IMPORT, SCHOOLS_IMPORT } from '@/lib/csv-import/configs'
 import {
   CSV_IMPORT_SCHOOL_SOURCE,
+  DUPLICATE_MESSAGES,
   MAX_IMPORT_ROWS,
+  facebookGroupKeys,
   matchOption,
+  parseBoolean,
+  rowMatchKeys,
   schoolKey,
   validateRow,
   type EntityKind,
@@ -33,11 +37,14 @@ async function importContext(entity: EntityKind): Promise<{ ctx: Ctx; error: nul
   const ctx = await getStudioId()
   if (!ctx) return { ctx: null, error: 'Unauthorized' }
   if (ctx.viewOnly) return { ctx: null, error: 'View only mode' }
-  // Same gate as the /school-outreach page itself. Leads are ungated.
-  if (entity === 'schools' && !ctx.isAdmin) {
+  // Same gates as the /school-outreach and /facebook-groups pages. Leads are ungated.
+  const gate = entity === 'schools' ? { feature: 'school_outreach' as const, name: 'School Outreach' }
+    : entity === 'facebook_groups' ? { feature: 'facebook_groups' as const, name: 'Facebook Groups' }
+    : null
+  if (gate && !ctx.isAdmin) {
     const tier = await getCachedStudioTier(ctx.studioId)
-    if (!hasFeatureAccess(tier, 'school_outreach')) {
-      return { ctx: null, error: 'School Outreach is not included in your plan.' }
+    if (!hasFeatureAccess(tier, gate.feature)) {
+      return { ctx: null, error: `${gate.name} is not included in your plan.` }
     }
   }
   return { ctx, error: null }
@@ -101,16 +108,38 @@ async function existingSchools(ctx: Ctx): Promise<Map<string, string>> {
   return map
 }
 
-/** Preview step: which of these dedupe keys already exist in the account. */
+interface ExistingGroup {
+  id: string
+  group_url: string | null
+}
+
+/** Every identity key of every group (see facebookGroupKeys) -> that group. */
+async function existingFacebookGroups(ctx: Ctx): Promise<Map<string, ExistingGroup>> {
+  const rows = await fetchAll<{ id: string; group_name: string; group_url: string | null }>(
+    ctx, 'facebook_groups', 'id, group_name, group_url',
+  )
+  const map = new Map<string, ExistingGroup>()
+  for (const r of rows) {
+    for (const k of facebookGroupKeys(r.group_name, r.group_url).identity) {
+      if (!map.has(k)) map.set(k, { id: r.id, group_url: r.group_url })
+    }
+  }
+  return map
+}
+
+/** Preview step: which of these match keys already exist in the account. */
 export async function findExistingImportKeys(
   entity: EntityKind,
   keys: string[],
 ): Promise<{ keys: string[]; error: string | null }> {
   const { ctx, error } = await importContext(entity)
   if (!ctx) return { keys: [], error }
-  if (!Array.isArray(keys) || keys.length > MAX_IMPORT_ROWS) return { keys: [], error: 'Too many rows.' }
+  // Facebook group rows have up to two match keys each.
+  if (!Array.isArray(keys) || keys.length > MAX_IMPORT_ROWS * 2) return { keys: [], error: 'Too many rows.' }
   try {
-    const existing = entity === 'leads' ? await existingLeadEmails(ctx) : await existingSchools(ctx)
+    const existing: Map<string, unknown> = entity === 'leads' ? await existingLeadEmails(ctx)
+      : entity === 'schools' ? await existingSchools(ctx)
+      : await existingFacebookGroups(ctx)
     return { keys: keys.filter(k => typeof k === 'string' && existing.has(k)), error: null }
   } catch (e) {
     return { keys: [], error: e instanceof Error ? e.message : 'Lookup failed' }
@@ -385,4 +414,123 @@ async function addContactsToExistingSchool(
     }
     results.push({ row: v.row, outcome: 'updated' })
   }
+}
+
+// ─── Facebook groups ────────────────────────────────────────────────────────
+
+function groupRecord(v: ValidatedRow) {
+  return {
+    group_name: v.clean.group_name as string,
+    group_url: (v.clean.group_url as string | null) ?? null,
+    group_location: (v.clean.group_location as string | null) ?? null,
+    group_membership_size: (v.clean.group_membership_size as number | null) ?? null,
+    post_type: v.clean.post_type as string,
+    qualification_status: v.clean.qualification_status as string,
+    is_active: v.clean.is_active as boolean,
+    post_frequency: (v.clean.post_frequency as string | null) ?? null,
+    post_days: (v.clean.post_days as string[] | null) ?? [],
+    post_week_pattern: v.clean.post_week_pattern as string,
+    shared_with: (v.clean.shared_with as string | null) ?? null,
+    posting_rules: (v.clean.posting_rules as string | null) ?? null,
+    application_date: (v.clean.application_date as string | null) ?? null,
+    acceptance_date: (v.clean.acceptance_date as string | null) ?? null,
+    most_recent_post_date: (v.clean.most_recent_post_date as string | null) ?? null,
+    notes: (v.clean.notes as string | null) ?? null,
+  }
+}
+
+type GroupRecord = ReturnType<typeof groupRecord>
+
+/**
+ * Columns an update may write: only cells the CSV filled in with a value that
+ * was understood, so blanks, defaults and unreadable values never overwrite
+ * what an existing group already has. The URL is only filled in, never changed.
+ */
+function groupPatch(v: ValidatedRow, raw: Record<string, string>, existing: ExistingGroup): Partial<GroupRecord> {
+  const rec = groupRecord(v)
+  const patch: Partial<GroupRecord> = {}
+  const set = <K extends keyof GroupRecord>(key: K) => { patch[key] = rec[key] }
+  for (const f of FACEBOOK_GROUPS_IMPORT.fields) {
+    const key = f.key as keyof GroupRecord
+    const value = raw[f.key]
+    if (!value) continue
+    switch (f.kind) {
+      case 'enum': if (matchOption(value, f.options ?? []) !== null) set(key); break
+      case 'boolean': if (parseBoolean(value) !== null) set(key); break
+      case 'days': if (rec.post_days.length > 0) set(key); break
+      case 'fb_group_url': if (!existing.group_url && rec.group_url) set(key); break
+      case 'integer':
+      case 'date': if (rec[key] !== null) set(key); break
+      default: set(key)
+    }
+  }
+  return patch
+}
+
+export async function importFacebookGroupsBatch(
+  rowsInput: MappedRow[],
+  mode: DuplicateMode,
+): Promise<{ results: RowResult[]; error: string | null }> {
+  const { ctx, error } = await importContext('facebook_groups')
+  if (!ctx) return { results: [], error }
+  const rows = sanitize(rowsInput, FACEBOOK_GROUPS_IMPORT)
+  if (!rows) return { results: [], error: 'Invalid import batch.' }
+
+  let existing: Map<string, ExistingGroup>
+  try {
+    existing = await existingFacebookGroups(ctx)
+  } catch (e) {
+    return { results: [], error: e instanceof Error ? e.message : 'Lookup failed' }
+  }
+
+  const results: RowResult[] = []
+  const toInsert: ValidatedRow[] = []
+  // Identity keys of groups already created or updated by this batch: a later
+  // row for the same group is a repeat within the file and must not overwrite the first.
+  const handled = new Set<string>()
+  const messages = DUPLICATE_MESSAGES.facebook_groups
+
+  for (const r of rows) {
+    const v = validateRow(r, FACEBOOK_GROUPS_IMPORT)
+    if (v.status === 'error') { results.push(errorResult(v)); continue }
+
+    const matchKeys = rowMatchKeys(v)
+    if (matchKeys.some(k => handled.has(k))) {
+      results.push({ row: v.row, outcome: 'skipped', message: messages.file })
+      continue
+    }
+    for (const k of v.identityKeys ?? matchKeys) handled.add(k)
+    const match = matchKeys.map(k => existing.get(k)).find(Boolean)
+    if (!match) { toInsert.push(v); continue }
+
+    if (mode === 'skip') { results.push({ row: v.row, outcome: 'skipped', message: messages.account }); continue }
+
+    const patch = groupPatch(v, r.values, match)
+    if (Object.keys(patch).length === 0) {
+      results.push({ row: v.row, outcome: 'skipped', message: 'Already exists; nothing new to update.' })
+      continue
+    }
+    const { error: upErr } = await ctx.supabase
+      .from('facebook_groups').update(patch).eq('id', match.id).eq('studio_id', ctx.studioId)
+    results.push(upErr ? { row: v.row, outcome: 'failed', message: upErr.message } : { row: v.row, outcome: 'updated' })
+  }
+
+  if (toInsert.length) {
+    const records = toInsert.map(v => ({ ...groupRecord(v), studio_id: ctx.studioId }))
+    const { error: insErr } = await ctx.supabase.from('facebook_groups').insert(records)
+    if (!insErr) {
+      for (const v of toInsert) results.push({ row: v.row, outcome: 'created' })
+    } else {
+      // One bad row fails the whole statement; retry one by one to find it.
+      for (let i = 0; i < toInsert.length; i++) {
+        const { error: oneErr } = await ctx.supabase.from('facebook_groups').insert(records[i])
+        results.push(oneErr
+          ? { row: toInsert[i].row, outcome: 'failed', message: oneErr.message }
+          : { row: toInsert[i].row, outcome: 'created' })
+      }
+    }
+  }
+
+  revalidatePath('/facebook-groups')
+  return { results: results.sort((a, b) => a.row - b.row), error: null }
 }
