@@ -9,9 +9,7 @@ import { graduateBlockedRoute } from '@/lib/features'
 import { getDesignerEmails, isDesignerEmail } from '@/lib/designer'
 import { canvaTypeLabel, isCanvaRequestType, canvaLinkRequired } from '@/lib/canva-requests'
 import type { CanvaRequestType } from '@/types/database'
-import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { sendAdminNotification } from '@/lib/admin-notify'
 
 function esc(s: string): string {
   return s
@@ -108,8 +106,7 @@ export async function submitCanvaRequest(formData: {
     const submittedAt = new Date().toLocaleString('en-US', {
       dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Chicago',
     })
-    await resend.emails.send({
-      from: 'Outside The Bachs <noreply@outsidethebachs.com>',
+    const { error: emailError } = await sendAdminNotification({
       to: getDesignerEmails(),
       subject: `New Canva request: ${typeLabel} — ${formData.asset_type}`,
       text: [
@@ -164,6 +161,7 @@ export async function submitCanvaRequest(formData: {
   </table>
 </body></html>`,
     })
+    if (emailError) console.error('[canva-edits] designer notification email failed:', emailError)
   } catch (err) {
     console.error('[canva-edits] designer notification email failed:', err)
   }
