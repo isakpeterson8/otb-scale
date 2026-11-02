@@ -11,6 +11,7 @@ import {
   countStatuses,
   makeBatches,
   mappingErrors,
+  rowMatchKeys,
   validateRows,
   type ImportConfig,
   type RowResult,
@@ -19,6 +20,7 @@ import {
 } from '@/lib/csv-import/core'
 import {
   findExistingImportKeys,
+  importFacebookGroupsBatch,
   importLeadsBatch,
   importSchoolsBatch,
   type DuplicateMode,
@@ -32,6 +34,12 @@ const STATUS_META: Record<RowStatus, { icon: string; label: string }> = {
   error:     { icon: '❌', label: 'Error' },
   duplicate: { icon: '🔁', label: 'Duplicate' },
 }
+
+const SEND_BATCH = {
+  leads: importLeadsBatch,
+  schools: importSchoolsBatch,
+  facebook_groups: importFacebookGroupsBatch,
+} as const
 
 const BUTTON_SECONDARY =
   'flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--ink)]/15 text-sm font-medium text-[var(--ink)] hover:bg-[var(--surface)] transition-colors'
@@ -97,7 +105,7 @@ function ImportModal({ config, onClose }: { config: ImportConfig; onClose: (impo
   const [dragOver, setDragOver] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const entityPlural = config.entity === 'leads' ? 'leads' : 'schools'
+  const entityPlural = config.nounPlural
 
   // ── Step 1: upload ──────────────────────────────────────────────────────
   function handleFile(file: File | undefined) {
@@ -140,7 +148,7 @@ function ImportModal({ config, onClose }: { config: ImportConfig; onClose: (impo
     setError(null)
     const mapped = applyMapping(rawRows, mapping)
     // Validate once without duplicates to collect the keys, then look them up.
-    const keys = [...new Set(validateRows(mapped, config, new Set()).map(r => r.dedupeKey).filter((k): k is string => !!k))]
+    const keys = [...new Set(validateRows(mapped, config, new Set()).flatMap(rowMatchKeys))]
     const { keys: existing, error: lookupError } = await findExistingImportKeys(config.entity, keys)
     setBusy(false)
     if (lookupError) { setError(lookupError); return }
@@ -167,7 +175,7 @@ function ImportModal({ config, onClose }: { config: ImportConfig; onClose: (impo
     const batches = makeBatches(toSend, config.entity)
     setProgress({ done: 0, total: toSend.length })
     const all: RowResult[] = []
-    const send = config.entity === 'leads' ? importLeadsBatch : importSchoolsBatch
+    const send = SEND_BATCH[config.entity]
 
     for (const batch of batches) {
       const payload = batch.map(({ row, values }) => ({ row, values }))
@@ -342,7 +350,7 @@ function ImportModal({ config, onClose }: { config: ImportConfig; onClose: (impo
                   </label>
                   <label className="flex items-center gap-1.5">
                     <input type="radio" name="dup-mode" checked={mode === 'update'} onChange={() => setMode('update')} />
-                    {config.entity === 'leads' ? 'Update the existing leads' : 'Add new contacts to the existing schools'}
+                    {config.updateLabel}
                   </label>
                 </fieldset>
               )}
