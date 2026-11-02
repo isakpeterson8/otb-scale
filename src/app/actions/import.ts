@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { getStudioId } from './_shared'
 import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
+import { existingSchoolSourceSpellings } from '@/lib/source-server'
+import { cleanSource } from '@/lib/source'
 import { LEADS_IMPORT, SCHOOLS_IMPORT } from '@/lib/csv-import/configs'
 import {
   CSV_IMPORT_SCHOOL_SOURCE,
@@ -258,6 +260,22 @@ export async function importSchoolsBatch(
     groups.set(v.dedupeKey, [...(groups.get(v.dedupeKey) ?? []), v])
   }
 
+  // Sources are saved in the studio's existing spelling when one matches
+  // case-insensitively; a new source keeps the first spelling seen in the file.
+  const groupSource = (group: ValidatedRow[]) =>
+    cleanSource(firstProvided(group, 'source')?.clean.source) ?? CSV_IMPORT_SCHOOL_SOURCE
+  let sourceSpellings: Map<string, string>
+  try {
+    sourceSpellings = await existingSchoolSourceSpellings(ctx.supabase, ctx.studioId, [...groups.values()].map(groupSource))
+  } catch (e) {
+    return { results: [], error: e instanceof Error ? e.message : 'Lookup failed' }
+  }
+  const spellSource = (raw: string) => {
+    const key = raw.toLowerCase()
+    if (!sourceSpellings.has(key)) sourceSpellings.set(key, raw)
+    return sourceSpellings.get(key) as string
+  }
+
   for (const [key, group] of groups) {
     const existingId = existing.get(key)
     // The row explicitly marked primary goes first, so the insert trigger makes it primary.
@@ -283,7 +301,7 @@ export async function importSchoolsBatch(
         city: (first.clean.city as string | null) ?? null,
         state: (first.clean.state as string | null) ?? null,
         school_type: (firstProvided(group, 'school_type')?.clean.school_type as string | undefined) ?? null,
-        source: (firstProvided(group, 'source')?.clean.source as string | undefined) ?? CSV_IMPORT_SCHOOL_SOURCE,
+        source: spellSource(groupSource(group)),
         stage: statusRow.clean.status as string,
         notes: (firstProvided(group, 'notes')?.clean.notes as string | undefined) ?? null,
       })

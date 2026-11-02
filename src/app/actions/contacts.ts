@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStudioId } from './_shared'
+import { normalizeLeadSource } from '@/lib/source-server'
 import { LEAD_STATUSES, WAITLIST_STATUS } from '@/types/database'
 import type { LeadStatus } from '@/types/database'
 
@@ -18,7 +19,7 @@ export async function createContact(formData: FormData) {
   if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase, studioId } = ctx
 
-  const leadSource = (formData.get('lead_source') as string) || null
+  const leadSource = normalizeLeadSource(formData.get('lead_source'))
   const leadSubSource = (formData.get('lead_sub_source') as string) || null
   const sourceFbGroupId = (formData.get('source_facebook_group_id') as string) || null
 
@@ -48,7 +49,7 @@ export async function updateContact(id: string, formData: FormData) {
   if (ctx.viewOnly) return { error: 'View only mode' }
   const { supabase } = ctx
 
-  const leadSource = (formData.get('lead_source') as string) || null
+  const leadSource = normalizeLeadSource(formData.get('lead_source'))
   const leadSubSource = (formData.get('lead_sub_source') as string) || null
   const sourceFbGroupId = (formData.get('source_facebook_group_id') as string) || null
 

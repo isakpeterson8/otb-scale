@@ -135,6 +135,8 @@ export interface Contact {
   waitlist_rank: number | null
   source: string | null
   lead_source: string | null
+  /** Generated: lower(trim(lead_source)), what filters and grouping compare; read-only. */
+  lead_source_key: string | null
   lead_sub_source: string | null
   source_facebook_group_id: string | null
   notes: string | null
@@ -321,6 +323,8 @@ export interface SchoolOutreach {
   studio_id: string
   school_name: string
   source: string | null
+  /** Generated: lower(trim(source)), what filters and grouping compare; read-only. */
+  source_key: string | null
   city: string | null
   state: string | null
   school_type: string | null

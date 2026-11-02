@@ -9,8 +9,9 @@ import type { Contact, LeadStatus, OrganicOutreach, OutreachType } from '@/types
 import { LEAD_SOURCES, LEAD_STATUSES, LEAD_SUB_SOURCES, OUTREACH_TYPES, WAITLIST_STATUS } from '@/types/database'
 import ListViewToolbar from '@/components/ui/ListViewToolbar'
 import GroupedList from '@/components/ui/GroupedList'
+import SourceCombobox from '@/components/ui/SourceCombobox'
 import { useListView } from '@/hooks/useListView'
-import { NONE_VALUE, sourceChipOptions, statusChipOptions, type ListFacets } from '@/lib/list-view'
+import { NONE_VALUE, sourceChipOptions, sourceGroupKey, statusChipOptions, type ListFacets } from '@/lib/list-view'
 import { LEADS_VIEW } from '@/lib/list-view-configs'
 import CsvImport from '@/components/csv-import/CsvImport'
 import { LEADS_IMPORT } from '@/lib/csv-import/configs'
@@ -194,28 +195,18 @@ function LeadForm({
       </div>
 
       {/* Lead source cascade */}
-      <div>
-        <label className="block text-xs text-[var(--ink-3)] mb-1">
-          Lead Source
-        </label>
-        <select
-          name="lead_source"
-          value={leadSource}
-          onChange={e => {
-            setLeadSource(e.target.value)
-            setLeadSubSource('')
-            setGroupId('')
-          }}
-          className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
-        >
-          <option value="">— Select source —</option>
-          {LEAD_SOURCES.map(s => (
-            <option key={s.value} value={s.value} className="bg-[var(--surface)]">
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <SourceCombobox
+        name="lead_source"
+        label="Lead Source"
+        options={LEAD_SOURCES}
+        defaultValue={leadSource}
+        placeholder="Type to search sources"
+        onChange={next => {
+          setLeadSource(next)
+          setLeadSubSource('')
+          setGroupId('')
+        }}
+      />
 
       {leadSource === 'facebook_group' && (
         <>
@@ -439,7 +430,7 @@ function LeadsTab({
 
   const groupOf =
     view.group === 'status' ? (c: Contact) => c.status ?? NONE_VALUE
-    : view.group === 'source' ? (c: Contact) => c.lead_source ?? NONE_VALUE
+    : view.group === 'source' ? (c: Contact) => sourceGroupKey(c.lead_source)
     : null
   const groupOptions = view.group === 'source' ? sourceChipOptions(LEADS_VIEW, facets) : statusChipOptions(LEADS_VIEW)
   const groupLabel = (key: string) => groupOptions.find(o => o.value === key)?.label ?? key
@@ -511,10 +502,8 @@ function LeadsTab({
             items={contacts}
             groupOf={groupOf}
             labelFor={groupLabel}
-            renderList={items => (
-          <>
-            {/* Mobile card list */}
-            <div className="md:hidden divide-y divide-[var(--ink)]/6">
+            renderCards={items => (
+            <div className="divide-y divide-[var(--ink)]/6">
               {items.map(contact => {
                 const sourceLabel = formatLeadSource(contact, facebookGroups)
                 return (
@@ -550,11 +539,11 @@ function LeadsTab({
                 )
               })}
             </div>
-
-            {/* Desktop table */}
-            <div className="hidden md:block">
-              <table className="w-full text-sm">
-                <thead>
+            )}
+            table={{
+              className: 'w-full text-sm',
+              columns: 7,
+              head: (
                   <tr className="border-b border-[var(--ink)]/8">
                     <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Name</th>
                     <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide">Email</th>
@@ -564,8 +553,9 @@ function LeadsTab({
                     <th className="text-left px-5 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide hidden lg:table-cell">Added</th>
                     <th className="px-5 py-3" />
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ink)]/6">
+              ),
+              renderRows: items => (
+                <>
                   {items.map(contact => {
                     const sourceLabel = formatLeadSource(contact, facebookGroups)
                     return (
@@ -608,11 +598,9 @@ function LeadsTab({
                       </tr>
                     )
                   })}
-                </tbody>
-              </table>
-            </div>
-          </>
-            )}
+                </>
+              ),
+            }}
           />
         )}
       </div>
