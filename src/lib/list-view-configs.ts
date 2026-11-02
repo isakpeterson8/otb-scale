@@ -38,5 +38,8 @@ export const SCHOOLS_VIEW: ListViewConfig = {
   sourceNoneLabel: 'No source',
   searchColumns: ['school_name'],
   searchPlaceholder: 'Search school or contact…',
+  // Computed field from the school_next_due migration: the date behind the
+  // cadence badge, read live from cadence_enrollments.
+  dueDateColumn: 'next_due_on',
   followUp: { kind: 'due_by_today', column: 'next_step_due_date' },
 }

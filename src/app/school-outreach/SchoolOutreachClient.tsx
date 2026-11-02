@@ -56,6 +56,14 @@ function StageBadge({ stage }: { stage: SchoolOutreachStage }) {
   )
 }
 
+/** "Email N due <date>": red when overdue, amber when due today, neutral when upcoming. */
+function dueBadge(label: string, dueAt: string, todayStr: string) {
+  const day = dueAt.slice(0, 10)
+  if (day < todayStr) return { label, bg: 'var(--red-l)', text: 'var(--red)' }
+  if (day === todayStr) return { label, bg: 'rgba(180,83,9,0.1)', text: 'var(--amber)' }
+  return { label, bg: 'rgba(4,173,239,0.1)', text: 'var(--accent-text)' }
+}
+
 function getCadenceBadge(e: CadenceEnrollment | null, todayStr: string) {
   if (!e) return { label: 'Not enrolled', bg: 'rgba(0,0,0,0.04)', text: 'rgba(0,0,0,0.35)' }
   if (e.status === 'completed') return { label: 'Completed', bg: 'rgba(22,163,74,0.1)', text: 'var(--green)' }
@@ -70,17 +78,19 @@ function getCadenceBadge(e: CadenceEnrollment | null, todayStr: string) {
   }
   if (num === 1) {
     if (e.email_2_due_at && e.email_2_due_at.slice(0, 10) <= todayStr) {
-      return { label: `Email 2 due ${fmtShort(e.email_2_due_at)}`, bg: 'rgba(180,83,9,0.1)', text: 'var(--amber)' }
+      return dueBadge(`Email 2 due ${fmtShort(e.email_2_due_at)}`, e.email_2_due_at, todayStr)
     }
     return { label: 'Email 1 sent', bg: 'rgba(4,173,239,0.1)', text: 'var(--accent-text)' }
   }
   if (num === 2) {
     const d = e.email_3_due_at
-    return { label: d ? `Email 3 due ${fmtShort(d)}` : 'Email 2 sent', bg: 'rgba(180,83,9,0.1)', text: 'var(--amber)' }
+    if (d) return dueBadge(`Email 3 due ${fmtShort(d)}`, d, todayStr)
+    return { label: 'Email 2 sent', bg: 'rgba(180,83,9,0.1)', text: 'var(--amber)' }
   }
   if (num === 3) {
     const d = e.email_4_due_at
-    return { label: d ? `Email 4 due ${fmtShort(d)}` : 'Email 3 sent', bg: 'rgba(180,83,9,0.1)', text: 'var(--amber)' }
+    if (d) return dueBadge(`Email 4 due ${fmtShort(d)}`, d, todayStr)
+    return { label: 'Email 3 sent', bg: 'rgba(180,83,9,0.1)', text: 'var(--amber)' }
   }
   return { label: 'Completed', bg: 'rgba(22,163,74,0.1)', text: 'var(--green)' }
 }
