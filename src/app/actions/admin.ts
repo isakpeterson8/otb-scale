@@ -6,6 +6,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { adminClient } from '@/lib/supabase/admin'
 import { getStudioId } from '@/app/actions/_shared'
+import { getAdminNotifyEmails, sendAdminNotification } from '@/lib/admin-notify'
 import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -287,15 +288,11 @@ export async function requestTierUpgrade(requestedTier: string) {
   if (error) return { error: error.message }
 
   // Notify OTB admins by email
-  const adminNotifyEmails = (process.env.ADMIN_NOTIFY_EMAILS ?? process.env.ADMIN_EMAILS ?? '').split(',').map(e => e.trim()).filter(Boolean)
-  if (adminNotifyEmails.length > 0) {
-    await resend.emails.send({
-      from: 'Outside The Bachs <noreply@outsidethebachs.com>',
-      to: adminNotifyEmails,
-      subject: `Tier upgrade request — ${userEmail ?? studioId}`,
-      text: `A studio has requested a tier upgrade.\n\nStudio ID: ${studioId}\nUser: ${userEmail ?? 'unknown'}\nRequested tier: ${requestedTier}\n\nApprove in the admin panel: https://studio.outsidethebachs.com/admin`,
-    })
-  }
+  await sendAdminNotification({
+    to: getAdminNotifyEmails(),
+    subject: `Tier upgrade request — ${userEmail ?? studioId}`,
+    text: `A studio has requested a tier upgrade.\n\nStudio ID: ${studioId}\nUser: ${userEmail ?? 'unknown'}\nRequested tier: ${requestedTier}\n\nApprove in the admin panel: https://studio.outsidethebachs.com/admin`,
+  })
 
   revalidatePath('/admin')
   return { error: null }

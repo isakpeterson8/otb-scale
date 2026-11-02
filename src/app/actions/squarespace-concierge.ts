@@ -7,6 +7,7 @@ import { getStudioId } from '@/app/actions/_shared'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
 import { graduateBlockedRoute } from '@/lib/features'
 import { Resend } from 'resend'
+import { getAdminNotifyEmails, sendAdminNotification } from '@/lib/admin-notify'
 import { COPY_PACK_PROMPT, CIRCLE_SYNC_PROMPT } from '@/lib/squarespace-prompts'
 import type {
   SquarespaceRequest,
@@ -164,39 +165,35 @@ export async function submitSquarespaceRequest(
   }
 
   // Admin notification
-  const adminEmails = process.env.ADMIN_NOTIFY_EMAILS ?? process.env.ADMIN_EMAILS ?? ''
-  if (adminEmails) {
-    const typeLabel = REQUEST_TYPE_LABELS[input.request_type]
-    await resend.emails.send({
-      from: 'Outside The Bachs <noreply@outsidethebachs.com>',
-      to: adminEmails.split(',').map(e => e.trim()).filter(Boolean),
-      subject: `New Squarespace request: ${typeLabel}`,
-      text: [
-        `New Squarespace concierge request`,
-        `Type: ${typeLabel}`,
-        input.studio_name ? `Studio: ${input.studio_name}` : '',
-        input.owner_name  ? `Owner: ${input.owner_name}` : '',
-        input.city_state  ? `Location: ${input.city_state}` : '',
-        ``,
-        `Review: https://studio.outsidethebachs.com/admin/requests/squarespace`,
-      ].filter(Boolean).join('\n'),
-      html: emailShell(`
-        <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">New Squarespace Request</h2>
-        <table style="width:100%;font-size:14px;color:#374151;border-collapse:collapse;">
-          <tr><td style="padding:4px 0;color:#6b7280;width:120px;">Type</td><td>${typeLabel}</td></tr>
-          ${input.studio_name ? `<tr><td style="padding:4px 0;color:#6b7280;">Studio</td><td>${input.studio_name}</td></tr>` : ''}
-          ${input.owner_name  ? `<tr><td style="padding:4px 0;color:#6b7280;">Owner</td><td>${input.owner_name}</td></tr>` : ''}
-          ${input.city_state  ? `<tr><td style="padding:4px 0;color:#6b7280;">Location</td><td>${input.city_state}</td></tr>` : ''}
-        </table>
-        <div style="margin-top:24px;">
-          <a href="https://studio.outsidethebachs.com/admin/requests/squarespace"
-             style="display:inline-block;padding:10px 20px;background:#0284a8;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
-            View in pipeline →
-          </a>
-        </div>
-      `),
-    })
-  }
+  const typeLabel = REQUEST_TYPE_LABELS[input.request_type]
+  await sendAdminNotification({
+    to: getAdminNotifyEmails(),
+    subject: `New Squarespace request: ${typeLabel}`,
+    text: [
+      `New Squarespace concierge request`,
+      `Type: ${typeLabel}`,
+      input.studio_name ? `Studio: ${input.studio_name}` : '',
+      input.owner_name  ? `Owner: ${input.owner_name}` : '',
+      input.city_state  ? `Location: ${input.city_state}` : '',
+      ``,
+      `Review: https://studio.outsidethebachs.com/admin/requests/squarespace`,
+    ].filter(Boolean).join('\n'),
+    html: emailShell(`
+      <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">New Squarespace Request</h2>
+      <table style="width:100%;font-size:14px;color:#374151;border-collapse:collapse;">
+        <tr><td style="padding:4px 0;color:#6b7280;width:120px;">Type</td><td>${typeLabel}</td></tr>
+        ${input.studio_name ? `<tr><td style="padding:4px 0;color:#6b7280;">Studio</td><td>${input.studio_name}</td></tr>` : ''}
+        ${input.owner_name  ? `<tr><td style="padding:4px 0;color:#6b7280;">Owner</td><td>${input.owner_name}</td></tr>` : ''}
+        ${input.city_state  ? `<tr><td style="padding:4px 0;color:#6b7280;">Location</td><td>${input.city_state}</td></tr>` : ''}
+      </table>
+      <div style="margin-top:24px;">
+        <a href="https://studio.outsidethebachs.com/admin/requests/squarespace"
+           style="display:inline-block;padding:10px 20px;background:#0284a8;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
+          View in pipeline →
+        </a>
+      </div>
+    `),
+  })
 
   revalidatePath('/squarespace-concierge')
   return {}
