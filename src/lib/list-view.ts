@@ -9,7 +9,13 @@
  *
  * Imported by both server and client code, so nothing here may touch
  * server-only modules.
+ *
+ * Sources are compared by key (trimmed, lowercased; see src/lib/source.ts):
+ * source values in the URL are keys, and filtering, grouping and sorting use
+ * the generated key column, so "book" and "Book" are always one source.
  */
+
+import { sourceKey } from './source'
 
 export type SortKey =
   | 'created_desc'
@@ -68,7 +74,9 @@ export interface ListViewConfig {
   /** Chip label for NULL status, or omit when the column is never NULL. */
   statusNoneLabel?: string
   sourceColumn: string
-  /** Fixed source set; omit to build the chips from whatever values exist. */
+  /** Generated lower(trim(source)) column; filters, grouping and sorting use it. */
+  sourceKeyColumn: string
+  /** Fixed source set (values are lowercase keys); omit to build the chips from whatever values exist. */
   sourceOptions?: FacetOption[]
   sourceNoneLabel: string
   /** Columns matched by the text search box. */
@@ -139,7 +147,7 @@ export function parseListView(params: ParamSource, config: ListViewConfig): List
   return {
     sort: oneOf(readParam(params, 'sort'), SORT_OPTIONS.map(o => o.value), DEFAULT_VIEW.sort),
     status: readList(params, 'status').filter(v => allowedStatus.has(v)),
-    source: readList(params, 'source')
+    source: Array.from(new Set(readList(params, 'source').map(v => v.toLowerCase())))
       .filter(v => (allowedSource ? allowedSource.has(v) : v.length <= 100)),
     q: (readParam(params, 'q') ?? '').slice(0, 100),
     group: oneOf(readParam(params, 'group'), GROUP_OPTIONS.map(o => o.value), DEFAULT_VIEW.group),
@@ -230,7 +238,7 @@ export function applyListView<Q extends FilterableQuery<Q>>(
   const orGroups: string[] = []
 
   q = applyIn(q, config.statusColumn, view.status, orGroups)
-  q = applyIn(q, config.sourceColumn, view.source, orGroups)
+  q = applyIn(q, config.sourceKeyColumn, view.source, orGroups)
 
   // Wildcards and quoting characters are stripped rather than escaped: a search
   // box has no use for them, and it keeps the or() string unambiguous.
@@ -256,7 +264,7 @@ export function applyListView<Q extends FilterableQuery<Q>>(
   // Grouped views order by the group key first so each section is contiguous;
   // the chosen sort then applies within each section.
   if (view.group === 'status') q = q.order(config.statusRankColumn, { ascending: true })
-  if (view.group === 'source') q = q.order(config.sourceColumn, { ascending: true, nullsFirst: false })
+  if (view.group === 'source') q = q.order(config.sourceKeyColumn, { ascending: true, nullsFirst: false })
 
   switch (view.sort) {
     case 'created_asc':
@@ -269,7 +277,7 @@ export function applyListView<Q extends FilterableQuery<Q>>(
       q = q.order(config.nameColumn, { ascending: false })
       break
     case 'source_asc':
-      q = q.order(config.sourceColumn, { ascending: true, nullsFirst: false }).order('created_at', { ascending: false })
+      q = q.order(config.sourceKeyColumn, { ascending: true, nullsFirst: false }).order('created_at', { ascending: false })
       break
     case 'status_pipeline':
       q = q.order(config.statusRankColumn, { ascending: true }).order('created_at', { ascending: false })
@@ -285,38 +293,59 @@ export function applyListView<Q extends FilterableQuery<Q>>(
 
 // ─── Facet counts ────────────────────────────────────────────────────────────
 
-/** Row counts per status / source value across the whole studio. NULL is keyed as NONE_VALUE. */
+/**
+ * Row counts per status / source across the whole studio. NULL is keyed as
+ * NONE_VALUE; sources are keyed by sourceKey(), with `sourceLabels` holding
+ * each key's preferred spelling.
+ */
 export interface ListFacets {
   total: number
   status: Record<string, number>
   source: Record<string, number>
+  sourceLabels: Record<string, string>
 }
 
-export const EMPTY_FACETS: ListFacets = { total: 0, status: {}, source: {} }
+export const EMPTY_FACETS: ListFacets = { total: 0, status: {}, source: {}, sourceLabels: {} }
 
-/** Folds the rows returned by a *_list_facets() SQL function into ListFacets. */
+/** The key a row's source is grouped and filtered under. */
+export function sourceGroupKey(source: string | null | undefined): string {
+  return sourceKey(source) ?? NONE_VALUE
+}
+
+/**
+ * Folds the rows returned by a *_list_facets() SQL function into ListFacets.
+ * The function already merges case variants; summing by key here keeps the
+ * chips merged even if it returns more than one spelling of a source.
+ */
 export function toFacets(rows: { facet: string; value: string | null; n: number | string }[] | null): ListFacets {
-  const out: ListFacets = { total: 0, status: {}, source: {} }
+  const out: ListFacets = { total: 0, status: {}, source: {}, sourceLabels: {} }
   for (const row of rows ?? []) {
     const n = Number(row.n)
-    const key = row.value ?? NONE_VALUE
     if (row.facet === 'status') {
-      out.status[key] = n
+      out.status[row.value ?? NONE_VALUE] = n
       out.total += n
     } else if (row.facet === 'source') {
-      out.source[key] = n
+      const key = sourceGroupKey(row.value)
+      out.source[key] = (out.source[key] ?? 0) + n
+      if (row.value && !(key in out.sourceLabels)) out.sourceLabels[key] = row.value.trim()
     }
   }
   return out
 }
 
-/** Source chips: the fixed option list, or every value present in the data. */
+/** Existing free-text sources as { value: preferred spelling, label }, A→Z. */
+export function existingSourceSpellings(facets: ListFacets): FacetOption[] {
+  return Object.values(facets.sourceLabels)
+    .sort((a, b) => a.localeCompare(b))
+    .map(label => ({ value: label, label }))
+}
+
+/** Source chips (value = key): the fixed option list, or every source present in the data. */
 export function sourceChipOptions(config: ListViewConfig, facets: ListFacets): FacetOption[] {
   const base = config.sourceOptions
-    ?? Object.keys(facets.source)
-      .filter(v => v !== NONE_VALUE)
-      .sort((a, b) => a.localeCompare(b))
-      .map(v => ({ value: v, label: v }))
+    ?? Object.entries(facets.sourceLabels)
+      .sort(([, a], [, b]) => a.localeCompare(b))
+      .map(([value, label]) => ({ value, label }))
   return [...base, { value: NONE_VALUE, label: config.sourceNoneLabel }]
 }
 

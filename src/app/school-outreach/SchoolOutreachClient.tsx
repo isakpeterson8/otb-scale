@@ -19,8 +19,9 @@ import { CONTACT_NAME_PLACEHOLDER, SCHOOL_STAGES } from '@/types/database'
 import { ContactsSection, PrimaryContactSummary, RecipientPicker, contactName, primaryContact } from './SchoolContacts'
 import ListViewToolbar from '@/components/ui/ListViewToolbar'
 import GroupedList from '@/components/ui/GroupedList'
+import SourceCombobox from '@/components/ui/SourceCombobox'
 import { useListView } from '@/hooks/useListView'
-import { NONE_VALUE, sourceChipOptions, statusChipOptions, type ListFacets } from '@/lib/list-view'
+import { existingSourceSpellings, sourceChipOptions, sourceGroupKey, statusChipOptions, type FacetOption, type ListFacets } from '@/lib/list-view'
 import { SCHOOLS_VIEW } from '@/lib/list-view-configs'
 import {
   OPENING_TEMPLATES,
@@ -128,7 +129,16 @@ function HighlightedBody({ text }: { text: string }) {
   )
 }
 
-function SchoolForm({ school, onClose }: { school?: SchoolOutreach; onClose: () => void }) {
+function SchoolForm({
+  school,
+  sourceOptions,
+  onClose,
+}: {
+  school?: SchoolOutreach
+  /** The studio's existing sources, each once in its preferred spelling. */
+  sourceOptions: FacetOption[]
+  onClose: () => void
+}) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -166,7 +176,14 @@ function SchoolForm({ school, onClose }: { school?: SchoolOutreach; onClose: () 
       </div>
       <div className="grid grid-cols-2 gap-3">
         {textField('School Type', 'school_type', 'text', 'Elementary')}
-        {textField('Source', 'source', 'text', 'District directory')}
+        <SourceCombobox
+          name="source"
+          label="Source"
+          options={sourceOptions}
+          defaultValue={school?.source}
+          allowCreate
+          placeholder="District directory"
+        />
       </div>
       {/* New schools can start with one contact; existing schools manage
           contacts in the Contacts section below the form. */}
@@ -632,7 +649,7 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
 
   const groupOf =
     view.group === 'status' ? (s: SchoolOutreach) => s.stage
-    : view.group === 'source' ? (s: SchoolOutreach) => s.source ?? NONE_VALUE
+    : view.group === 'source' ? (s: SchoolOutreach) => sourceGroupKey(s.source)
     : null
   const groupOptions = view.group === 'source' ? sourceChipOptions(SCHOOLS_VIEW, facets) : statusChipOptions(SCHOOLS_VIEW)
   const groupLabel = (key: string) => groupOptions.find(o => o.value === key)?.label ?? key
@@ -767,6 +784,7 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
             <SchoolForm
               key={editSchool?.id ?? 'new'}
               school={editSchool ?? undefined}
+              sourceOptions={existingSourceSpellings(facets)}
               onClose={() => { setShowForm(false); setEditSchoolId(null) }}
             />
             {editSchool && <ContactsSection school={editSchool} />}
@@ -805,10 +823,8 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
             items={schools}
             groupOf={groupOf}
             labelFor={groupLabel}
-            renderList={items => (
-          <>
-            {/* Mobile card list */}
-            <div className="md:hidden divide-y divide-[var(--ink)]/6">
+            renderCards={items => (
+            <div className="divide-y divide-[var(--ink)]/6">
               {items.map((school) => {
                 const enrollment = getEnrollment(school.id)
                 const badge = getCadenceBadge(enrollment, todayStr)
@@ -898,11 +914,12 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                 )
               })}
             </div>
-
-            {/* Desktop table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm min-w-[720px]">
-                <thead>
+            )}
+            table={{
+              className: 'w-full text-sm min-w-[720px]',
+              wrapperClassName: 'overflow-x-auto',
+              columns: 6,
+              head: (
                   <tr className="border-b border-[var(--ink)]/8">
                     {['School', 'Contact', 'Phone', 'Stage', 'Cadence', ''].map((h) => (
                       <th key={h} className="text-left px-4 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide whitespace-nowrap">
@@ -910,8 +927,9 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                       </th>
                     ))}
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ink)]/6">
+              ),
+              renderRows: items => (
+                <>
                   {items.map((school) => {
                     const enrollment = getEnrollment(school.id)
                     const badge = getCadenceBadge(enrollment, todayStr)
@@ -1011,11 +1029,9 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                       </tr>
                     )
                   })}
-                </tbody>
-              </table>
-            </div>
-          </>
-            )}
+                </>
+              ),
+            }}
           />
         )}
       </div>

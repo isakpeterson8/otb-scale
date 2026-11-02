@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getStudioId } from './_shared'
+import { normalizeSchoolSource } from '@/lib/source-server'
 
 export async function createSchoolOutreach(formData: FormData) {
   const ctx = await getStudioId()
@@ -23,10 +24,17 @@ export async function createSchoolOutreach(formData: FormData) {
     return { error: `“${contact.email}” is not a valid email address.` }
   }
 
+  let source: string | null
+  try {
+    source = await normalizeSchoolSource(supabase, studioId, formData.get('source'))
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Could not check sources' }
+  }
+
   const { data: created, error } = await supabase.from('school_outreach').insert({
     studio_id: studioId,
     school_name: formData.get('school_name') as string,
-    source: (formData.get('source') as string)?.trim() || null,
+    source,
     city: (formData.get('city') as string)?.trim() || null,
     state: (formData.get('state') as string)?.trim() || null,
     school_type: (formData.get('school_type') as string)?.trim() || null,
@@ -59,13 +67,20 @@ export async function updateSchoolOutreach(id: string, formData: FormData) {
   const ctx = await getStudioId()
   if (!ctx) return { error: 'Unauthorized' }
   if (ctx.viewOnly) return { error: 'View only mode' }
-  const { supabase } = ctx
+  const { supabase, studioId } = ctx
+
+  let source: string | null
+  try {
+    source = await normalizeSchoolSource(supabase, studioId, formData.get('source'))
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Could not check sources' }
+  }
 
   const { error } = await supabase
     .from('school_outreach')
     .update({
       school_name: formData.get('school_name') as string,
-      source: (formData.get('source') as string)?.trim() || null,
+      source,
       city: (formData.get('city') as string)?.trim() || null,
       state: (formData.get('state') as string)?.trim() || null,
       school_type: (formData.get('school_type') as string)?.trim() || null,
