@@ -146,6 +146,33 @@ function CheckCircleIcon({ filled }: { filled: boolean }) {
   )
 }
 
+function ExternalLinkIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden className="shrink-0 opacity-60">
+      <path d="M7 1.5h3.5V5M10.5 1.5L5.5 6.5M9 7.5v2.5a.5.5 0 01-.5.5h-6.5a.5.5 0 01-.5-.5V3.5a.5.5 0 01.5-.5H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// ─── Group Name Link ──────────────────────────────────────────────────────────
+
+// Shared by Today's Posts and the main list so the two render group links the same way
+function GroupNameLink({ group, truncate = false }: { group: FacebookGroup; truncate?: boolean }) {
+  if (!group.group_url) return <>{group.group_name}</>
+  return (
+    <a
+      href={group.group_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Open ${group.group_name} on Facebook`}
+      className="inline-flex items-center gap-1 max-w-full hover:text-[var(--accent-text)] transition-colors"
+    >
+      <span className={truncate ? 'truncate' : undefined}>{group.group_name}</span>
+      <ExternalLinkIcon />
+    </a>
+  )
+}
+
 // ─── Todo Section ─────────────────────────────────────────────────────────────
 
 function TodoSection({
@@ -153,11 +180,13 @@ function TodoSection({
   completions,
   assets,
   allCompletions,
+  onEdit,
 }: {
   dueGroups: FacebookGroup[]
   completions: GroupPostCompletion[]
   assets: GroupPostAsset[]
   allCompletions: Props['allCompletions']
+  onEdit: (group: FacebookGroup) => void
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [formState, setFormState] = useState({ assetId: '', likes: '', comments: '', dms: '' })
@@ -215,20 +244,41 @@ function TodoSection({
 
           return (
             <div key={group.id}>
-              <button
-                onClick={() => handleToggle(group)}
-                disabled={isDone || isPending}
+              {/* Not one big button: the row holds a link and its own action buttons */}
+              <div
                 className={[
-                  'w-full flex items-center gap-3 px-5 py-3 text-left transition-colors',
-                  isDone ? 'opacity-60 cursor-default' : 'hover:bg-[var(--canvas)]',
+                  'flex items-center gap-3 px-5 py-3 transition-colors',
+                  isDone ? 'opacity-60' : 'hover:bg-[var(--canvas)]',
                 ].join(' ')}
               >
-                <CheckCircleIcon filled={isDone} />
+                <button
+                  type="button"
+                  onClick={() => handleToggle(group)}
+                  disabled={isDone || isPending}
+                  className={isDone ? 'cursor-default' : ''}
+                  aria-label={isDone ? `${group.group_name} posted today` : `Log post for ${group.group_name}`}
+                >
+                  <CheckCircleIcon filled={isDone} />
+                </button>
                 <div className="flex-1 min-w-0">
                   <span className={['text-sm font-medium truncate block', isDone ? 'line-through text-[var(--ink-3)]' : 'text-[var(--ink)]'].join(' ')}>
-                    {group.group_name}
+                    <GroupNameLink group={group} truncate />
                   </span>
-                  <span className="text-xs text-[var(--ink-3)]">{scheduleLabel(group)}</span>
+                  <span className="text-xs text-[var(--ink-3)]">
+                    {scheduleLabel(group)}
+                    {!group.group_url && (
+                      <>
+                        {' · '}
+                        <button
+                          type="button"
+                          onClick={() => onEdit(group)}
+                          className="text-[var(--accent-text)] hover:underline"
+                        >
+                          Add link
+                        </button>
+                      </>
+                    )}
+                  </span>
                 </div>
                 {isDone && completionForToday && (
                   <span className="text-xs text-[var(--ink-3)] shrink-0">
@@ -238,11 +288,21 @@ function TodoSection({
                   </span>
                 )}
                 {!isDone && (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden className={['text-[var(--ink-3)] transition-transform', isExpanded ? 'rotate-180' : ''].join(' ')}>
-                    <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(group)}
+                    disabled={isPending}
+                    aria-expanded={isExpanded}
+                    className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--ink-2)] whitespace-nowrap disabled:opacity-60"
+                    style={{ background: 'rgba(0,0,0,0.05)' }}
+                  >
+                    Log post
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden className={['text-[var(--ink-3)] transition-transform', isExpanded ? 'rotate-180' : ''].join(' ')}>
+                      <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
                 )}
-              </button>
+              </div>
 
               {isExpanded && !isDone && (
                 <div className="px-5 pb-4 pt-2 bg-[var(--canvas)] border-t border-[var(--ink)]/6 space-y-3">
@@ -755,6 +815,7 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
           completions={todayCompletions}
           assets={assets}
           allCompletions={allCompletions}
+          onEdit={(group) => { setShowForm(false); setEditGroup(group) }}
         />
       )}
 
@@ -847,9 +908,7 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-[var(--ink)] text-sm">
-                          {group.group_url
-                            ? <a href={group.group_url} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--accent-text)] transition-colors">{group.group_name}</a>
-                            : group.group_name}
+                          <GroupNameLink group={group} />
                         </p>
                         {group.shared_with && (
                           <p className="text-xs text-[var(--ink-3)] mt-0.5">Shared with {group.shared_with}</p>
@@ -931,9 +990,7 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
                     >
                       <div className="min-w-0">
                         <span className="font-medium text-[var(--ink)] truncate block text-sm">
-                          {group.group_url
-                            ? <a href={group.group_url} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--accent-text)] transition-colors">{group.group_name}</a>
-                            : group.group_name}
+                          <GroupNameLink group={group} truncate />
                         </span>
                         {group.post_frequency && (
                           <span className="text-xs text-[var(--ink-3)] truncate block">{scheduleLabel(group)}</span>
