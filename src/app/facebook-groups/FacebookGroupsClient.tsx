@@ -30,9 +30,6 @@ interface Props {
   allCompletions: {
     group_id: string
     last_used_asset_id: string | null
-    likes: number
-    comments: number
-    dms: number
     created_at: string
   }[]
   assets: GroupPostAsset[]
@@ -115,17 +112,6 @@ function formatDate(d: string | null) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function computeEngagement(allCompletions: Props['allCompletions']) {
-  const map: Record<string, { likes: number; comments: number; dms: number }> = {}
-  for (const c of allCompletions) {
-    if (!map[c.group_id]) map[c.group_id] = { likes: 0, comments: 0, dms: 0 }
-    map[c.group_id].likes += c.likes ?? 0
-    map[c.group_id].comments += c.comments ?? 0
-    map[c.group_id].dms += c.dms ?? 0
-  }
-  return map
-}
-
 function getLastUsedAssetId(groupId: string, allCompletions: Props['allCompletions']): string {
   const found = allCompletions.find(c => c.group_id === groupId && c.last_used_asset_id)
   return found?.last_used_asset_id ?? ''
@@ -151,6 +137,23 @@ function ExternalLinkIcon() {
     <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden className="shrink-0 opacity-60">
       <path d="M7 1.5h3.5V5M10.5 1.5L5.5 6.5M9 7.5v2.5a.5.5 0 01-.5.5h-6.5a.5.5 0 01-.5-.5V3.5a.5.5 0 01.5-.5H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  )
+}
+
+// ─── Engagement Badge ─────────────────────────────────────────────────────────
+
+// Binary: has the group's "Initial engagement post complete" box been checked?
+function EngagementBadge({ group }: { group: FacebookGroup }) {
+  return group.initial_engagement_post_complete ? (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+      style={{ background: 'rgba(22,163,74,0.12)', color: '#15803d' }}
+      title="Initial engagement post complete"
+    >
+      ✓ Done
+    </span>
+  ) : (
+    <span className="text-xs text-[var(--ink-3)] whitespace-nowrap" title="Initial engagement post not done yet">Not yet</span>
   )
 }
 
@@ -189,7 +192,7 @@ function TodoSection({
   onEdit: (group: FacebookGroup) => void
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [formState, setFormState] = useState({ assetId: '', likes: '', comments: '', dms: '' })
+  const [formState, setFormState] = useState({ assetId: '' })
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -200,7 +203,7 @@ function TodoSection({
     if (completedIds.has(group.id)) return
     if (expandedId === group.id) { setExpandedId(null); return }
     const lastAsset = getLastUsedAssetId(group.id, allCompletions)
-    setFormState({ assetId: lastAsset, likes: '', comments: '', dms: '' })
+    setFormState({ assetId: lastAsset })
     setExpandedId(group.id)
     setError(null)
   }
@@ -210,9 +213,6 @@ function TodoSection({
     startTransition(async () => {
       const result = await markPostCompletion(groupId, {
         assetId: formState.assetId || null,
-        likes: parseInt(formState.likes) || 0,
-        comments: parseInt(formState.comments) || 0,
-        dms: parseInt(formState.dms) || 0,
       })
       if (result.error) setError(result.error)
       else setExpandedId(null)
@@ -240,7 +240,6 @@ function TodoSection({
           const isDone = completedIds.has(group.id)
           const isExpanded = expandedId === group.id
           const groupAssets = assets.filter(a => a.group_id === group.id)
-          const completionForToday = completions.find(c => c.group_id === group.id)
 
           return (
             <div key={group.id}>
@@ -280,12 +279,8 @@ function TodoSection({
                     )}
                   </span>
                 </div>
-                {isDone && completionForToday && (
-                  <span className="text-xs text-[var(--ink-3)] shrink-0">
-                    {completionForToday.likes + completionForToday.comments + completionForToday.dms > 0
-                      ? `♥${completionForToday.likes} 💬${completionForToday.comments} ✉${completionForToday.dms}`
-                      : 'Posted'}
-                  </span>
+                {isDone && (
+                  <span className="text-xs text-[var(--ink-3)] shrink-0">Posted</span>
                 )}
                 {!isDone && (
                   <button
@@ -323,23 +318,6 @@ function TodoSection({
                       </select>
                     </div>
                   )}
-
-                  <div>
-                    <label className="block text-xs text-[var(--ink-3)] mb-1">Engagement (optional)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {([['likes', '♥ Likes'], ['comments', '💬 Comments'], ['dms', '✉ DMs']] as const).map(([field, placeholder]) => (
-                        <input
-                          key={field}
-                          type="number"
-                          min="0"
-                          placeholder={placeholder}
-                          value={formState[field]}
-                          onChange={e => setFormState(s => ({ ...s, [field]: e.target.value }))}
-                          className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
-                        />
-                      ))}
-                    </div>
-                  </div>
 
                   {error && (
                     <p className="text-xs text-[var(--red)]">{error}</p>
@@ -677,6 +655,18 @@ function GroupForm({
         <label htmlFor="is_active" className="text-sm text-[var(--ink-2)]">Active group</label>
       </div>
 
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="initial_engagement_post_complete"
+          name="initial_engagement_post_complete"
+          value="true"
+          defaultChecked={group?.initial_engagement_post_complete ?? false}
+          className="rounded"
+        />
+        <label htmlFor="initial_engagement_post_complete" className="text-sm text-[var(--ink-2)]">Initial engagement post complete</label>
+      </div>
+
       <div>
         <label className="block text-xs text-[var(--ink-3)] mb-1">Notes</label>
         <textarea
@@ -734,8 +724,6 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
   const filtered = filter === 'all' ? groups : groups.filter(g => g.post_type === filter)
   const dueToday = groups.filter(isDueToday)
 
-  const engagement = computeEngagement(allCompletions)
-
   // For the edit modal, find fresh group data from the props (post-revalidation)
   const editGroupFresh = editGroup
     ? (groups.find(g => g.id === editGroup.id) ?? editGroup)
@@ -746,14 +734,10 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
   function deleteConsequences(group: FacebookGroup): string[] {
     const postCount  = allCompletions.filter(c => c.group_id === group.id).length
     const assetCount = assets.filter(a => a.group_id === group.id).length
-    const eng        = engagement[group.id]
     const out: string[] = []
 
     if (postCount > 0) {
-      const totals = eng
-        ? ` (${eng.likes} likes, ${eng.comments} comments, ${eng.dms} DMs)`
-        : ''
-      out.push(`${postCount} logged post${postCount === 1 ? '' : 's'} and all engagement history${totals}`)
+      out.push(`${postCount} logged post${postCount === 1 ? '' : 's'}`)
     }
     if (assetCount > 0) {
       out.push(`${assetCount} saved post asset${assetCount === 1 ? '' : 's'} (copy and images)`)
@@ -858,17 +842,12 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
       {(showForm || editGroupFresh) && (
         <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:bg-black/50 sm:px-4">
           <div className="flex-1 overflow-y-auto bg-[var(--surface)] sm:flex-none sm:rounded-2xl sm:border sm:border-[var(--ink)]/8 sm:max-h-[90vh] sm:w-full sm:max-w-lg p-6 flex flex-col">
-            {/* Modal header with engagement totals for edit */}
+            {/* Modal header */}
             <div className="flex items-start justify-between mb-5">
               <div>
                 <h3 className="text-base font-medium text-[var(--ink)]">
                   {editGroupFresh ? 'Edit group' : 'Add Facebook group'}
                 </h3>
-                {editGroupFresh && engagement[editGroupFresh.id] && (
-                  <p className="text-xs text-[var(--ink-3)] mt-1">
-                    All-time: ♥{engagement[editGroupFresh.id].likes} likes · 💬{engagement[editGroupFresh.id].comments} comments · ✉{engagement[editGroupFresh.id].dms} DMs
-                  </p>
-                )}
               </div>
               <button
                 onClick={() => { setShowForm(false); setEditGroup(null) }}
@@ -902,7 +881,6 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
                 const postBadge = group.post_type ? POST_TYPE_BADGE[group.post_type] : null
                 const dateStyle = lastPostedStyle(group.most_recent_post_date)
                 const qualBadge = QUAL_BADGE[group.qualification_status ?? 'active']
-                const eng = engagement[group.id]
                 return (
                   <div key={group.id} className={`p-4 space-y-2${!group.is_active ? ' opacity-50' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
@@ -931,9 +909,7 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
                       >
                         {qualBadge.shortLabel}
                       </span>
-                      {eng && (eng.likes + eng.comments + eng.dms) > 0 && (
-                        <span className="text-xs text-[var(--ink-3)]">♥{eng.likes} 💬{eng.comments} ✉{eng.dms}</span>
-                      )}
+                      <EngagementBadge group={group} />
                     </div>
                     {group.post_frequency && (
                       <p className="text-xs text-[var(--ink-3)]">{scheduleLabel(group)}</p>
@@ -981,7 +957,6 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
                   const postBadge = group.post_type ? POST_TYPE_BADGE[group.post_type] : null
                   const dateStyle = lastPostedStyle(group.most_recent_post_date)
                   const qualBadge = QUAL_BADGE[group.qualification_status ?? 'active']
-                  const eng = engagement[group.id]
                   return (
                     <div
                       key={group.id}
@@ -1016,10 +991,8 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
                           {formatDate(group.most_recent_post_date)}
                         </span>
                       </span>
-                      <span className="text-xs text-[var(--ink-3)]">
-                        {eng && (eng.likes + eng.comments + eng.dms) > 0
-                          ? `♥${eng.likes} 💬${eng.comments} ✉${eng.dms}`
-                          : '—'}
+                      <span>
+                        <EngagementBadge group={group} />
                       </span>
                       <div className="flex items-center gap-1.5">
                         <button
