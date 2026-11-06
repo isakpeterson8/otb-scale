@@ -14,6 +14,8 @@ import CsvImport from '@/components/csv-import/CsvImport'
 import { FACEBOOK_GROUPS_IMPORT } from '@/lib/csv-import/configs'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast, { useToast } from '@/components/ui/Toast'
+import ScheduleView from './ScheduleView'
+import { DAYS, DAY_LABEL, getISOWeek } from './schedule'
 import type {
   FacebookGroup,
   GroupPostCompletion,
@@ -36,13 +38,9 @@ interface Props {
 }
 
 type FilterTab = 'all' | PostType
+type ViewMode = 'list' | 'schedule'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
-const DAY_LABEL: Record<string, string> = {
-  mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun',
-}
 
 const POST_TYPE_BADGE: Record<PostType, { label: string; bg: string; color: string }> = {
   self_promo:  { label: 'Self Promo',  bg: 'rgba(4,173,239,0.12)',  color: '#0284a8' },
@@ -57,14 +55,6 @@ const QUAL_BADGE: Record<QualificationStatus, { label: string; shortLabel: strin
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getISOWeek(date: Date): number {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7)
-  const w1 = new Date(d.getFullYear(), 0, 4)
-  return 1 + Math.round(((d.getTime() - w1.getTime()) / 86400000 - 3 + (w1.getDay() + 6) % 7) / 7)
-}
 
 function isDueToday(group: FacebookGroup): boolean {
   if (!group.post_frequency || !group.is_active) return false
@@ -707,6 +697,7 @@ function GroupForm({
 
 export default function FacebookGroupsClient({ groups, todayCompletions, allCompletions, assets }: Props) {
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [view, setView] = useState<ViewMode>('list')
   const [showForm, setShowForm] = useState(false)
   const [editGroup, setEditGroup] = useState<FacebookGroup | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FacebookGroup | null>(null)
@@ -836,6 +827,24 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
             {label}
           </button>
         ))}
+        <div className="ml-auto pl-3 shrink-0 flex items-center" role="group" aria-label="View">
+          <div className="flex rounded-lg p-0.5" style={{ background: 'rgba(0,0,0,0.05)' }}>
+            {([['list', 'List'], ['schedule', 'Schedule']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                aria-pressed={view === key}
+                className={[
+                  'px-3 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap',
+                  view === key ? 'bg-[var(--surface)] text-[var(--ink)] shadow-sm' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Modal */}
@@ -867,7 +876,10 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
         </div>
       )}
 
-      {/* Group list */}
+      {/* Schedule grid or group list */}
+      {view === 'schedule' ? (
+        <ScheduleView groups={filtered} onEdit={(group) => { setShowForm(false); setEditGroup(group) }} />
+      ) : (
       <div className="bg-[var(--surface)] rounded-xl border border-[var(--ink)]/8 overflow-hidden">
         {filtered.length === 0 ? (
           <div className="flex items-center justify-center py-16">
@@ -1025,6 +1037,7 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
           </>
         )}
       </div>
+      )}
 
       {/* Delete confirmation */}
       {deleteTarget && (
