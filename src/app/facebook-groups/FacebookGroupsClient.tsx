@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useSyncExternalStore, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   createFacebookGroup,
@@ -39,6 +39,26 @@ interface Props {
 
 type FilterTab = 'all' | PostType
 type ViewMode = 'list' | 'schedule'
+
+// Remembers List vs Schedule per browser. Storage can be blocked (private mode), so
+// never throw, and keep the choice in memory so the toggle still works without it.
+const VIEW_STORAGE_KEY = 'otb_fb_groups_view'
+let memoryView: ViewMode | null = null
+const viewListeners = new Set<() => void>()
+
+function loadView(): ViewMode {
+  if (memoryView) return memoryView
+  try { return localStorage.getItem(VIEW_STORAGE_KEY) === 'schedule' ? 'schedule' : 'list' } catch { return 'list' }
+}
+function saveView(v: ViewMode) {
+  memoryView = v
+  try { localStorage.setItem(VIEW_STORAGE_KEY, v) } catch {}
+  viewListeners.forEach(l => l())
+}
+function subscribeView(cb: () => void) {
+  viewListeners.add(cb)
+  return () => { viewListeners.delete(cb) }
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -697,7 +717,9 @@ function GroupForm({
 
 export default function FacebookGroupsClient({ groups, todayCompletions, allCompletions, assets }: Props) {
   const [filter, setFilter] = useState<FilterTab>('all')
-  const [view, setView] = useState<ViewMode>('list')
+  // The server render has no localStorage, so it renders List; the browser then switches to the saved view.
+  const view = useSyncExternalStore(subscribeView, loadView, () => 'list' as ViewMode)
+  const setView = saveView
   const [showForm, setShowForm] = useState(false)
   const [editGroup, setEditGroup] = useState<FacebookGroup | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FacebookGroup | null>(null)
