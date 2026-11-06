@@ -6,9 +6,9 @@ import {
   createFacebookGroup,
   updateFacebookGroup,
   markPostCompletion,
-  createPostAsset,
-  deletePostAsset,
   deleteFacebookGroup,
+  linkTemplateToGroup,
+  unlinkTemplateFromGroup,
 } from '@/app/actions/facebook-groups'
 import CsvImport from '@/components/csv-import/CsvImport'
 import { FACEBOOK_GROUPS_IMPORT } from '@/lib/csv-import/configs'
@@ -16,10 +16,19 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast, { useToast } from '@/components/ui/Toast'
 import ScheduleView from './ScheduleView'
 import { DAYS, DAY_LABEL, getISOWeek } from './schedule'
+import {
+  TemplateLibrary,
+  TemplatePicker,
+  GroupTemplatesSection,
+  CopyButton,
+  computeTemplateStats,
+  type TemplateLink,
+  type TemplateStats,
+} from './PostTemplates'
 import type {
   FacebookGroup,
   GroupPostCompletion,
-  GroupPostAsset,
+  PostTemplate,
   PostType,
   QualificationStatus,
 } from '@/types/database'
@@ -29,12 +38,14 @@ import type {
 interface Props {
   groups: FacebookGroup[]
   todayCompletions: GroupPostCompletion[]
+  /** Newest first. */
   allCompletions: {
     group_id: string
-    last_used_asset_id: string | null
+    template_id: string | null
     created_at: string
   }[]
-  assets: GroupPostAsset[]
+  templates: PostTemplate[]
+  templateLinks: TemplateLink[]
 }
 
 type FilterTab = 'all' | PostType
@@ -122,9 +133,11 @@ function formatDate(d: string | null) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function getLastUsedAssetId(groupId: string, allCompletions: Props['allCompletions']): string {
-  const found = allCompletions.find(c => c.group_id === groupId && c.last_used_asset_id)
-  return found?.last_used_asset_id ?? ''
+/** The template this group used most recently, if it's still in the active library. */
+function getLastUsedTemplateId(groupId: string, allCompletions: Props['allCompletions'], templates: PostTemplate[]): string {
+  const active = new Set(templates.filter(t => !t.archived).map(t => t.id))
+  const found = allCompletions.find(c => c.group_id === groupId && c.template_id && active.has(c.template_id))
+  return found?.template_id ?? ''
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -191,18 +204,20 @@ function GroupNameLink({ group, truncate = false }: { group: FacebookGroup; trun
 function TodoSection({
   dueGroups,
   completions,
-  assets,
+  templates,
+  templateLinks,
   allCompletions,
   onEdit,
 }: {
   dueGroups: FacebookGroup[]
   completions: GroupPostCompletion[]
-  assets: GroupPostAsset[]
+  templates: PostTemplate[]
+  templateLinks: TemplateLink[]
   allCompletions: Props['allCompletions']
   onEdit: (group: FacebookGroup) => void
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [formState, setFormState] = useState({ assetId: '' })
+  const [formState, setFormState] = useState({ templateId: '' })
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -212,8 +227,7 @@ function TodoSection({
   function handleToggle(group: FacebookGroup) {
     if (completedIds.has(group.id)) return
     if (expandedId === group.id) { setExpandedId(null); return }
-    const lastAsset = getLastUsedAssetId(group.id, allCompletions)
-    setFormState({ assetId: lastAsset })
+    setFormState({ templateId: getLastUsedTemplateId(group.id, allCompletions, templates) })
     setExpandedId(group.id)
     setError(null)
   }
@@ -222,7 +236,7 @@ function TodoSection({
     setError(null)
     startTransition(async () => {
       const result = await markPostCompletion(groupId, {
-        assetId: formState.assetId || null,
+        templateId: formState.templateId || null,
       })
       if (result.error) setError(result.error)
       else setExpandedId(null)
@@ -249,7 +263,12 @@ function TodoSection({
         {dueGroups.map((group) => {
           const isDone = completedIds.has(group.id)
           const isExpanded = expandedId === group.id
-          const groupAssets = assets.filter(a => a.group_id === group.id)
+          // Templates linked to this group or logged in it: listed first in the picker
+          const groupTemplateIds = new Set([
+            ...templateLinks.filter(l => l.group_id === group.id).map(l => l.template_id),
+            ...allCompletions.filter(c => c.group_id === group.id && c.template_id).map(c => c.template_id as string),
+          ])
+          const selectedTemplate = templates.find(t => t.id === formState.templateId)
 
           return (
             <div key={group.id}>
@@ -311,23 +330,18 @@ function TodoSection({
 
               {isExpanded && !isDone && (
                 <div className="px-5 pb-4 pt-2 bg-[var(--canvas)] border-t border-[var(--ink)]/6 space-y-3">
-                  {groupAssets.length > 0 && (
-                    <div>
-                      <label className="block text-xs text-[var(--ink-3)] mb-1">Post variant used</label>
-                      <select
-                        value={formState.assetId}
-                        onChange={e => setFormState(s => ({ ...s, assetId: e.target.value }))}
-                        className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
-                      >
-                        <option value="">No specific variant</option>
-                        {groupAssets.map(a => (
-                          <option key={a.id} value={a.id}>
-                            {a.label ? `${a.label} — ` : ''}{a.type === 'image' ? '🖼 ' : ''}{a.content.length > 60 ? a.content.slice(0, 60) + '…' : a.content}
-                          </option>
-                        ))}
-                      </select>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs text-[var(--ink-3)]">Post template used</label>
+                      {selectedTemplate && <CopyButton template={selectedTemplate} compact />}
                     </div>
-                  )}
+                    <TemplatePicker
+                      templates={templates}
+                      preferredIds={groupTemplateIds}
+                      selectedId={formState.templateId}
+                      onSelect={(id) => setFormState({ templateId: id })}
+                    />
+                  </div>
 
                   {error && (
                     <p className="text-xs text-[var(--red)]">{error}</p>
@@ -359,145 +373,44 @@ function TodoSection({
   )
 }
 
-// ─── Post Assets Section ──────────────────────────────────────────────────────
-
-function PostAssetsSection({
-  groupId,
-  groupAssets,
-}: {
-  groupId: string
-  groupAssets: GroupPostAsset[]
-}) {
-  const [showAdd, setShowAdd] = useState(false)
-  const [addType, setAddType] = useState<'copy' | 'image'>('copy')
-  const [addContent, setAddContent] = useState('')
-  const [addLabel, setAddLabel] = useState('')
-  const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-
-  function handleAdd() {
-    if (!addContent.trim()) return
-    setError(null)
-    startTransition(async () => {
-      const result = await createPostAsset(groupId, addType, addContent.trim(), addLabel.trim())
-      if (result.error) setError(result.error)
-      else { setShowAdd(false); setAddContent(''); setAddLabel('') }
-    })
-  }
-
-  function handleDelete(assetId: string) {
-    startTransition(async () => {
-      await deletePostAsset(assetId)
-    })
-  }
-
-  return (
-    <div className="border-t border-[var(--ink)]/8 pt-4 mt-2">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-medium text-[var(--ink-2)] uppercase tracking-wide">Post Assets</h4>
-        <button
-          type="button"
-          onClick={() => setShowAdd(v => !v)}
-          className="text-xs text-[var(--accent-text)] hover:underline"
-        >
-          + Add variant
-        </button>
-      </div>
-
-      {groupAssets.length === 0 && !showAdd && (
-        <p className="text-xs text-[var(--ink-3)] italic">No assets yet. Add copy or image variants to track what you post.</p>
-      )}
-
-      {groupAssets.length > 0 && (
-        <div className="space-y-2 mb-3">
-          {groupAssets.map(asset => (
-            <div key={asset.id} className="flex items-start gap-2 p-2.5 rounded-lg border border-[var(--ink)]/8 bg-[var(--canvas)]">
-              <span className="shrink-0 mt-0.5 text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: asset.type === 'copy' ? 'rgba(4,173,239,0.12)' : 'rgba(109,40,217,0.1)', color: asset.type === 'copy' ? '#0284a8' : '#6d28d9' }}>
-                {asset.type === 'copy' ? 'Copy' : 'Image'}
-              </span>
-              <div className="flex-1 min-w-0">
-                {asset.label && <p className="text-xs font-medium text-[var(--ink-2)] mb-0.5">{asset.label}</p>}
-                <p className="text-xs text-[var(--ink-3)] break-words">{asset.content}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(asset.id)}
-                disabled={isPending}
-                className="shrink-0 p-1 text-[var(--ink-3)] hover:text-[var(--red)] transition-colors disabled:opacity-40"
-                title="Delete"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                  <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showAdd && (
-        <div className="space-y-2 p-3 rounded-lg border border-[var(--ink)]/8 bg-[var(--canvas)]">
-          <div className="flex gap-2">
-            <select
-              value={addType}
-              onChange={e => setAddType(e.target.value as 'copy' | 'image')}
-              className="px-2.5 py-1.5 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-xs text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
-            >
-              <option value="copy">Copy</option>
-              <option value="image">Image</option>
-            </select>
-            <input
-              type="text"
-              placeholder="Label (optional)"
-              value={addLabel}
-              onChange={e => setAddLabel(e.target.value)}
-              className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
-            />
-          </div>
-          <textarea
-            placeholder={addType === 'copy' ? 'Post copy text…' : 'Image URL…'}
-            value={addContent}
-            onChange={e => setAddContent(e.target.value)}
-            rows={addType === 'copy' ? 3 : 1}
-            className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--surface)] text-xs text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] resize-none"
-          />
-          {error && <p className="text-xs text-[var(--red)]">{error}</p>}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleAdd}
-              disabled={isPending || !addContent.trim()}
-              className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-[var(--ink)] text-xs font-medium hover:bg-[var(--accent-text)] hover:text-[var(--canvas)] disabled:opacity-50 transition-colors"
-            >
-              {isPending ? 'Saving…' : 'Add'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowAdd(false); setAddContent(''); setAddLabel('') }}
-              className="px-3 py-1.5 text-xs text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── Group Form ───────────────────────────────────────────────────────────────
 
 function GroupForm({
   group,
-  groupAssets,
+  templates,
+  linkedTemplateIds,
+  templateStats,
   onClose,
 }: {
   group?: FacebookGroup
-  groupAssets: GroupPostAsset[]
+  templates: PostTemplate[]
+  linkedTemplateIds: string[]
+  templateStats: Record<string, TemplateStats>
   onClose: () => void
 }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // A new group has no id yet: keep its picks here and submit them with the form.
+  const [newGroupTemplateIds, setNewGroupTemplateIds] = useState<string[]>([])
+  const [isLinking, startLinking] = useTransition()
+
+  function addTemplate(templateId: string) {
+    if (!group) { setNewGroupTemplateIds(ids => ids.includes(templateId) ? ids : [...ids, templateId]); return }
+    setError(null)
+    startLinking(async () => {
+      const r = await linkTemplateToGroup(group.id, templateId)
+      if (r.error) setError(r.error)
+    })
+  }
+
+  function removeTemplate(templateId: string) {
+    if (!group) { setNewGroupTemplateIds(ids => ids.filter(id => id !== templateId)); return }
+    setError(null)
+    startLinking(async () => {
+      const r = await unlinkTemplateFromGroup(group.id, templateId)
+      if (r.error) setError(r.error)
+    })
+  }
   const [freq, setFreq] = useState<string>(group?.post_frequency ?? '')
   const [selectedDays, setSelectedDays] = useState<string[]>(group?.post_days ?? [])
 
@@ -705,17 +618,23 @@ function GroupForm({
         </button>
       </div>
 
-      {/* Post Assets — only for existing groups */}
-      {group && (
-        <PostAssetsSection groupId={group.id} groupAssets={groupAssets} />
-      )}
+      {/* Post templates from the shared library */}
+      {!group && newGroupTemplateIds.map(id => <input key={id} type="hidden" name="template_ids" value={id} />)}
+      <GroupTemplatesSection
+        templates={templates}
+        linkedIds={group ? linkedTemplateIds : newGroupTemplateIds}
+        stats={templateStats}
+        onAdd={addTemplate}
+        onRemove={removeTemplate}
+        isPending={isLinking}
+      />
     </form>
   )
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function FacebookGroupsClient({ groups, todayCompletions, allCompletions, assets }: Props) {
+export default function FacebookGroupsClient({ groups, todayCompletions, allCompletions, templates, templateLinks }: Props) {
   const [filter, setFilter] = useState<FilterTab>('all')
   // The server render has no localStorage, so it renders List; the browser then switches to the saved view.
   const view = useSyncExternalStore(subscribeView, loadView, () => 'list' as ViewMode)
@@ -742,18 +661,18 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
     ? (groups.find(g => g.id === editGroup.id) ?? editGroup)
     : null
 
-  // What a delete would cascade away — group_post_completions and group_post_assets
-  // are both ON DELETE CASCADE, so name them explicitly before confirming.
+  const templateStats = computeTemplateStats(templateLinks, allCompletions)
+  const linkedTemplateIds = (groupId: string) =>
+    templateLinks.filter(l => l.group_id === groupId).map(l => l.template_id)
+
+  // What a delete would cascade away — group_post_completions is ON DELETE CASCADE,
+  // so name it before confirming. Its templates stay in the shared library.
   function deleteConsequences(group: FacebookGroup): string[] {
     const postCount  = allCompletions.filter(c => c.group_id === group.id).length
-    const assetCount = assets.filter(a => a.group_id === group.id).length
     const out: string[] = []
 
     if (postCount > 0) {
       out.push(`${postCount} logged post${postCount === 1 ? '' : 's'}`)
-    }
-    if (assetCount > 0) {
-      out.push(`${assetCount} saved post asset${assetCount === 1 ? '' : 's'} (copy and images)`)
     }
     return out
   }
@@ -805,12 +724,16 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
         </div>
       </div>
 
+      {/* Shared post template library */}
+      <TemplateLibrary templates={templates} stats={templateStats} />
+
       {/* Today's To-Do */}
       {dueToday.length > 0 && (
         <TodoSection
           dueGroups={dueToday}
           completions={todayCompletions}
-          assets={assets}
+          templates={templates}
+          templateLinks={templateLinks}
           allCompletions={allCompletions}
           onEdit={(group) => { setShowForm(false); setEditGroup(group) }}
         />
@@ -891,7 +814,9 @@ export default function FacebookGroupsClient({ groups, todayCompletions, allComp
             </div>
             <GroupForm
               group={editGroupFresh ?? undefined}
-              groupAssets={editGroupFresh ? assets.filter(a => a.group_id === editGroupFresh.id) : []}
+              templates={templates}
+              linkedTemplateIds={editGroupFresh ? linkedTemplateIds(editGroupFresh.id) : []}
+              templateStats={templateStats}
               onClose={() => { setShowForm(false); setEditGroup(null) }}
             />
           </div>

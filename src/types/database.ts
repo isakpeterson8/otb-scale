@@ -285,12 +285,34 @@ export interface GroupPostCompletion {
   date: string
   completed_by: string | null
   last_used_asset_id: string | null
+  template_id: string | null
   likes: number
   comments: number
   dms: number
   created_at: string
 }
 
+export interface PostTemplate {
+  id: string
+  studio_id: string
+  title: string
+  body: string
+  variant_label: string | null
+  tags: string[]
+  image_url: string | null
+  archived: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface GroupPostTemplate {
+  group_id: string
+  template_id: string
+  studio_id: string
+  created_at: string
+}
+
+/** Legacy per-group copy; replaced by PostTemplate (kept until the table is dropped). */
 export interface GroupPostAsset {
   id: string
   group_id: string

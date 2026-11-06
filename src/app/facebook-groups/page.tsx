@@ -6,7 +6,7 @@ import UpgradeBanner from '@/components/UpgradeBanner'
 import FacebookGroupsClient from './FacebookGroupsClient'
 import { hasFeatureAccess } from '@/lib/features'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
-import type { FacebookGroup, GroupPostCompletion, GroupPostAsset } from '@/types/database'
+import type { FacebookGroup, GroupPostCompletion, PostTemplate } from '@/types/database'
 
 export const metadata: Metadata = { title: 'Facebook Groups' }
 
@@ -40,7 +40,8 @@ export default async function FacebookGroupsPage() {
     { data: groupsRaw },
     { data: todayCompletionsRaw },
     { data: allCompletionsRaw },
-    { data: assetsRaw },
+    { data: templatesRaw },
+    { data: linksRaw },
   ] = await Promise.all([
     supabase
       .from('facebook_groups')
@@ -54,24 +55,30 @@ export default async function FacebookGroupsPage() {
       .eq('date', today),
     supabase
       .from('group_post_completions')
-      .select('group_id, last_used_asset_id, created_at')
+      .select('group_id, template_id, created_at')
       .eq('studio_id', studioId)
       .order('created_at', { ascending: false })
       .limit(2000),
     supabase
-      .from('group_post_assets')
+      .from('post_templates')
       .select('*')
-      .order('created_at', { ascending: true }),
+      .eq('studio_id', studioId)
+      .order('title', { ascending: true }),
+    supabase
+      .from('group_post_templates')
+      .select('group_id, template_id')
+      .eq('studio_id', studioId),
   ])
 
   const groups = (groupsRaw ?? []) as FacebookGroup[]
   const todayCompletions = (todayCompletionsRaw ?? []) as GroupPostCompletion[]
   const allCompletions = (allCompletionsRaw ?? []) as {
     group_id: string
-    last_used_asset_id: string | null
+    template_id: string | null
     created_at: string
   }[]
-  const assets = (assetsRaw ?? []) as GroupPostAsset[]
+  const templates = (templatesRaw ?? []) as PostTemplate[]
+  const templateLinks = (linksRaw ?? []) as { group_id: string; template_id: string }[]
 
   return (
     <AppShell>
@@ -80,7 +87,8 @@ export default async function FacebookGroupsPage() {
           groups={groups}
           todayCompletions={todayCompletions}
           allCompletions={allCompletions}
-          assets={assets}
+          templates={templates}
+          templateLinks={templateLinks}
         />
       </main>
     </AppShell>
