@@ -54,7 +54,7 @@ export default async function FacebookGroupsPage() {
       .eq('date', today),
     supabase
       .from('group_post_completions')
-      .select('group_id, last_used_asset_id, likes, comments, dms, created_at')
+      .select('group_id, last_used_asset_id, created_at')
       .eq('studio_id', studioId)
       .order('created_at', { ascending: false })
       .limit(2000),
@@ -69,9 +69,6 @@ export default async function FacebookGroupsPage() {
   const allCompletions = (allCompletionsRaw ?? []) as {
     group_id: string
     last_used_asset_id: string | null
-    likes: number
-    comments: number
-    dms: number
     created_at: string
   }[]
   const assets = (assetsRaw ?? []) as GroupPostAsset[]
