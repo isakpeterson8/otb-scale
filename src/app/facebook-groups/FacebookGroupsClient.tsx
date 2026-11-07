@@ -199,6 +199,53 @@ function GroupNameLink({ group, truncate = false }: { group: FacebookGroup; trun
   )
 }
 
+// ─── Rules Note ───────────────────────────────────────────────────────────────
+
+function InfoIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden className="shrink-0 mt-[2px] opacity-70">
+      <circle cx="6" cy="6" r="5.25" stroke="currentColor" strokeWidth="1.1" />
+      <path d="M6 5.5v3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <circle cx="6" cy="3.6" r="0.7" fill="currentColor" />
+    </svg>
+  )
+}
+
+// Rules that fit in about two lines of the row show in full; anything longer
+// shows its first line and expands inline, so the group link stays in view.
+const SHORT_RULES_MAX_LINES = 2
+const SHORT_RULES_MAX_CHARS = 140
+
+function RulesNote({ rules }: { rules: string }) {
+  const [open, setOpen] = useState(false)
+  const lines = rules.split('\n').filter(l => l.trim())
+  const isShort = lines.length <= SHORT_RULES_MAX_LINES && rules.length <= SHORT_RULES_MAX_CHARS
+
+  return (
+    <div className="mt-1.5 flex items-start gap-1.5 rounded-md px-2 py-1.5 text-xs text-[var(--ink-2)] bg-[var(--canvas)] border border-[var(--ink)]/6">
+      <InfoIcon />
+      <div className="min-w-0 flex-1">
+        <span className="sr-only">Group rules: </span>
+        {isShort || open ? (
+          <p className="whitespace-pre-line break-words">{rules}</p>
+        ) : (
+          <p className="truncate">{lines[0]}</p>
+        )}
+        {!isShort && (
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            aria-expanded={open}
+            className="mt-0.5 text-[var(--accent-text)] hover:underline"
+          >
+            {open ? 'Hide rules' : 'Show rules'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Todo Section ─────────────────────────────────────────────────────────────
 
 function TodoSection({
@@ -275,7 +322,7 @@ function TodoSection({
               {/* Not one big button: the row holds a link and its own action buttons */}
               <div
                 className={[
-                  'flex items-center gap-3 px-5 py-3 transition-colors',
+                  'flex items-start gap-3 px-5 py-3 transition-colors',
                   isDone ? 'opacity-60' : 'hover:bg-[var(--canvas)]',
                 ].join(' ')}
               >
@@ -306,7 +353,20 @@ function TodoSection({
                         </button>
                       </>
                     )}
+                    {!group.posting_rules?.trim() && (
+                      <>
+                        {' · '}
+                        <button
+                          type="button"
+                          onClick={() => onEdit(group)}
+                          className="text-[var(--accent-text)] hover:underline"
+                        >
+                          Add rules
+                        </button>
+                      </>
+                    )}
                   </span>
+                  {group.posting_rules?.trim() && <RulesNote rules={group.posting_rules.trim()} />}
                 </div>
                 {isDone && (
                   <span className="text-xs text-[var(--ink-3)] shrink-0">Posted</span>
@@ -471,13 +531,14 @@ function GroupForm({
       </div>
       <div>
         <label className="block text-xs text-[var(--ink-3)] mb-1">Posting Rules</label>
-        <input
+        <textarea
           name="posting_rules"
-          type="text"
           defaultValue={group?.posting_rules ?? ''}
-          placeholder="e.g. Sunday self-promo only"
-          className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
+          rows={3}
+          placeholder="e.g. Promo posts only on Fridays, no links, admin approval required"
+          className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] resize-y"
         />
+        <p className="text-xs text-[var(--ink-3)] mt-1">Shown under the group in Today&apos;s Posts.</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {field('Application Date', 'application_date', 'date')}
