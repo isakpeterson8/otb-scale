@@ -473,6 +473,7 @@ function GroupForm({
   }
   const [freq, setFreq] = useState<string>(group?.post_frequency ?? '')
   const [selectedDays, setSelectedDays] = useState<string[]>(group?.post_days ?? [])
+  const [isActive, setIsActive] = useState<boolean>(group?.is_active ?? true)
 
   function toggleDay(day: string) {
     setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
@@ -628,12 +629,13 @@ function GroupForm({
       </div>
 
       <div className="flex items-center gap-2 pt-1">
+        {/* An unchecked checkbox is left out of FormData, so send the value explicitly */}
+        <input type="hidden" name="is_active" value={isActive ? 'true' : 'false'} />
         <input
           type="checkbox"
           id="is_active"
-          name="is_active"
-          value="true"
-          defaultChecked={group?.is_active ?? true}
+          checked={isActive}
+          onChange={e => setIsActive(e.target.checked)}
           className="rounded"
         />
         <label htmlFor="is_active" className="text-sm text-[var(--ink-2)]">Active group</label>
