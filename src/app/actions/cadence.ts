@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { CONTACT_NAME_PLACEHOLDER, type CadenceEnrollment, type SchoolContact } from '@/types/database'
+import { OPENING_TEMPLATES } from '@/lib/emailTemplates'
+import { advanceSchoolStage, mapLimit, recordEmailSent, undoEmailSent } from '@/lib/cadence-progress'
 
 async function isViewOnly(): Promise<boolean> {
   const cookieStore = await cookies()
@@ -142,7 +144,7 @@ export async function sendCadenceEmail({
   emailNumber: number
   subject: string
   body: string
-}): Promise<{ error: string | null; threadId: string | null }> {
+}): Promise<{ error: string | null; threadId: string | null; stageAdvanced?: boolean; markError?: string | null }> {
   if (await isViewOnly()) return { error: 'View only mode', threadId: null }
   if (contactIds.length === 0) return { error: 'Choose at least one recipient.', threadId: null }
   const supabase = await createClient()
@@ -151,11 +153,16 @@ export async function sendCadenceEmail({
 
   const { data: enrollment } = await supabase
     .from('cadence_enrollments')
-    .select('id, school_id')
+    .select('id, school_id, status, current_email_number')
     .eq('id', enrollmentId)
     .eq('user_id', user.id)
     .maybeSingle()
   if (!enrollment) return { error: 'Cadence not found.', threadId: null }
+  // Refuse before sending rather than send and then fail to record it.
+  if (enrollment.status !== 'active') return { error: 'This school is no longer in an active cadence.', threadId: null }
+  if (emailNumber !== (enrollment.current_email_number ?? 0) + 1) {
+    return { error: `Email ${emailNumber} isn't the next email for this school. Refresh and try again.`, threadId: null }
+  }
 
   const { data: school } = await supabase
     .from('school_outreach')
@@ -234,8 +241,12 @@ export async function sendCadenceEmail({
   )
   if (logError) console.error('[sendCadenceEmail] recipient log insert failed:', logError.message)
 
+  // Same path as "Mark #N sent": steps the cadence and moves Lead → Initial Contact.
+  const marked = await recordEmailSent(supabase, user.id, enrollmentId, emailNumber)
+  if (marked.error) console.error('[sendCadenceEmail] mark sent failed:', marked.error)
+
   revalidatePath('/school-outreach')
-  return { error: null, threadId }
+  return { error: null, threadId, stageAdvanced: marked.stageAdvanced, markError: marked.error }
 }
 
 export async function enrollInCadence(schoolId: string, openingTemplate: string) {
@@ -266,34 +277,130 @@ export async function enrollInCadence(schoolId: string, openingTemplate: string)
 }
 
 export async function markEmailSent(enrollmentId: string, emailNumber: number) {
-  if (await isViewOnly()) return { error: 'View only mode' }
+  if (await isViewOnly()) return { error: 'View only mode', stageAdvanced: false }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
+  if (!user) return { error: 'Unauthorized', stageAdvanced: false }
+
+  const result = await recordEmailSent(supabase, user.id, enrollmentId, emailNumber)
+  if (result.error) return { error: result.error, stageAdvanced: false }
+  revalidatePath('/school-outreach')
+  return { error: null, stageAdvanced: result.stageAdvanced }
+}
+
+/**
+ * Steps a cadence back one email ("Undo" toast, "Undo last sent").
+ * `expectedEmailNumber` guards against undoing a different email than the
+ * one the member is looking at.
+ */
+export async function undoLastEmailSent(enrollmentId: string, expectedEmailNumber?: number) {
+  if (await isViewOnly()) return { error: 'View only mode', emailNumber: null, stageReverted: false }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized', emailNumber: null, stageReverted: false }
+
+  const result = await undoEmailSent(supabase, user.id, enrollmentId, expectedEmailNumber)
+  if (result.error) return { error: result.error, emailNumber: null, stageReverted: false }
+  revalidatePath('/school-outreach')
+  return { error: null, emailNumber: result.emailNumber, stageReverted: result.stageReverted }
+}
+
+const BULK_LIMIT = 500
+const BULK_CONCURRENCY = 8
+
+export type BulkSentItem = { enrollmentId: string; emailNumber: number }
+
+/**
+ * Bulk "Mark next email sent". The client picks which enrollments and which
+ * email each is on (it applies the same-day confirmation); each item goes
+ * through the same recordEmailSent as a single mark.
+ */
+export async function markEmailsSent(items: BulkSentItem[]) {
+  const empty = { marked: [] as BulkSentItem[], failed: [] as { enrollmentId: string; error: string }[], stageAdvanced: 0 }
+  if (await isViewOnly()) return { error: 'View only mode', ...empty }
+  if (items.length > BULK_LIMIT) return { error: `Select at most ${BULK_LIMIT} schools at a time.`, ...empty }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized', ...empty }
 
   const now = new Date()
-  const nextDue = new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000)
-  const isLast = emailNumber === 4
+  const results = await mapLimit(items, BULK_CONCURRENCY, async item => ({
+    item,
+    result: await recordEmailSent(supabase, user.id, item.enrollmentId, item.emailNumber, now),
+  }))
 
-  const updates: Record<string, unknown> = {
-    [`email_${emailNumber}_sent_at`]: now.toISOString(),
-    current_email_number: emailNumber,
-    status: isLast ? 'completed' : 'active',
+  const out = { ...empty }
+  for (const { item, result } of results) {
+    if (result.error) out.failed.push({ enrollmentId: item.enrollmentId, error: result.error })
+    else {
+      out.marked.push(item)
+      if (result.stageAdvanced) out.stageAdvanced++
+    }
   }
-
-  if (!isLast) {
-    updates[`email_${emailNumber + 1}_due_at`] = nextDue.toISOString()
-  }
-
-  const { error } = await supabase
-    .from('cadence_enrollments')
-    .update(updates)
-    .eq('id', enrollmentId)
-    .eq('user_id', user.id)
-
-  if (error) return { error: error.message }
   revalidatePath('/school-outreach')
-  return { error: null }
+  return { error: null, ...out }
+}
+
+/** Undo for a bulk mark: steps each enrollment back, if it is still on the email that was marked. */
+export async function undoEmailsSent(items: BulkSentItem[]) {
+  if (await isViewOnly()) return { error: 'View only mode', undone: 0, failed: 0 }
+  if (items.length > BULK_LIMIT) return { error: `At most ${BULK_LIMIT} at a time.`, undone: 0, failed: 0 }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized', undone: 0, failed: 0 }
+
+  const results = await mapLimit(items, BULK_CONCURRENCY, item =>
+    undoEmailSent(supabase, user.id, item.enrollmentId, item.emailNumber),
+  )
+  const undone = results.filter(r => !r.error).length
+  revalidatePath('/school-outreach')
+  return { error: null, undone, failed: results.length - undone }
+}
+
+/**
+ * Bulk "Enroll in cadence". Schools already in an active cadence are skipped
+ * rather than restarted; everything else gets a fresh enrollment at Email 1.
+ */
+export async function bulkEnrollInCadence(schoolIds: string[], openingTemplate: string) {
+  if (await isViewOnly()) return { error: 'View only mode', enrolled: 0, skipped: 0 }
+  if (schoolIds.length > BULK_LIMIT) return { error: `Select at most ${BULK_LIMIT} schools at a time.`, enrolled: 0, skipped: 0 }
+  if (!Object.prototype.hasOwnProperty.call(OPENING_TEMPLATES, openingTemplate)) return { error: 'Unknown opening email.', enrolled: 0, skipped: 0 }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized', enrolled: 0, skipped: 0 }
+
+  const { data: active, error: activeError } = await supabase
+    .from('cadence_enrollments')
+    .select('school_id')
+    .in('school_id', schoolIds)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+  if (activeError) return { error: activeError.message, enrolled: 0, skipped: 0 }
+  const activeIds = new Set(((active ?? []) as { school_id: string }[]).map(r => r.school_id))
+
+  // Only schools this member can see (RLS), so ids from elsewhere are dropped.
+  const { data: visible, error: visibleError } = await supabase
+    .from('school_outreach')
+    .select('id')
+    .in('id', schoolIds)
+  if (visibleError) return { error: visibleError.message, enrolled: 0, skipped: 0 }
+  const toEnroll = ((visible ?? []) as { id: string }[]).map(r => r.id).filter(id => !activeIds.has(id))
+
+  if (toEnroll.length > 0) {
+    const { error } = await supabase.from('cadence_enrollments').insert(
+      toEnroll.map(id => ({
+        school_id: id,
+        user_id: user.id,
+        opening_template: openingTemplate,
+        current_email_number: 0,
+        status: 'active',
+      })),
+    )
+    if (error) return { error: error.message, enrolled: 0, skipped: 0 }
+  }
+
+  revalidatePath('/school-outreach')
+  return { error: null, enrolled: toEnroll.length, skipped: schoolIds.length - toEnroll.length }
 }
 
 export async function removeFromCadence(enrollmentId: string, reason: 'manual' | 'reply_detected') {
@@ -362,10 +469,8 @@ export async function checkGmailReplies(): Promise<number> {
       const thread = await res.json() as { messages?: unknown[] }
       if ((thread.messages?.length ?? 0) > 1) {
         await removeFromCadence(e.id, 'reply_detected')
-        await supabase
-          .from('school_outreach')
-          .update({ stage: 'replied' })
-          .eq('id', e.school_id)
+        // Forward-only: a school already past Replied keeps its stage.
+        await advanceSchoolStage(supabase, e.school_id, 'replied')
         detected++
       }
     } catch {

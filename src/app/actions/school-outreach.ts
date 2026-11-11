@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getStudioId } from './_shared'
 import { normalizeSchoolSource } from '@/lib/source-server'
+import { advanceSchoolStage, isSchoolStage } from '@/lib/cadence-progress'
 
 export async function createSchoolOutreach(formData: FormData) {
   const ctx = await getStudioId()
@@ -121,4 +122,23 @@ export async function deleteSchoolOutreach(id: string) {
 
   revalidatePath('/school-outreach')
   return { error: null }
+}
+
+/**
+ * Bulk "Change stage". Forward-only, like the automatic stage moves: schools
+ * already at or past `stage` are left as they are and counted as skipped.
+ * (A single school can still be moved anywhere from its Edit form.)
+ */
+export async function bulkSetSchoolStage(schoolIds: string[], stage: string) {
+  const ctx = await getStudioId()
+  if (!ctx) return { error: 'Unauthorized', moved: 0, skipped: 0 }
+  if (ctx.viewOnly) return { error: 'View only mode', moved: 0, skipped: 0 }
+  if (!isSchoolStage(stage)) return { error: 'Unknown stage.', moved: 0, skipped: 0 }
+  if (schoolIds.length > 500) return { error: 'Select at most 500 schools at a time.', moved: 0, skipped: 0 }
+  const { supabase, studioId } = ctx
+
+  const { advanced, error } = await advanceSchoolStage(supabase, schoolIds, stage, { studioId })
+  if (error) return { error, moved: 0, skipped: 0 }
+  revalidatePath('/school-outreach')
+  return { error: null, moved: advanced.length, skipped: schoolIds.length - advanced.length }
 }

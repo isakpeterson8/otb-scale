@@ -12,6 +12,14 @@ interface ConfirmDialogProps {
   confirmLabel?: string
   cancelLabel?: string
   isPending?: boolean
+  /** Shown on the confirm button while isPending. */
+  pendingLabel?: string
+  /** 'danger' (default) is for deletes; 'default' for reversible confirmations. */
+  tone?: 'danger' | 'default'
+  /** Small print under the message. Defaults to "This cannot be undone." for danger, none otherwise. */
+  note?: string | null
+  /** Optional middle button, e.g. "Skip those". */
+  secondary?: { label: string; onClick: () => void }
   onConfirm: () => void
   onCancel: () => void
 }
@@ -23,9 +31,15 @@ export default function ConfirmDialog({
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
   isPending = false,
+  pendingLabel,
+  tone = 'danger',
+  note,
+  secondary,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const smallPrint = note === undefined ? (tone === 'danger' ? 'This cannot be undone.' : null) : note
+
   // Escape closes the dialog — but never mid-request
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -55,21 +69,26 @@ export default function ConfirmDialog({
         <p className="mt-2 text-sm text-[var(--ink-2)]">{message}</p>
 
         {consequences && consequences.length > 0 && (
-          <ul className="mt-3 space-y-1 rounded-lg bg-[var(--red-l)] px-3 py-2.5">
+          <ul className={`mt-3 space-y-1 rounded-lg px-3 py-2.5 ${tone === 'danger' ? 'bg-[var(--red-l)]' : 'bg-[var(--canvas)]'}`}>
             {consequences.map((c) => (
               <li key={c} className="text-xs text-[var(--ink-2)]">• {c}</li>
             ))}
           </ul>
         )}
 
-        <p className="mt-3 text-xs text-[var(--ink-3)]">This cannot be undone.</p>
+        {smallPrint && <p className="mt-3 text-xs text-[var(--ink-3)]">{smallPrint}</p>}
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
           <Button variant="ghost" onClick={onCancel} disabled={isPending}>
             {cancelLabel}
           </Button>
-          <Button variant="danger" onClick={onConfirm} disabled={isPending}>
-            {isPending ? 'Deleting…' : confirmLabel}
+          {secondary && (
+            <Button variant="ghost" onClick={secondary.onClick} disabled={isPending}>
+              {secondary.label}
+            </Button>
+          )}
+          <Button variant={tone === 'danger' ? 'danger' : 'primary'} onClick={onConfirm} disabled={isPending}>
+            {isPending ? (pendingLabel ?? (tone === 'danger' ? 'Deleting…' : 'Saving…')) : confirmLabel}
           </Button>
         </div>
       </div>
