@@ -4,16 +4,22 @@ import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import CsvImport from '@/components/csv-import/CsvImport'
 import { SCHOOLS_IMPORT } from '@/lib/csv-import/configs'
-import { createSchoolOutreach, updateSchoolOutreach, deleteSchoolOutreach } from '@/app/actions/school-outreach'
+import { createSchoolOutreach, updateSchoolOutreach, deleteSchoolOutreach, bulkSetSchoolStage } from '@/app/actions/school-outreach'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast, { useToast } from '@/components/ui/Toast'
 import {
   enrollInCadence,
+  bulkEnrollInCadence,
   markEmailSent,
+  markEmailsSent,
+  undoLastEmailSent,
+  undoEmailsSent,
   removeFromCadence,
   checkGmailReplies,
   sendCadenceEmail,
+  type BulkSentItem,
 } from '@/app/actions/cadence'
+import { SCHOOL_STAGE_RANK } from '@/lib/cadence-progress'
 import type { SchoolOutreach, SchoolOutreachStage, SchoolWithContacts, CadenceEnrollment, UserSettings } from '@/types/database'
 import { CONTACT_NAME_PLACEHOLDER, SCHOOL_STAGES } from '@/types/database'
 import { ContactsSection, PrimaryContactSummary, RecipientPicker, contactName, primaryContact } from './SchoolContacts'
@@ -101,6 +107,30 @@ function getNextEmailNumber(e: CadenceEnrollment): number | null {
   if (num >= 4) return null
   return num + 1
 }
+
+/** Sent date of email `n` (1–4), or null. */
+function sentAt(e: CadenceEnrollment, n: number): string | null {
+  if (n < 1 || n > 4) return null
+  return (e[`email_${n}_sent_at` as keyof CadenceEnrollment] as string | null) ?? null
+}
+
+/** Whether an ISO timestamp falls on today's date in the member's time zone. */
+function isToday(iso: string | null): boolean {
+  return !!iso && new Date(iso).toDateString() === new Date().toDateString()
+}
+
+/** The email "Undo last sent" would step back, or null when there is nothing to undo. */
+function getUndoableEmailNumber(e: CadenceEnrollment): number | null {
+  const n = e.current_email_number ?? 0
+  if (n < 1) return null
+  if (e.status === 'active' || (e.status === 'completed' && n === 4)) return n
+  return null
+}
+
+const UNDO_MS = 10_000
+const CHECKBOX_CLASS = 'h-4 w-4 shrink-0 cursor-pointer accent-[var(--accent-text)]'
+const stageLabel = (stage: SchoolOutreachStage) => SCHOOL_STAGES.find(s => s.value === stage)?.label ?? stage
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 function getNextEmailContent(e: CadenceEnrollment) {
   const nextNum = getNextEmailNumber(e)
@@ -264,6 +294,17 @@ function SchoolForm({
   )
 }
 
+type PendingConfirm = {
+  title: string
+  message: string
+  consequences?: string[]
+  confirmLabel: string
+  onConfirm: () => void
+  secondary?: { label: string; onClick: () => void }
+}
+
+const NO_IDS: ReadonlySet<string> = new Set()
+
 const OPENING_TEMPLATE_KEYS: OpeningTemplateKey[] = ['initial_contact', 'familiar_teacher', 'shared_student', 'virtual']
 const OPENING_TEMPLATE_LABELS: Record<OpeningTemplateKey, string> = {
   initial_contact: 'Initial Contact',
@@ -273,12 +314,12 @@ const OPENING_TEMPLATE_LABELS: Record<OpeningTemplateKey, string> = {
 }
 
 function EnrollModal({
-  school,
+  subtitle,
   onClose,
   onEnroll,
   isPending,
 }: {
-  school: SchoolOutreach
+  subtitle: string
   onClose: () => void
   onEnroll: (template: OpeningTemplateKey) => void
   isPending: boolean
@@ -292,7 +333,7 @@ function EnrollModal({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-medium text-[var(--ink)]">Enroll in Cadence</h3>
-            <p className="text-xs text-[var(--ink-3)] mt-0.5">{school.school_name} — choose your opening email</p>
+            <p className="text-xs text-[var(--ink-3)] mt-0.5">{subtitle}</p>
           </div>
           <button onClick={onClose} className="text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -358,11 +399,14 @@ function TemplateViewerModal({
   enrollment,
   settings,
   onClose,
+  onSent,
 }: {
   school: SchoolWithContacts
   enrollment: CadenceEnrollment
   settings: UserSettings | null
   onClose: () => void
+  /** Called after a successful Gmail send (the server has already marked it sent). */
+  onSent: (r: { emailNumber: number; stageAdvanced: boolean; markError: string | null }) => void
 }) {
   const rawContent = getNextEmailContent(enrollment)
   const primary = primaryContact(school)
@@ -435,8 +479,12 @@ function TemplateViewerModal({
       setSending(false)
       return
     }
-    await markEmailSent(enrollment.id, resolved!.emailNumber)
-    onClose()
+    // sendCadenceEmail records the send itself (same path as "Mark #N sent").
+    onSent({
+      emailNumber: resolved!.emailNumber,
+      stageAdvanced: !!result.stageAdvanced,
+      markError: result.markError ?? null,
+    })
   }
 
   return (
@@ -560,12 +608,37 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
   const [editSchoolId, setEditSchoolId] = useState<string | null>(null)
   const editSchool = editSchoolId ? schools.find(s => s.id === editSchoolId) ?? null : null
   const [enrollModal, setEnrollModal] = useState<SchoolOutreach | null>(null)
+  const [bulkEnrollOpen, setBulkEnrollOpen] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null)
   const [templateViewer, setTemplateViewer] = useState<{ school: SchoolWithContacts; enrollment: CadenceEnrollment } | null>(null)
   const [showPhoneScript, setShowPhoneScript] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [deleteTarget, setDeleteTarget] = useState<SchoolWithContacts | null>(null)
   const [isDeleting, startDelete] = useTransition()
-  const { toast, showToast } = useToast()
+  const { toast, showToast, dismissToast } = useToast()
+
+  // Selection belongs to one list view: changing the filter, sort or search
+  // clears it, and rows that drop out of the view (e.g. after a stage change
+  // under a stage filter) stop counting as selected.
+  const viewKey = JSON.stringify(view)
+  const [selection, setSelection] = useState<{ viewKey: string; ids: Set<string> }>(() => ({ viewKey, ids: new Set() }))
+  const selectedIdSet = selection.viewKey === viewKey ? selection.ids : NO_IDS
+  const selectedSchools = schools.filter(s => selectedIdSet.has(s.id))
+  const allSelected = schools.length > 0 && selectedSchools.length === schools.length
+  const someSelected = selectedSchools.length > 0
+
+  function setSelectedIds(ids: Set<string>) {
+    setSelection({ viewKey, ids })
+  }
+  function toggleSelected(id: string) {
+    const next = new Set(selectedSchools.map(s => s.id))
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+  function toggleAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(schools.map(s => s.id)))
+  }
 
   const today = new Date()
   const todayStr = today.toISOString().slice(0, 10)
@@ -630,17 +703,176 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
 
   function handleEnroll(school: SchoolOutreach, template: OpeningTemplateKey) {
     startTransition(async () => {
-      await enrollInCadence(school.id, template)
+      const result = await enrollInCadence(school.id, template)
+      if (result.error) showToast(result.error, 'error')
       setEnrollModal(null)
     })
   }
 
-  function handleMarkSent(enrollment: CadenceEnrollment) {
+  function handleMarkSent(school: SchoolOutreach, enrollment: CadenceEnrollment) {
     const nextNum = getNextEmailNumber(enrollment)
     if (!nextNum) return
-    if (!confirm(`Mark Email ${nextNum} as sent?`)) return
+    // Two emails to the same school on one day is almost always a misclick.
+    if (nextNum > 1 && isToday(sentAt(enrollment, nextNum - 1))) {
+      setPendingConfirm({
+        title: `Email ${nextNum - 1} was sent today`,
+        message: `Email ${nextNum - 1} to ${school.school_name} was sent today. Mark email ${nextNum} sent too?`,
+        confirmLabel: `Mark #${nextNum} sent`,
+        onConfirm: () => { setPendingConfirm(null); markSent(school, enrollment, nextNum) },
+      })
+      return
+    }
+    markSent(school, enrollment, nextNum)
+  }
+
+  function markSent(school: SchoolOutreach, enrollment: CadenceEnrollment, emailNumber: number) {
     startTransition(async () => {
-      await markEmailSent(enrollment.id, nextNum)
+      const result = await markEmailSent(enrollment.id, emailNumber)
+      if (result.error) {
+        showToast(result.error, 'error')
+        return
+      }
+      showToast(
+        `Email ${emailNumber} marked sent · ${school.school_name}${result.stageAdvanced ? ' · moved to Initial Contact' : ''}`,
+        'success',
+        { durationMs: UNDO_MS, action: { label: 'Undo', onClick: () => undoSent(school, enrollment.id, emailNumber) } },
+      )
+    })
+  }
+
+  function undoSent(school: SchoolOutreach, enrollmentId: string, emailNumber: number) {
+    startTransition(async () => {
+      const result = await undoLastEmailSent(enrollmentId, emailNumber)
+      if (result.error) showToast(result.error, 'error')
+      else showToast(`Email ${emailNumber} unmarked · ${school.school_name}${result.stageReverted ? ' · back to Lead' : ''}`)
+    })
+  }
+
+  function handleUndoLast(school: SchoolOutreach, enrollment: CadenceEnrollment) {
+    const n = getUndoableEmailNumber(enrollment)
+    if (!n) return
+    setPendingConfirm({
+      title: `Undo email ${n} sent?`,
+      message: `Email ${n} to ${school.school_name} will be marked not sent, and the cadence goes back to email ${n} with its due date recalculated.`,
+      confirmLabel: `Undo #${n} sent`,
+      onConfirm: () => { setPendingConfirm(null); undoSent(school, enrollment.id, n) },
+    })
+  }
+
+  function handleTemplateSent(school: SchoolOutreach, r: { emailNumber: number; stageAdvanced: boolean; markError: string | null }) {
+    setTemplateViewer(null)
+    if (r.markError) showToast(`Email ${r.emailNumber} sent, but it couldn’t be marked sent: ${r.markError}`, 'error')
+    else showToast(`Email ${r.emailNumber} sent · ${school.school_name}${r.stageAdvanced ? ' · moved to Initial Contact' : ''}`)
+  }
+
+  // ─── Bulk actions ──────────────────────────────────────────────────────────
+
+  function handleBulkStage(stage: SchoolOutreachStage) {
+    const targets = selectedSchools
+    const label = stageLabel(stage)
+    const alreadyThere = targets.filter(s => (SCHOOL_STAGE_RANK[s.stage] ?? 0) >= SCHOOL_STAGE_RANK[stage]).length
+    if (alreadyThere === targets.length) {
+      showToast(`All selected schools are already at or past ${label}.`, 'error')
+      return
+    }
+    setPendingConfirm({
+      title: `Move ${plural(targets.length - alreadyThere, 'school')} to ${label}?`,
+      message: alreadyThere > 0
+        ? `${plural(alreadyThere, 'school')} already at or past ${label} will stay where they are. Stages only move forward here; use Edit to move a school back.`
+        : 'Stages only move forward here; use Edit to move a school back.',
+      confirmLabel: `Move to ${label}`,
+      onConfirm: () => {
+        setPendingConfirm(null)
+        startTransition(async () => {
+          const result = await bulkSetSchoolStage(targets.map(s => s.id), stage)
+          if (result.error) showToast(result.error, 'error')
+          else showToast(`Moved ${plural(result.moved, 'school')} to ${label}${result.skipped ? ` · ${result.skipped} skipped` : ''}`)
+        })
+      },
+    })
+  }
+
+  function handleBulkMarkSent() {
+    const items = selectedSchools.flatMap(school => {
+      const enrollment = getEnrollment(school.id)
+      const emailNumber = enrollment ? getNextEmailNumber(enrollment) : null
+      return enrollment && emailNumber ? [{ school, enrollment, emailNumber }] : []
+    })
+    const notActive = selectedSchools.length - items.length
+    if (items.length === 0) {
+      showToast('None of the selected schools is in an active cadence.', 'error')
+      return
+    }
+    const sameDay = items.filter(i => i.emailNumber > 1 && isToday(sentAt(i.enrollment, i.emailNumber - 1)))
+    const notSameDay = items.filter(i => !sameDay.includes(i))
+
+    const byEmail = new Map<number, number>()
+    for (const i of items) byEmail.set(i.emailNumber, (byEmail.get(i.emailNumber) ?? 0) + 1)
+    const consequences = [...byEmail.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([n, count]) => `Email ${n} → ${plural(count, 'school')}`)
+    if (notActive > 0) consequences.push(`${plural(notActive, 'school')} not in an active cadence will be skipped`)
+
+    const run = (list: typeof items) => {
+      setPendingConfirm(null)
+      startTransition(async () => {
+        const result = await markEmailsSent(list.map(i => ({ enrollmentId: i.enrollment.id, emailNumber: i.emailNumber })))
+        if (result.error) {
+          showToast(result.error, 'error')
+          return
+        }
+        const marked: BulkSentItem[] = result.marked
+        const parts = [`Next email marked sent for ${plural(marked.length, 'school')}`]
+        if (result.stageAdvanced) parts.push(`${result.stageAdvanced} moved to Initial Contact`)
+        if (result.failed.length) parts.push(`${result.failed.length} failed: ${result.failed[0].error}`)
+        showToast(parts.join(' · '), result.failed.length && !marked.length ? 'error' : 'success', marked.length ? {
+          durationMs: UNDO_MS,
+          action: {
+            label: 'Undo',
+            onClick: () => startTransition(async () => {
+              const undo = await undoEmailsSent(marked)
+              if (undo.error) showToast(undo.error, 'error')
+              else showToast(`Undid ${plural(undo.undone, 'email')}${undo.failed ? ` · ${undo.failed} couldn’t be undone` : ''}`, undo.failed ? 'error' : 'success')
+            }),
+          },
+        } : {})
+      })
+    }
+
+    setPendingConfirm({
+      title: `Mark the next email sent for ${plural(items.length, 'school')}?`,
+      message: sameDay.length > 0
+        ? `${plural(sameDay.length, 'school')} already had an email marked sent today. Mark those too?`
+        : 'Each school moves to its next email, and its next due date is recalculated.',
+      consequences,
+      confirmLabel: sameDay.length > 0 ? `Mark all ${items.length}` : `Mark ${items.length} sent`,
+      secondary: sameDay.length > 0 && notSameDay.length > 0
+        ? { label: `Skip those ${sameDay.length}`, onClick: () => run(notSameDay) }
+        : undefined,
+      onConfirm: () => run(items),
+    })
+  }
+
+  const bulkEnrollable = selectedSchools.filter(s => {
+    const e = getEnrollment(s.id)
+    return !e || e.status !== 'active'
+  })
+
+  function handleBulkEnrollOpen() {
+    if (bulkEnrollable.length === 0) {
+      showToast('All selected schools are already in an active cadence.', 'error')
+      return
+    }
+    setBulkEnrollOpen(true)
+  }
+
+  function handleBulkEnroll(template: OpeningTemplateKey) {
+    const ids = bulkEnrollable.map(s => s.id)
+    startTransition(async () => {
+      const result = await bulkEnrollInCadence(ids, template)
+      setBulkEnrollOpen(false)
+      if (result.error) showToast(result.error, 'error')
+      else showToast(`Enrolled ${plural(result.enrolled, 'school')}${result.skipped ? ` · ${result.skipped} skipped` : ''}`)
     })
   }
 
@@ -804,9 +1036,23 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
 
       {enrollModal && (
         <EnrollModal
-          school={enrollModal}
+          subtitle={`${enrollModal.school_name} — choose your opening email`}
           onClose={() => setEnrollModal(null)}
           onEnroll={(template) => handleEnroll(enrollModal, template)}
+          isPending={isPending}
+        />
+      )}
+
+      {bulkEnrollOpen && (
+        <EnrollModal
+          subtitle={
+            `${plural(bulkEnrollable.length, 'school')} — choose your opening email` +
+            (selectedSchools.length > bulkEnrollable.length
+              ? ` (${selectedSchools.length - bulkEnrollable.length} already in an active cadence will be skipped)`
+              : '')
+          }
+          onClose={() => setBulkEnrollOpen(false)}
+          onEnroll={handleBulkEnroll}
           isPending={isPending}
         />
       )}
@@ -817,7 +1063,75 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
           enrollment={templateViewer.enrollment}
           settings={settings}
           onClose={() => setTemplateViewer(null)}
+          onSent={(r) => handleTemplateSent(templateViewer.school, r)}
         />
+      )}
+
+      {/* Selection + bulk actions */}
+      {schools.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-4 py-2.5 text-sm"
+          style={{
+            borderColor: someSelected ? 'var(--accent-text)' : 'rgba(255,248,240,0.08)',
+            background: someSelected ? 'var(--accent-light)' : 'var(--surface)',
+          }}
+        >
+          <label className="flex min-h-[32px] cursor-pointer items-center gap-2 text-[var(--ink-2)]">
+            <input
+              type="checkbox"
+              className={CHECKBOX_CLASS}
+              checked={allSelected}
+              ref={el => { if (el) el.indeterminate = someSelected && !allSelected }}
+              onChange={toggleAll}
+              aria-label={allSelected ? 'Clear selection' : `Select all ${schools.length} schools in this view`}
+            />
+            {someSelected
+              ? <span className="font-medium text-[var(--ink)]">{selectedSchools.length} selected</span>
+              : <span>Select all {schools.length} in this view</span>}
+          </label>
+          {someSelected && (
+            <>
+              {!allSelected && (
+                <button onClick={toggleAll} className="text-xs text-[var(--accent-text)] hover:underline">
+                  Select all {schools.length}
+                </button>
+              )}
+              <span className="hidden sm:inline text-[var(--ink-3)]">|</span>
+              <select
+                value=""
+                disabled={isPending}
+                onChange={e => { if (e.target.value) handleBulkStage(e.target.value as SchoolOutreachStage) }}
+                aria-label="Change stage of selected schools"
+                className="rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] px-2 py-1.5 text-xs text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)] disabled:opacity-50"
+              >
+                <option value="">Change stage…</option>
+                {SCHOOL_STAGES.map(({ value, label }) => (
+                  <option key={value} value={value} className="bg-[var(--surface)]">{label}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleBulkMarkSent}
+                disabled={isPending}
+                className="rounded-lg border border-[var(--ink)]/15 px-2.5 py-1.5 text-xs text-[var(--ink)] hover:bg-[var(--canvas)] disabled:opacity-50"
+              >
+                Mark next email sent
+              </button>
+              <button
+                onClick={handleBulkEnrollOpen}
+                disabled={isPending}
+                className="rounded-lg border border-[var(--ink)]/15 px-2.5 py-1.5 text-xs text-[var(--ink)] hover:bg-[var(--canvas)] disabled:opacity-50"
+              >
+                Enroll in cadence
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="ml-auto text-xs text-[var(--ink-3)] hover:text-[var(--ink)]"
+              >
+                Clear
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {/* School list */}
@@ -840,10 +1154,18 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                 const badge = getCadenceBadge(enrollment, todayStr)
                 const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
                 const canEnroll = !enrollment || enrollment.status === 'removed' || enrollment.status === 'replied' || enrollment.status === 'completed'
+                const undoNum = enrollment ? getUndoableEmailNumber(enrollment) : null
                 return (
                   <div key={school.id} className="px-4 py-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+                      <input
+                        type="checkbox"
+                        className={`${CHECKBOX_CLASS} mt-1`}
+                        checked={selectedIdSet.has(school.id)}
+                        onChange={() => toggleSelected(school.id)}
+                        aria-label={`Select ${school.school_name}`}
+                      />
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-[var(--ink)] truncate">{school.school_name}</p>
                         {(school.city || school.state) && (
                           <p className="text-xs text-[var(--ink-3)]">{[school.city, school.state].filter(Boolean).join(', ')}</p>
@@ -883,7 +1205,7 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                         {badge.label}
                       </span>
                     </div>
-                    {(canEnroll || (enrollment && enrollment.status === 'active' && nextNum)) && (
+                    {(canEnroll || undoNum || (enrollment && enrollment.status === 'active' && nextNum)) && (
                       <div className="flex items-center gap-1 flex-wrap">
                         {canEnroll && (
                           <button
@@ -903,11 +1225,11 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                               View #{nextNum}
                             </button>
                             <button
-                              onClick={() => handleMarkSent(enrollment)}
+                              onClick={() => handleMarkSent(school, enrollment)}
                               disabled={isPending}
                               className="text-xs text-[var(--green)] hover:underline disabled:opacity-50 min-h-[40px] px-2"
                             >
-                              Mark sent
+                              Mark #{nextNum} sent
                             </button>
                             <button
                               onClick={() => handleRemove(enrollment)}
@@ -918,6 +1240,15 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                             </button>
                           </>
                         )}
+                        {enrollment && undoNum && (
+                          <button
+                            onClick={() => handleUndoLast(school, enrollment)}
+                            disabled={isPending}
+                            className="text-xs text-[var(--ink-3)] hover:text-[var(--ink)] hover:underline disabled:opacity-50 min-h-[40px] px-2"
+                          >
+                            Undo last sent
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -926,11 +1257,21 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
             </div>
             )}
             table={{
-              className: 'w-full text-sm min-w-[720px]',
+              className: 'w-full text-sm min-w-[760px]',
               wrapperClassName: 'overflow-x-auto',
-              columns: 6,
+              columns: 7,
               head: (
                   <tr className="border-b border-[var(--ink)]/8">
+                    <th className="w-10 pl-4 pr-0 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        className={CHECKBOX_CLASS}
+                        checked={allSelected}
+                        ref={el => { if (el) el.indeterminate = someSelected && !allSelected }}
+                        onChange={toggleAll}
+                        aria-label={allSelected ? 'Clear selection' : `Select all ${schools.length} schools in this view`}
+                      />
+                    </th>
                     {['School', 'Contact', 'Phone', 'Stage', 'Cadence', ''].map((h) => (
                       <th key={h} className="text-left px-4 py-3 text-xs text-[var(--ink-3)] font-medium uppercase tracking-wide whitespace-nowrap">
                         {h}
@@ -945,9 +1286,24 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                     const badge = getCadenceBadge(enrollment, todayStr)
                     const nextNum = enrollment ? getNextEmailNumber(enrollment) : null
                     const canEnroll = !enrollment || enrollment.status === 'removed' || enrollment.status === 'replied' || enrollment.status === 'completed'
+                    const undoNum = enrollment ? getUndoableEmailNumber(enrollment) : null
+                    const isSelected = selectedIdSet.has(school.id)
 
                     return (
-                      <tr key={school.id} className="hover:bg-[var(--canvas)] transition-colors">
+                      <tr
+                        key={school.id}
+                        className="hover:bg-[var(--canvas)] transition-colors"
+                        style={isSelected ? { background: 'var(--accent-light)' } : undefined}
+                      >
+                        <td className="w-10 pl-4 pr-0 py-3 align-top">
+                          <input
+                            type="checkbox"
+                            className={`${CHECKBOX_CLASS} mt-0.5`}
+                            checked={isSelected}
+                            onChange={() => toggleSelected(school.id)}
+                            aria-label={`Select ${school.school_name}`}
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <p className="font-medium text-[var(--ink)] truncate max-w-[180px]">{school.school_name}</p>
                           {(school.city || school.state) && (
@@ -992,11 +1348,11 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                                   </button>
                                   <span className="text-[var(--ink-3)] text-xs">·</span>
                                   <button
-                                    onClick={() => handleMarkSent(enrollment)}
+                                    onClick={() => handleMarkSent(school, enrollment)}
                                     disabled={isPending}
                                     className="text-xs text-[var(--green)] hover:underline disabled:opacity-50"
                                   >
-                                    Mark sent
+                                    Mark #{nextNum} sent
                                   </button>
                                   <span className="text-[var(--ink-3)] text-xs">·</span>
                                   <button
@@ -1005,6 +1361,18 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
                                     className="text-xs text-[var(--ink-3)] hover:text-[var(--red)] disabled:opacity-50"
                                   >
                                     Remove
+                                  </button>
+                                </>
+                              )}
+                              {enrollment && undoNum && (
+                                <>
+                                  {(canEnroll || enrollment.status === 'active') && <span className="text-[var(--ink-3)] text-xs">·</span>}
+                                  <button
+                                    onClick={() => handleUndoLast(school, enrollment)}
+                                    disabled={isPending}
+                                    className="text-xs text-[var(--ink-3)] hover:text-[var(--ink)] hover:underline disabled:opacity-50"
+                                  >
+                                    Undo last sent
                                   </button>
                                 </>
                               )}
@@ -1059,7 +1427,21 @@ export default function SchoolOutreachClient({ schools, facets, enrollments, set
         />
       )}
 
-      <Toast toast={toast} />
+      {pendingConfirm && (
+        <ConfirmDialog
+          tone="default"
+          title={pendingConfirm.title}
+          message={pendingConfirm.message}
+          consequences={pendingConfirm.consequences}
+          confirmLabel={pendingConfirm.confirmLabel}
+          secondary={pendingConfirm.secondary}
+          isPending={isPending}
+          onConfirm={pendingConfirm.onConfirm}
+          onCancel={() => setPendingConfirm(null)}
+        />
+      )}
+
+      <Toast toast={toast} onDismiss={dismissToast} />
     </div>
   )
 }

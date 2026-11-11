@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { adminClient } from '@/lib/supabase/admin'
+import { advanceSchoolStage } from '@/lib/cadence-progress'
 
 export async function GET() {
   return runCheck()
@@ -89,10 +90,8 @@ async function runCheck() {
           })
           .eq('id', e.id)
 
-        await adminClient
-          .from('school_outreach')
-          .update({ stage: 'replied' })
-          .eq('id', e.school_id)
+        // Forward-only: a school already past Replied keeps its stage.
+        await advanceSchoolStage(adminClient, e.school_id, 'replied')
 
         detected++
       }
