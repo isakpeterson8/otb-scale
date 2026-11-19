@@ -26,7 +26,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const TEMPLATE_NAME = 'OTB Scale Standard Work Plan'
+const TEMPLATE_NAME = 'OTB Scale Work Plan'
 const EXPECTED_TASKS = 49
 const EXPECTED_INTERNAL_NOTES = 4
 

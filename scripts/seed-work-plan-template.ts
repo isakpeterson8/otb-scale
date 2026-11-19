@@ -29,7 +29,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
 
-const TEMPLATE_NAME = 'OTB Scale Standard Work Plan'
+const TEMPLATE_NAME = 'OTB Scale Work Plan'
 const MILESTONE_TAGS = ['website', 'gbp', 'instagram', 'flyer', 'seo', 'general']
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
