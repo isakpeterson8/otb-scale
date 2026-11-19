@@ -16,6 +16,7 @@ const FREE_TIER_BLOCKED: { path: string; toast: string }[] = [
   { path: '/school-outreach', toast: 'School Outreach is available on the Scale plan.' },
   { path: '/education',       toast: 'The Education Library is available on the Scale plan.' },
   { path: '/cadence',         toast: 'Cadence Check-In is available on the Scale plan.' },
+  { path: '/live-support',    toast: 'Live Support Sessions are available on the Scale plan.' },
   // /settings is intentionally NOT blocked — free tier users can access it
 ]
 

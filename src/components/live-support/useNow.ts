@@ -1,20 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 
 /**
- * The current time, ticking every `intervalMs`. null until mounted, so the
- * server render and first client render agree and local-timezone text is only
- * produced in the browser.
+ * The current time, rounded down to `intervalMs` and re-rendering each tick.
+ * null during the server render and hydration, so local-timezone text is only
+ * produced in the browser and the two renders always agree.
  */
-export function useNow(intervalMs = 30_000): Date | null {
-  const [now, setNow] = useState<Date | null>(null)
-  useEffect(() => {
-    setNow(new Date())
-    const id = setInterval(() => setNow(new Date()), intervalMs)
+export function useNow(intervalMs = 10_000): Date | null {
+  const subscribe = useCallback((onTick: () => void) => {
+    const id = setInterval(onTick, intervalMs)
     return () => clearInterval(id)
   }, [intervalMs])
-  return now
+  const bucket = useSyncExternalStore(
+    subscribe,
+    () => Math.floor(Date.now() / intervalMs),
+    () => null,
+  )
+  return bucket == null ? null : new Date(bucket * intervalMs)
 }
 
 export function fmtLocalDateTime(iso: string): string {
