@@ -15,7 +15,7 @@ import { FACEBOOK_GROUPS_IMPORT } from '@/lib/csv-import/configs'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast, { useToast } from '@/components/ui/Toast'
 import ScheduleView from './ScheduleView'
-import { DAYS, DAY_LABEL, getISOWeek } from './schedule'
+import { DAYS, DAY_LABEL, currentWeek, getISOWeek } from './schedule'
 import {
   TemplateLibrary,
   TemplatePicker,
@@ -87,9 +87,13 @@ const QUAL_BADGE: Record<QualificationStatus, { label: string; shortLabel: strin
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function isDueToday(group: FacebookGroup): boolean {
+/** Local midnight of the Monday that starts the week containing `d`. */
+function mondayOf(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getDay() + 6) % 7)
+}
+
+function isDueOn(group: FacebookGroup, now: Date): boolean {
   if (!group.post_frequency || !group.is_active) return false
-  const now = new Date()
   const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()]
   const days = group.post_days ?? []
 
@@ -98,10 +102,17 @@ function isDueToday(group: FacebookGroup): boolean {
     case 'weekly': return days.includes(dayName)
     case 'biweekly': {
       if (!days.includes(dayName)) return false
+      // With a post on record, skip only the week right after the last post's week.
+      // Same week (a second posting day) or two+ weeks on is due, whatever A/B says.
+      if (group.most_recent_post_date) {
+        const last = new Date(group.most_recent_post_date + 'T00:00:00')
+        const weekGap = Math.round((mondayOf(now).getTime() - mondayOf(last).getTime()) / (7 * 86_400_000))
+        return weekGap !== 1
+      }
+      // Never posted: A/B weeks place the group; 'both' or blank shows every week.
       const week = getISOWeek(now)
-      const pattern = group.post_week_pattern ?? 'both'
-      if (pattern === 'a_week') return week % 2 === 1
-      if (pattern === 'b_week') return week % 2 === 0
+      if (group.post_week_pattern === 'a_week') return week % 2 === 1
+      if (group.post_week_pattern === 'b_week') return week % 2 === 0
       return true
     }
     case 'monthly':
@@ -110,6 +121,10 @@ function isDueToday(group: FacebookGroup): boolean {
       return days.includes(dayName) && now.getDate() <= 7 && (now.getMonth() + 1) % 2 === 1
     default: return false
   }
+}
+
+function isDueToday(group: FacebookGroup): boolean {
+  return isDueOn(group, new Date())
 }
 
 function scheduleLabel(group: FacebookGroup): string {
@@ -572,7 +587,7 @@ function GroupForm({
               <label className="block text-xs text-[var(--ink-3)] mb-1">Week Pattern</label>
               <select
                 name="post_week_pattern"
-                defaultValue={group?.post_week_pattern ?? 'both'}
+                defaultValue={group?.post_week_pattern ?? (currentWeek() === 'a' ? 'a_week' : 'b_week')}
                 className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
               >
                 <option value="both">Both weeks</option>
