@@ -15,7 +15,7 @@ import { FACEBOOK_GROUPS_IMPORT } from '@/lib/csv-import/configs'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Toast, { useToast } from '@/components/ui/Toast'
 import ScheduleView from './ScheduleView'
-import { DAYS, DAY_LABEL, getISOWeek } from './schedule'
+import { DAYS, DAY_LABEL, currentWeek, getISOWeek } from './schedule'
 import {
   TemplateLibrary,
   TemplatePicker,
@@ -87,27 +87,46 @@ const QUAL_BADGE: Record<QualificationStatus, { label: string; shortLabel: strin
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Minimum days between posts: a group posted fewer days ago than this isn't due. */
+const MIN_DAYS_BETWEEN_POSTS = { weekly: 6, biweekly: 13, monthly: 27, bimonthly: 55 } as const
+
+/** Whole calendar days from a YYYY-MM-DD date to today, in local time. */
+function daysSince(date: string, now: Date): number {
+  const then = new Date(date + 'T00:00:00')
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((today.getTime() - then.getTime()) / 86_400_000)
+}
+
 function isDueToday(group: FacebookGroup): boolean {
   if (!group.post_frequency || !group.is_active) return false
   const now = new Date()
   const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()]
   const days = group.post_days ?? []
+  if (group.post_frequency === 'daily') return true
+  if (!days.includes(dayName)) return false
+
+  // Days since the last post. A post dated today (or tomorrow: the server stamps it
+  // in UTC) is today's post, so the group stays in the due list, marked done.
+  const since = group.most_recent_post_date ? daysSince(group.most_recent_post_date, now) : null
+  const postedToday = since !== null && since <= 0
+  const lastPost = postedToday ? null : since
+  if (lastPost !== null && lastPost < MIN_DAYS_BETWEEN_POSTS[group.post_frequency]) return false
 
   switch (group.post_frequency) {
-    case 'daily': return true
-    case 'weekly': return days.includes(dayName)
+    case 'weekly': return true
     case 'biweekly': {
-      if (!days.includes(dayName)) return false
+      // With a post on record, the 13-day gap above decides. A/B weeks only place
+      // groups that have never been posted.
+      if (lastPost !== null || postedToday) return true
       const week = getISOWeek(now)
-      const pattern = group.post_week_pattern ?? 'both'
-      if (pattern === 'a_week') return week % 2 === 1
-      if (pattern === 'b_week') return week % 2 === 0
+      if (group.post_week_pattern === 'a_week') return week % 2 === 1
+      if (group.post_week_pattern === 'b_week') return week % 2 === 0
       return true
     }
     case 'monthly':
-      return days.includes(dayName) && now.getDate() <= 7
+      return now.getDate() <= 7
     case 'bimonthly':
-      return days.includes(dayName) && now.getDate() <= 7 && (now.getMonth() + 1) % 2 === 1
+      return now.getDate() <= 7 && (now.getMonth() + 1) % 2 === 1
     default: return false
   }
 }
@@ -572,7 +591,7 @@ function GroupForm({
               <label className="block text-xs text-[var(--ink-3)] mb-1">Week Pattern</label>
               <select
                 name="post_week_pattern"
-                defaultValue={group?.post_week_pattern ?? 'both'}
+                defaultValue={group?.post_week_pattern ?? (currentWeek() === 'a' ? 'a_week' : 'b_week')}
                 className="w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]"
               >
                 <option value="both">Both weeks</option>
