@@ -16,6 +16,7 @@ const TOP_NAV = [
   { key: 'sites',     label: 'Sites',     href: '/admin/squarespace' },
   { key: 'content',   label: 'Content',   href: '/admin/library' },
   { key: 'insights',  label: 'Insights',  href: '/admin/cadence' },
+  { key: 'lss',       label: 'Live Support', href: '/admin/lss' },
 ] as const
 
 type SectionKey = (typeof TOP_NAV)[number]['key']
@@ -46,6 +47,7 @@ function getActiveSection(pathname: string): SectionKey {
   if (pathname.startsWith('/admin/library'))    return 'content'
   if (pathname.startsWith('/admin/resources'))  return 'content'
   if (pathname.startsWith('/admin/cadence'))    return 'insights'
+  if (pathname.startsWith('/admin/lss'))        return 'lss'
   return 'members'
 }
 
