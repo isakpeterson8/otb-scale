@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import type { Contact, LeadStatus, SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
 import { ACTIVE_LEAD_STATUSES, LEAD_STATUSES } from '@/types/database'
 import GettingStartedCard from '@/components/dashboard/GettingStartedCard'
+import NextLiveSupportCard from '@/components/dashboard/NextLiveSupportCard'
+import type { LssSessionSummary } from '@/lib/live-support'
 
 const STRATEGY_SESSION_URL = 'https://login.outsidethebachs.com/music-lesson-studio-strategy-session-request'
 
@@ -23,6 +25,8 @@ interface Props {
   enrollments: Enrollment[]
   activeGroups: Group[]
   activeLeads: ActiveLead[]
+  /** Present only for Scale/Lifetime (and admins); null hides the card. */
+  liveSupport?: { next: LssSessionSummary | null } | null
 }
 
 function fmtCurrency(n: number | null) {
@@ -140,7 +144,7 @@ function ActiveLeadsSection({ activeLeads }: { activeLeads: ActiveLead[] }) {
   )
 }
 
-export default function DashboardClient({ isFreeTier, toastMessage, latestSnapshot, schools, enrollments, activeGroups, activeLeads }: Props) {
+export default function DashboardClient({ isFreeTier, toastMessage, latestSnapshot, schools, enrollments, activeGroups, activeLeads, liveSupport }: Props) {
   const router = useRouter()
   const [toast, setToast] = useState<string | null>(toastMessage ?? null)
 
@@ -305,6 +309,8 @@ export default function DashboardClient({ isFreeTier, toastMessage, latestSnapsh
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
       </div>
+
+      {liveSupport && <NextLiveSupportCard session={liveSupport.next} />}
 
       {/* Row 1 — Studio Snapshot */}
       <section className="space-y-3">

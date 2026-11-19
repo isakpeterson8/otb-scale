@@ -5,7 +5,7 @@ import { adminClient } from '@/lib/supabase/admin'
 import { getCachedClient, getCachedStudioTier } from '@/lib/supabase/cached'
 import { getStudioId } from '@/app/actions/_shared'
 import { hasFeatureAccess } from '@/lib/features'
-import type { LssSessionSummary } from '@/lib/live-support'
+import { upcomingSessions, type LssSessionSummary } from '@/lib/live-support'
 
 export type LiveSupportAccess =
   | { status: 'anonymous' }
@@ -66,4 +66,20 @@ export function maskZoomUrl(url: string | null): string | null {
   } catch {
     return '••••••'
   }
+}
+
+/**
+ * The next session that hasn't ended (one in progress counts), via RLS.
+ * Looks back 12 hours so a session that has started but not finished is included.
+ */
+export async function getNextLssSession(): Promise<LssSessionSummary | null> {
+  const supabase = await getCachedClient()
+  const now = new Date()
+  const { data } = await supabase
+    .from('lss_sessions')
+    .select(SESSION_COLUMNS)
+    .gte('starts_at', new Date(now.getTime() - 12 * 3_600_000).toISOString())
+    .order('starts_at', { ascending: true })
+    .limit(10)
+  return upcomingSessions((data ?? []) as LssSessionSummary[], now)[0] ?? null
 }

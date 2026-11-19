@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { getStudioId } from '@/app/actions/_shared'
 import { generateReminders } from '@/app/actions/reminders'
 import { getCachedStudioTier } from '@/lib/supabase/cached'
+import { hasFeatureAccess } from '@/lib/features'
+import { getNextLssSession } from '@/lib/live-support-server'
 import AppShell from '@/components/layout/AppShell'
 import DashboardClient from './DashboardClient'
 import type { Contact, SchoolOutreach, CadenceEnrollment, FacebookGroup, StudioSnapshot } from '@/types/database'
@@ -68,8 +70,14 @@ export default async function DashboardPage({
     )
   }
 
+  // Live Support card: Scale and Lifetime only (Graduates get the paid
+  // dashboard but not this card). Same View As rule as the education library.
+  const showLiveSupport = viewOnly
+    ? hasFeatureAccess(tier, 'live_support')
+    : isAdmin || hasFeatureAccess(tier, 'live_support')
+
   // Paid tier: fetch all data
-  const [snapshotRes, schoolsRes, groupsRes, activeLeadsRes] = await Promise.all([
+  const [snapshotRes, schoolsRes, groupsRes, activeLeadsRes, nextLss] = await Promise.all([
     supabase
       .from('studio_snapshots')
       .select('snapshot_date, enrollment, collected_revenue')
@@ -89,6 +97,7 @@ export default async function DashboardPage({
       .eq('is_active', true)
       .order('group_name', { ascending: true }),
     activeLeadsQuery,
+    showLiveSupport ? getNextLssSession() : Promise.resolve(null),
   ])
 
   const schoolIds = (schoolsRes.data ?? []).map((s: { id: string }) => s.id)
@@ -113,6 +122,7 @@ export default async function DashboardPage({
           enrollments={enrollmentsData}
           activeGroups={(groupsRes.data ?? []) as Pick<FacebookGroup, 'id' | 'group_name' | 'most_recent_post_date'>[]}
           activeLeads={(activeLeadsRes.data ?? []) as Pick<Contact, 'id' | 'name' | 'status'>[]}
+          liveSupport={showLiveSupport ? { next: nextLss } : null}
         />
       </main>
     </AppShell>
