@@ -87,48 +87,44 @@ const QUAL_BADGE: Record<QualificationStatus, { label: string; shortLabel: strin
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Minimum days between posts: a group posted fewer days ago than this isn't due. */
-const MIN_DAYS_BETWEEN_POSTS = { weekly: 6, biweekly: 13, monthly: 27, bimonthly: 55 } as const
-
-/** Whole calendar days from a YYYY-MM-DD date to today, in local time. */
-function daysSince(date: string, now: Date): number {
-  const then = new Date(date + 'T00:00:00')
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  return Math.round((today.getTime() - then.getTime()) / 86_400_000)
+/** Local midnight of the Monday that starts the week containing `d`. */
+function mondayOf(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getDay() + 6) % 7)
 }
 
-function isDueToday(group: FacebookGroup): boolean {
+function isDueOn(group: FacebookGroup, now: Date): boolean {
   if (!group.post_frequency || !group.is_active) return false
-  const now = new Date()
   const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()]
   const days = group.post_days ?? []
-  if (group.post_frequency === 'daily') return true
-  if (!days.includes(dayName)) return false
-
-  // Days since the last post. A post dated today (or tomorrow: the server stamps it
-  // in UTC) is today's post, so the group stays in the due list, marked done.
-  const since = group.most_recent_post_date ? daysSince(group.most_recent_post_date, now) : null
-  const postedToday = since !== null && since <= 0
-  const lastPost = postedToday ? null : since
-  if (lastPost !== null && lastPost < MIN_DAYS_BETWEEN_POSTS[group.post_frequency]) return false
 
   switch (group.post_frequency) {
-    case 'weekly': return true
+    case 'daily': return true
+    case 'weekly': return days.includes(dayName)
     case 'biweekly': {
-      // With a post on record, the 13-day gap above decides. A/B weeks only place
-      // groups that have never been posted.
-      if (lastPost !== null || postedToday) return true
+      if (!days.includes(dayName)) return false
+      // With a post on record, skip only the week right after the last post's week.
+      // Same week (a second posting day) or two+ weeks on is due, whatever A/B says.
+      if (group.most_recent_post_date) {
+        const last = new Date(group.most_recent_post_date + 'T00:00:00')
+        const weekGap = Math.round((mondayOf(now).getTime() - mondayOf(last).getTime()) / (7 * 86_400_000))
+        return weekGap !== 1
+      }
+      // Never posted: A/B weeks place the group; 'both' or blank shows every week.
       const week = getISOWeek(now)
       if (group.post_week_pattern === 'a_week') return week % 2 === 1
       if (group.post_week_pattern === 'b_week') return week % 2 === 0
       return true
     }
     case 'monthly':
-      return now.getDate() <= 7
+      return days.includes(dayName) && now.getDate() <= 7
     case 'bimonthly':
-      return now.getDate() <= 7 && (now.getMonth() + 1) % 2 === 1
+      return days.includes(dayName) && now.getDate() <= 7 && (now.getMonth() + 1) % 2 === 1
     default: return false
   }
+}
+
+function isDueToday(group: FacebookGroup): boolean {
+  return isDueOn(group, new Date())
 }
 
 function scheduleLabel(group: FacebookGroup): string {
