@@ -7,6 +7,7 @@ export type Feature =
   | 'gmail_integration'
   | 'education_library'
   | 'resources'
+  | 'live_support'
 
 const ACCESS_MATRIX: Record<Feature, SubscriptionTier[]> = {
   facebook_groups:   ['scale', 'graduate', 'lifetime'],
@@ -15,6 +16,8 @@ const ACCESS_MATRIX: Record<Feature, SubscriptionTier[]> = {
   gmail_integration: ['scale', 'graduate', 'lifetime'],
   education_library: ['scale', 'lifetime'],
   resources:         ['scale', 'graduate', 'lifetime'],
+  // Mirrored in SQL by public.has_live_support_access() (RLS on lss_sessions).
+  live_support:      ['scale', 'lifetime'],
 }
 
 export function hasFeatureAccess(tier: string, feature: Feature): boolean {
@@ -63,6 +66,7 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   gmail_integration: 'Gmail Integration',
   education_library: 'Education Library',
   resources:         'Resources',
+  live_support:      'Live Support Sessions',
 }
 
 export const TIER_LABELS: Record<SubscriptionTier, string> = {
