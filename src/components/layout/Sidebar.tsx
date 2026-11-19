@@ -156,6 +156,16 @@ const NAV_ALL = [
     icon: NAV_LOCKED[1].icon,
   },
   NAV_LOCKED[3], // Cadence Check-In
+  {
+    label: 'Live Support',
+    href: '/live-support',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <rect x="1.5" y="4" width="9" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M10.5 7l4-2.2v6.4l-4-2.2" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" opacity=".6" />
+      </svg>
+    ),
+  },
   CANVA_EDITS_NAV_ITEM,
   {
     label: 'Squarespace',
@@ -215,11 +225,13 @@ export default function Sidebar({ displayName, isAdmin, showAdminLink, tier, vie
   const restrictedTier = viewOnly ? viewAsTier : (isAdmin ? null : tier)
 
   // Nav visibility comes from the same two sources the server enforces:
-  // GRADUATE_BLOCKED for route blocks, ACCESS_MATRIX for the education library.
+  // GRADUATE_BLOCKED for route blocks, ACCESS_MATRIX for the education library
+  // and Live Support. (Free never sees Live Support: it isn't in NAV_LOCKED.)
   const hiddenForTier = (href: string) => {
     if (!restrictedTier) return false
     if (graduateBlockedRoute(restrictedTier, href)) return true
     if (href === '/education' && !hasFeatureAccess(restrictedTier, 'education_library')) return true
+    if (href === '/live-support' && !hasFeatureAccess(restrictedTier, 'live_support')) return true
     return false
   }
 
