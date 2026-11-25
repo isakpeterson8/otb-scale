@@ -116,13 +116,15 @@ export const FACEBOOK_GROUPS_IMPORT: ImportConfig = {
       aliases: ['post frequency', 'posting frequency', 'schedule', 'posting schedule', 'how often'], example: 'Weekly' },
     { key: 'post_days', label: 'Days', kind: 'days',
       aliases: ['post days', 'posting days', 'day', 'days of week', 'post day', 'posting day'], example: 'Mon, Thu' },
-    { key: 'post_week_pattern', label: 'Week pattern', kind: 'enum', defaultValue: 'both',
+    // No default: a biweekly row without an A/B week stays blank so the schedule flags it.
+    // Defaulting to 'both' made those groups show as due every week.
+    { key: 'post_week_pattern', label: 'Week pattern', kind: 'enum',
       options: [
         { value: 'both', label: 'Both weeks' },
         { value: 'a_week', label: 'A-Week' },
         { value: 'b_week', label: 'B-Week' },
       ],
-      aliases: ['week', 'weeks', 'ab week'], example: 'Both weeks' },
+      aliases: ['week', 'weeks', 'ab week'], example: 'A-Week' },
     { key: 'shared_with', label: 'Shared with', kind: 'text', maxLength: 200,
       aliases: ['shared', 'partner'], example: 'Jordan (partner studio)' },
     { key: 'posting_rules', label: 'Posting rules', kind: 'text', maxLength: 5000,

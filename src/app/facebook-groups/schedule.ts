@@ -33,7 +33,7 @@ export interface Schedule {
   weeks: { a: DayCells; b: DayCells }
   /** Monthly and bimonthly groups post in the first week of the month, outside the A/B cycle. */
   monthly: DayCells
-  /** Active groups missing a frequency, posting days or (biweekly) an A/B week. */
+  /** Active groups missing a frequency, posting days or (biweekly) a single A/B week. */
   flagged: { group: FacebookGroup; reason: string }[]
   inactiveCount: number
 }
@@ -66,7 +66,8 @@ export function buildSchedule(groups: FacebookGroup[]): Schedule {
     if (g.post_frequency === 'biweekly') {
       if (g.post_week_pattern === 'a_week') weeks = ['a']
       else if (g.post_week_pattern === 'b_week') weeks = ['b']
-      else if (!g.post_week_pattern) s.flagged.push({ group: g, reason: 'Biweekly with no A/B week picked (shown in both weeks)' })
+      else if (g.post_week_pattern === 'both') s.flagged.push({ group: g, reason: 'Biweekly set to both weeks — will show as due every week.' })
+      else s.flagged.push({ group: g, reason: 'Biweekly with no A/B week picked (shown in both weeks)' })
     }
     for (const w of weeks) for (const d of days) s.weeks[w][d].push(g)
   }
