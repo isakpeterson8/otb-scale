@@ -58,6 +58,7 @@ export interface GoogleStatus {
   testError: string | null
   sendUpdates: SendUpdates
   inviteWindowDays: number
+  clientInvitesPaused: boolean
 }
 
 export async function getGoogleStatus(): Promise<Result<GoogleStatus>> {
@@ -74,6 +75,7 @@ export async function getGoogleStatus(): Promise<Result<GoogleStatus>> {
     testError: null,
     sendUpdates: settings.sendUpdates,
     inviteWindowDays: settings.inviteWindowDays,
+    clientInvitesPaused: settings.clientInvitesPaused,
   }
   if (status.connected && !status.wrongAccount && status.configured && settings.calendarId) {
     try {
@@ -99,6 +101,14 @@ export async function saveInviteSendUpdates(mode: SendUpdates): Promise<Result> 
   if (!await getStaffContext()) return { error: 'Unauthorized' }
   if (!['all', 'externalOnly', 'none'].includes(mode)) return { error: 'Invalid mode' }
   const { error } = await adminClient.from('lss_settings').update({ invite_send_updates: mode }).eq('id', true)
+  if (error) return { error: error.message }
+  revalidatePath('/admin/lss')
+  return { error: null }
+}
+
+export async function saveClientInvitesPaused(paused: boolean): Promise<Result> {
+  if (!await getStaffContext()) return { error: 'Unauthorized' }
+  const { error } = await adminClient.from('lss_settings').update({ client_invites_paused: !!paused }).eq('id', true)
   if (error) return { error: error.message }
   revalidatePath('/admin/lss')
   return { error: null }

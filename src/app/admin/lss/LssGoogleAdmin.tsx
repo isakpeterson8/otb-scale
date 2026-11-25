@@ -11,6 +11,7 @@ import {
   saveGoogleCalendarId,
   saveInviteSendUpdates,
   saveInviteWindowDays,
+  saveClientInvitesPaused,
   syncOneSession,
   type GoogleStatus,
   type ReviewEvent,
@@ -284,14 +285,32 @@ interface SyncLine {
   addedList: string[]
   removedList: string[]
   outsideWindow: boolean
+  clientsPaused: boolean
 }
 
-export function SyncCard({ connected, lastSync, sendUpdates }: { connected: boolean; lastSync: string | null; sendUpdates: LssSendUpdates }) {
+export function SyncCard({ connected, lastSync, sendUpdates, clientInvitesPaused }: {
+  connected: boolean
+  lastSync: string | null
+  sendUpdates: LssSendUpdates
+  clientInvitesPaused: boolean
+}) {
   const router = useRouter()
   const [pauseSec, setPauseSec] = useState(30)
   const [lines, setLines] = useState<SyncLine[]>([])
   const [running, setRunning] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [pauseError, setPauseError] = useState<string | null>(null)
+  const [pausePending, startPause] = useTransition()
+
+  function setPaused(paused: boolean) {
+    if (!paused && !window.confirm('Turn client invites ON? The next sync — this button, the 3 AM nightly sync or any tier change — will add Scale/Lifetime owners to every session in the invite window and email them.')) return
+    setPauseError(null)
+    startPause(async () => {
+      const r = await saveClientInvitesPaused(paused)
+      if (r.error) setPauseError(r.error)
+      else router.refresh()
+    })
+  }
 
   async function run(dryRun: boolean) {
     setRunning(true)
@@ -318,6 +337,7 @@ export function SyncCard({ connected, lastSync, sendUpdates }: { connected: bool
         total: d?.attendeeCount ?? null,
         error: r.error ?? d?.error ?? d?.skipped ?? null,
         outsideWindow: d ? !d.inWindow : false,
+        clientsPaused: !!d?.clientsPaused,
         quota: !!d?.quota,
         addedList: d?.added ?? [],
         removedList: d?.removed ?? [],
@@ -343,9 +363,22 @@ export function SyncCard({ connected, lastSync, sendUpdates }: { connected: bool
         </p>
         {lastSync && <p className="text-xs text-[var(--ink-3)] mt-1">Last sync: {lastSync}</p>}
       </div>
+
+      <div className="rounded-lg px-3 py-2 text-xs flex flex-wrap items-center gap-3"
+        style={{ background: clientInvitesPaused ? 'rgba(139,69,19,0.18)' : 'rgba(45,90,61,0.22)', color: 'var(--ink)' }}>
+        <span className="flex-1 min-w-[14rem]">
+          {clientInvitesPaused
+            ? <><strong>Client invites are PAUSED.</strong> No sync adds clients or emails them — not this button, not the 3 AM nightly sync, not tier changes. Hosts are still synced. Preview still shows what would be sent.</>
+            : <><strong>Client invites are ON.</strong> Syncs add Scale/Lifetime owners to sessions in the invite window and email them (sendUpdates={sendUpdates}).</>}
+        </span>
+        <button type="button" className={secondaryBtn} disabled={pausePending} onClick={() => setPaused(!clientInvitesPaused)}>
+          {clientInvitesPaused ? 'Turn client invites on' : 'Pause client invites'}
+        </button>
+      </div>
+      {pauseError && <Note tone="error">{pauseError}</Note>}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className={secondaryBtn} disabled={!connected || running} onClick={() => run(true)}>Preview changes</button>
-        <button type="button" className={primaryBtn} disabled={!connected || running} onClick={() => run(false)}>Send invites / sync now</button>
+        <button type="button" className={primaryBtn} disabled={!connected || running} onClick={() => run(false)}>{clientInvitesPaused ? 'Sync hosts only (invites paused)' : 'Send invites / sync now'}</button>
         <label className="text-xs text-[var(--ink-3)] inline-flex items-center gap-1">
           Pause between batches
           <input type="number" min={0} max={600} value={pauseSec} onChange={e => setPauseSec(Number(e.target.value) || 0)}
@@ -360,6 +393,7 @@ export function SyncCard({ connected, lastSync, sendUpdates }: { connected: bool
               <summary className="cursor-pointer">
                 {l.when} — +{l.added} −{l.removed}{l.total !== null ? ` · ${l.total} guests` : ''}
                 {l.outsideWindow && <span className="text-[var(--ink-3)]"> · outside invite window (hosts only)</span>}
+                {l.clientsPaused && !l.outsideWindow && <span className="text-[var(--ink-3)]"> · client invites paused (hosts only)</span>}
                 {l.error && <span style={{ color: 'var(--red)' }}> · {l.quota ? 'QUOTA: ' : ''}{l.error}</span>}
               </summary>
               {l.addedList.length > 0 && <p className="mt-1">Added: {l.addedList.join(', ')}</p>}
