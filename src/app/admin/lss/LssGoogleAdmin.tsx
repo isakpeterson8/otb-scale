@@ -73,7 +73,7 @@ export function GoogleConnectionCard({ status, flash }: { status: GoogleStatus; 
       <div>
         <h3 className="text-sm font-medium text-[var(--ink)]">Google Calendar</h3>
         <p className="text-xs text-[var(--ink-3)] mt-0.5">
-          Invites go out from the shared calendar, sent by {status.expectedAccount}. Clients never see other guests, coach emails or the Zoom link.
+          Invites are sent from {status.expectedAccount}: clients see it as the sender and reply-to. They never see other guests, any other coach email or the Zoom link.
         </p>
       </div>
 

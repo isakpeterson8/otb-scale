@@ -15,10 +15,11 @@ export const LSS_GOOGLE_SCOPES = [
 
 /**
  * The only Google account allowed to connect. Google sends invite emails From
- * and Reply-To the connected account, so this must be a non-coach mailbox:
- * clients see this address on every invite.
+ * and Reply-To the connected account, so clients see this address on every
+ * invite (decided: Isak's address is the visible sender; no other coach email
+ * appears).
  */
-export const LSS_CALENDAR_OWNER = 'support@outsidethebachs.com'
+export const LSS_CALENDAR_OWNER = 'isak@outsidethebachs.com'
 export const LSS_OAUTH_STATE_COOKIE = 'lss_google_oauth_state'
 
 export const LSS_LIVE_SUPPORT_URL = 'https://studio.outsidethebachs.com/live-support'
