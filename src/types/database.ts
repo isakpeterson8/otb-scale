@@ -682,3 +682,20 @@ export type ClientWorkPlanTaskItem = Omit<WorkPlanTaskItem, 'done_by'>
 export interface ClientWorkPlanTaskWithItems extends ClientWorkPlanTask {
   items: ClientWorkPlanTaskItem[]
 }
+
+// ─── Live Support Sessions ───────────────────────────────────────────────────
+// lss_settings is deliberately not typed here: it holds the Zoom join URL and
+// is read only by server code (src/lib/live-support-server.ts).
+export interface LssSession {
+  id: string
+  title: string
+  coach_names: string | null
+  starts_at: string
+  duration_minutes: number
+  description: string | null
+  facebook_event_url: string | null
+  recording_url: string | null
+  google_event_id: string | null
+  created_at: string
+  updated_at: string
+}
