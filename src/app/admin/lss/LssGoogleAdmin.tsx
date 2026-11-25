@@ -10,6 +10,7 @@ import {
   reviewCalendarEvents,
   saveGoogleCalendarId,
   saveInviteSendUpdates,
+  saveInviteWindowDays,
   syncOneSession,
   type GoogleStatus,
   type ReviewEvent,
@@ -45,15 +46,16 @@ function joinNames(names: string[]): string {
 // ─── Connection ──────────────────────────────────────────────────────────────
 
 const SEND_UPDATES_LABEL: Record<LssSendUpdates, string> = {
-  none: 'none — Google sends no emails (safe default until the test is done)',
+  none: 'none — Google sends no emails',
   externalOnly: 'externalOnly — email only non-Google-Calendar guests',
-  all: 'all — email every guest Google considers affected',
+  all: 'all — email every newly added guest (recommended)',
 }
 
 export function GoogleConnectionCard({ status, flash }: { status: GoogleStatus; flash: { error?: string; connected?: boolean } }) {
   const router = useRouter()
   const [calId, setCalId] = useState(status.calendarId ?? '')
   const [mode, setMode] = useState<LssSendUpdates>(status.sendUpdates)
+  const [windowDays, setWindowDays] = useState(String(status.inviteWindowDays))
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
@@ -129,6 +131,21 @@ export function GoogleConnectionCard({ status, flash }: { status: GoogleStatus; 
         </div>
         <button type="button" className={secondaryBtn} disabled={pending || mode === status.sendUpdates}
           onClick={() => save(() => saveInviteSendUpdates(mode))}>
+          Save
+        </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+        <div className="flex-1">
+          <label className="block text-xs mb-1 text-[var(--ink-3)]">Invite window (days)</label>
+          <input type="number" min={1} max={365} value={windowDays} onChange={e => setWindowDays(e.target.value)} className={inputClass} />
+          <p className="text-[11px] text-[var(--ink-3)] mt-1">
+            Clients are added to sessions starting within this many days; the nightly sync adds them as sessions come into range.
+            Hosts are always added. Removals apply to every upcoming session.
+          </p>
+        </div>
+        <button type="button" className={secondaryBtn} disabled={pending || Number(windowDays) === status.inviteWindowDays}
+          onClick={() => save(() => saveInviteWindowDays(Number(windowDays)))}>
           Save
         </button>
       </div>
@@ -266,6 +283,7 @@ interface SyncLine {
   quota: boolean
   addedList: string[]
   removedList: string[]
+  outsideWindow: boolean
 }
 
 export function SyncCard({ connected, lastSync, sendUpdates }: { connected: boolean; lastSync: string | null; sendUpdates: LssSendUpdates }) {
@@ -299,6 +317,7 @@ export function SyncCard({ connected, lastSync, sendUpdates }: { connected: bool
         removed: d?.removed.length ?? 0,
         total: d?.attendeeCount ?? null,
         error: r.error ?? d?.error ?? d?.skipped ?? null,
+        outsideWindow: d ? !d.inWindow : false,
         quota: !!d?.quota,
         addedList: d?.added ?? [],
         removedList: d?.removed ?? [],
@@ -340,6 +359,7 @@ export function SyncCard({ connected, lastSync, sendUpdates }: { connected: bool
             <details key={i} className="text-xs text-[var(--ink-2)] rounded bg-[var(--canvas)] px-3 py-2">
               <summary className="cursor-pointer">
                 {l.when} — +{l.added} −{l.removed}{l.total !== null ? ` · ${l.total} guests` : ''}
+                {l.outsideWindow && <span className="text-[var(--ink-3)]"> · outside invite window (hosts only)</span>}
                 {l.error && <span style={{ color: 'var(--red)' }}> · {l.quota ? 'QUOTA: ' : ''}{l.error}</span>}
               </summary>
               {l.addedList.length > 0 && <p className="mt-1">Added: {l.addedList.join(', ')}</p>}

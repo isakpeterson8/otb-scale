@@ -9,6 +9,10 @@
 // with sendUpdates=none (people quietly drop off), additions with the mode
 // stored in lss_settings.invite_send_updates.
 //
+// Rolling invite window (lss_settings.invite_window_days): clients are only
+// ADDED to sessions starting within the window; hosts are always added.
+// Removals apply to every upcoming session, inside the window or not.
+//
 // Never removes: hosts, any lss_coaches email, the connected calendar owner,
 // the organizer, or resources. Never touches events before Dec 1, 2026.
 
@@ -34,19 +38,28 @@ export interface LssCalendarSettings {
   calendarId: string | null
   sendUpdates: SendUpdates
   ignoredEventIds: string[]
+  inviteWindowDays: number
 }
+
+export const LSS_DEFAULT_INVITE_WINDOW_DAYS = 14
 
 export async function readCalendarSettings(): Promise<LssCalendarSettings> {
   const { data } = await adminClient
     .from('lss_settings')
-    .select('google_calendar_id, invite_send_updates, ignored_google_event_ids')
+    .select('google_calendar_id, invite_send_updates, ignored_google_event_ids, invite_window_days')
     .eq('id', true)
     .maybeSingle()
-  const row = data as { google_calendar_id: string | null; invite_send_updates: SendUpdates | null; ignored_google_event_ids: string[] | null } | null
+  const row = data as {
+    google_calendar_id: string | null
+    invite_send_updates: SendUpdates | null
+    ignored_google_event_ids: string[] | null
+    invite_window_days: number | null
+  } | null
   return {
     calendarId: row?.google_calendar_id?.trim() || null,
     sendUpdates: row?.invite_send_updates ?? 'none',
     ignoredEventIds: row?.ignored_google_event_ids ?? [],
+    inviteWindowDays: row?.invite_window_days ?? LSS_DEFAULT_INVITE_WINDOW_DAYS,
   }
 }
 
@@ -186,6 +199,8 @@ export interface SessionSyncResult {
   error: string | null
   quota: boolean
   skipped?: string
+  /** False when the session starts after the invite window: clients are not added yet. */
+  inWindow: boolean
 }
 
 export interface SyncOptions {
@@ -231,6 +246,8 @@ interface SyncContext {
   protectedEmails: Set<string>
   hosts: Map<string, CoachRow[]>
   dryRun: boolean
+  /** Sessions starting before this instant get clients added. */
+  windowEndIso: string
 }
 
 async function buildContext(opts: SyncOptions, sessionIds: string[]): Promise<SyncContext> {
@@ -257,6 +274,7 @@ async function buildContext(opts: SyncOptions, sessionIds: string[]): Promise<Sy
     protectedEmails,
     hosts,
     dryRun: !!opts.dryRun,
+    windowEndIso: new Date(Date.now() + settings.inviteWindowDays * 86_400_000).toISOString(),
   }
 }
 
@@ -264,6 +282,7 @@ async function syncOne(s: LinkedSession, ctx: SyncContext): Promise<SessionSyncR
   const base: SessionSyncResult = {
     sessionId: s.id, title: s.title, startsAt: s.starts_at,
     added: [], removed: [], attendeeCount: null, error: null, quota: false,
+    inWindow: new Date(s.starts_at).toISOString() < ctx.windowEndIso,
   }
   if (s.starts_at < LSS_IMPORT_FROM_ISO) return { ...base, skipped: 'before Dec 1, 2026' }
 
@@ -275,7 +294,10 @@ async function syncOne(s: LinkedSession, ctx: SyncContext): Promise<SessionSyncR
     }
 
     const hostEmails = (ctx.hosts.get(s.id) ?? []).map(h => norm(h.email))
-    const desired = new Set<string>([...hostEmails, ...ctx.eligible])
+    // `wanted` decides removals (an eligible client is never removed, in or out
+    // of the window); `toAdd` decides additions (clients only inside the window).
+    const wanted = new Set<string>([...hostEmails, ...ctx.eligible])
+    const toAdd = base.inWindow ? wanted : new Set<string>(hostEmails)
     const inScope = (e: string) => ctx.scope === null || ctx.scope.has(e) || hostEmails.includes(e)
 
     const current = event.attendees ?? []
@@ -284,11 +306,11 @@ async function syncOne(s: LinkedSession, ctx: SyncContext): Promise<SessionSyncR
     for (const a of current) {
       const e = norm(a.email)
       const isProtected = a.organizer || a.self || a.resource || ctx.protectedEmails.has(e) || hostEmails.includes(e)
-      if (!desired.has(e) && !isProtected && inScope(e)) removed.push(e)
+      if (!wanted.has(e) && !isProtected && inScope(e)) removed.push(e)
       else keep.push(a)
     }
     const have = new Set(keep.map(a => norm(a.email)))
-    const added = [...desired].filter(e => !have.has(e) && inScope(e)).sort()
+    const added = [...toAdd].filter(e => !have.has(e) && inScope(e)).sort()
 
     if (!ctx.dryRun) {
       if (removed.length) {

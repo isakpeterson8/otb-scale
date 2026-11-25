@@ -57,6 +57,7 @@ export interface GoogleStatus {
   calendarTitle: string | null
   testError: string | null
   sendUpdates: SendUpdates
+  inviteWindowDays: number
 }
 
 export async function getGoogleStatus(): Promise<Result<GoogleStatus>> {
@@ -72,6 +73,7 @@ export async function getGoogleStatus(): Promise<Result<GoogleStatus>> {
     calendarTitle: null,
     testError: null,
     sendUpdates: settings.sendUpdates,
+    inviteWindowDays: settings.inviteWindowDays,
   }
   if (status.connected && !status.wrongAccount && status.configured && settings.calendarId) {
     try {
@@ -97,6 +99,15 @@ export async function saveInviteSendUpdates(mode: SendUpdates): Promise<Result> 
   if (!await getStaffContext()) return { error: 'Unauthorized' }
   if (!['all', 'externalOnly', 'none'].includes(mode)) return { error: 'Invalid mode' }
   const { error } = await adminClient.from('lss_settings').update({ invite_send_updates: mode }).eq('id', true)
+  if (error) return { error: error.message }
+  revalidatePath('/admin/lss')
+  return { error: null }
+}
+
+export async function saveInviteWindowDays(days: number): Promise<Result> {
+  if (!await getStaffContext()) return { error: 'Unauthorized' }
+  if (!Number.isInteger(days) || days < 1 || days > 365) return { error: 'Enter a whole number of days from 1 to 365.' }
+  const { error } = await adminClient.from('lss_settings').update({ invite_window_days: days }).eq('id', true)
   if (error) return { error: error.message }
   revalidatePath('/admin/lss')
   return { error: null }
