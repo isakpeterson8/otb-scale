@@ -1,6 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
+import { syncLssForStudio } from '@/lib/lss-sync'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
@@ -237,6 +239,9 @@ export async function updateStudioTier(studioId: string, tier: string) {
   const { error } = await adminClient.from('studios').update({ subscription_tier: tier }).eq('id', studioId)
   if (error) return { error: error.message }
 
+  // Live Support calendar invites follow the tier (added or quietly removed).
+  after(() => syncLssForStudio(studioId))
+
   revalidatePath('/admin')
   return { error: null }
 }
@@ -369,10 +374,14 @@ async function applyGrantToExistingUser(email: string, tier: string) {
   }
 
   if (!profile.studio_id) return
+  const studioId = profile.studio_id as string
   await adminClient
     .from('studios')
     .update({ subscription_tier: tier })
-    .eq('id', profile.studio_id)
+    .eq('id', studioId)
+
+  // Live Support calendar invites follow the tier (added or quietly removed).
+  after(() => syncLssForStudio(studioId))
 }
 
 export async function createAccessGrant(
@@ -474,6 +483,8 @@ export async function approveTierRequest(studioId: string) {
     })
     .eq('id', studioId)
   if (error) return { error: error.message }
+
+  after(() => syncLssForStudio(studioId))
 
   revalidatePath('/admin')
   return { error: null }

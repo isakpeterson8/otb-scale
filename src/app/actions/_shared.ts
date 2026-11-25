@@ -1,4 +1,6 @@
 import { cookies } from 'next/headers'
+import { after } from 'next/server'
+import { syncLssForStudio } from '@/lib/lss-sync'
 import { adminClient } from '@/lib/supabase/admin'
 import { getCachedClient, getCachedUser, getCachedProfile } from '@/lib/supabase/cached'
 
@@ -105,6 +107,11 @@ export async function getStudioId(): Promise<StudioContext | null> {
       return null
     } else {
       studioId = created.id
+      // A new studio that starts on Scale/Lifetime (from an access grant) gets its invites.
+      if (initialTier === 'scale' || initialTier === 'lifetime') {
+        const newStudioId = created.id as string
+        after(() => syncLssForStudio(newStudioId))
+      }
     }
   }
 
