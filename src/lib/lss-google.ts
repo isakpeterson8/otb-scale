@@ -13,6 +13,10 @@ export const LSS_GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
 ]
 
+/** The only Google account allowed to connect (owner of the LSS calendar). */
+export const LSS_CALENDAR_OWNER = 'isak@outsidethebachs.com'
+export const LSS_OAUTH_STATE_COOKIE = 'lss_google_oauth_state'
+
 export const LSS_LIVE_SUPPORT_URL = 'https://studio.outsidethebachs.com/live-support'
 
 /** The import screen never lists or touches events before this instant (Dec 1, 2026 00:00 Central). */
@@ -92,8 +96,18 @@ export async function readTokenRow(): Promise<TokenRow | null> {
   return (data as TokenRow | null) ?? null
 }
 
-/** Exchanges an authorization code and stores the tokens. Returns the connected account's email. */
-export async function exchangeCodeAndStore(code: string, connectedBy: string): Promise<string | null> {
+/**
+ * Exchanges an authorization code and stores the tokens, but only when the
+ * account is LSS_CALENDAR_OWNER; otherwise nothing is saved (an existing good
+ * connection is kept) and WrongAccountError is thrown.
+ */
+export class WrongAccountError extends Error {
+  constructor(public email: string | null) {
+    super(`wrong_account:${email ?? 'unknown'}`)
+  }
+}
+
+export async function exchangeCodeAndStore(code: string, connectedBy: string): Promise<string> {
   const cfg = lssOAuthConfig()
   if (!cfg) throw new Error('Google LSS OAuth is not configured')
 
@@ -118,6 +132,7 @@ export async function exchangeCodeAndStore(code: string, connectedBy: string): P
   }
 
   const email = emailFromIdToken(t.id_token)
+  if (email !== LSS_CALENDAR_OWNER) throw new WrongAccountError(email)
   const row: Record<string, unknown> = {
     id: true,
     account_email: email,
