@@ -686,6 +686,31 @@ export interface ClientWorkPlanTaskWithItems extends ClientWorkPlanTask {
 // ─── Live Support Sessions ───────────────────────────────────────────────────
 // lss_settings is deliberately not typed here: it holds the Zoom join URL and
 // is read only by server code (src/lib/live-support-server.ts).
+export interface LssCoach {
+  id: string
+  first_name: string
+  email: string
+  active: boolean
+  created_at: string
+}
+
+export interface LssSessionHost {
+  session_id: string
+  coach_id: string
+  position: number
+}
+
+export type LssSendUpdates = 'all' | 'externalOnly' | 'none'
+
+export interface LssSessionSync {
+  session_id: string
+  synced_at: string | null
+  error: string | null
+  last_added: number | null
+  last_removed: number | null
+  attendee_count: number | null
+}
+
 export interface LssSession {
   id: string
   title: string
