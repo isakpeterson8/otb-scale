@@ -9,6 +9,11 @@
 // with sendUpdates=none (people quietly drop off), additions with the mode
 // stored in lss_settings.invite_send_updates.
 //
+// Client invites paused (lss_settings.client_invites_paused, default true):
+// no sync adds clients — nightly cron, tier changes, session edits and the
+// admin button all respect it. Hosts are still added and removals still apply.
+// Dry runs (Preview) ignore it so the admin can see what would be sent.
+//
 // Rolling invite window (lss_settings.invite_window_days): clients are only
 // ADDED to sessions starting within the window; hosts are always added.
 // Removals apply to every upcoming session, inside the window or not.
@@ -40,6 +45,7 @@ export interface LssCalendarSettings {
   sendUpdates: SendUpdates
   ignoredEventIds: string[]
   inviteWindowDays: number
+  clientInvitesPaused: boolean
 }
 
 export const LSS_DEFAULT_INVITE_WINDOW_DAYS = 14
@@ -47,7 +53,7 @@ export const LSS_DEFAULT_INVITE_WINDOW_DAYS = 14
 export async function readCalendarSettings(): Promise<LssCalendarSettings> {
   const { data } = await adminClient
     .from('lss_settings')
-    .select('google_calendar_id, invite_send_updates, ignored_google_event_ids, invite_window_days')
+    .select('google_calendar_id, invite_send_updates, ignored_google_event_ids, invite_window_days, client_invites_paused')
     .eq('id', true)
     .maybeSingle()
   const row = data as {
@@ -55,12 +61,15 @@ export async function readCalendarSettings(): Promise<LssCalendarSettings> {
     invite_send_updates: SendUpdates | null
     ignored_google_event_ids: string[] | null
     invite_window_days: number | null
+    client_invites_paused: boolean | null
   } | null
   return {
     calendarId: row?.google_calendar_id?.trim() || null,
     sendUpdates: row?.invite_send_updates ?? 'none',
     ignoredEventIds: row?.ignored_google_event_ids ?? [],
     inviteWindowDays: row?.invite_window_days ?? LSS_DEFAULT_INVITE_WINDOW_DAYS,
+    // Fail closed: no row or no column means paused.
+    clientInvitesPaused: row?.client_invites_paused ?? true,
   }
 }
 
@@ -202,6 +211,8 @@ export interface SessionSyncResult {
   skipped?: string
   /** False when the session starts after the invite window: clients are not added yet. */
   inWindow: boolean
+  /** True when client invites are paused: only hosts were (or would be) added. */
+  clientsPaused: boolean
 }
 
 export interface SyncOptions {
@@ -249,6 +260,8 @@ interface SyncContext {
   dryRun: boolean
   /** Sessions starting before this instant get clients added. */
   windowEndIso: string
+  /** lss_settings.client_invites_paused (ignored on dry runs). */
+  clientsPaused: boolean
 }
 
 async function buildContext(opts: SyncOptions, sessionIds: string[]): Promise<SyncContext> {
@@ -276,6 +289,7 @@ async function buildContext(opts: SyncOptions, sessionIds: string[]): Promise<Sy
     hosts,
     dryRun: !!opts.dryRun,
     windowEndIso: new Date(Date.now() + settings.inviteWindowDays * 86_400_000).toISOString(),
+    clientsPaused: settings.clientInvitesPaused && !opts.dryRun,
   }
 }
 
@@ -284,6 +298,7 @@ async function syncOne(s: LinkedSession, ctx: SyncContext): Promise<SessionSyncR
     sessionId: s.id, title: s.title, startsAt: s.starts_at,
     added: [], removed: [], attendeeCount: null, error: null, quota: false,
     inWindow: new Date(s.starts_at).toISOString() < ctx.windowEndIso,
+    clientsPaused: ctx.clientsPaused,
   }
   if (s.starts_at < LSS_IMPORT_FROM_ISO) return { ...base, skipped: 'before Dec 1, 2026' }
 
@@ -304,7 +319,7 @@ async function syncOne(s: LinkedSession, ctx: SyncContext): Promise<SessionSyncR
     // `wanted` decides removals (an eligible client is never removed, in or out
     // of the window); `toAdd` decides additions (clients only inside the window).
     const wanted = new Set<string>([...hostEmails, ...ctx.eligible])
-    const toAdd = base.inWindow ? wanted : new Set<string>(hostEmails)
+    const toAdd = base.inWindow && !ctx.clientsPaused ? wanted : new Set<string>(hostEmails)
     const inScope = (e: string) => ctx.scope === null || ctx.scope.has(e) || hostEmails.includes(e)
 
     const current = event.attendees ?? []

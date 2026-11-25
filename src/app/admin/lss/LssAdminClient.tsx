@@ -319,7 +319,7 @@ export default function LssAdminClient({
 
       {google && <GoogleConnectionCard status={google} flash={googleFlash} />}
       {google && <ReviewEventsCard coaches={coaches} connected={connected} />}
-      {google && <SyncCard connected={connected} lastSync={lastSync} sendUpdates={google.sendUpdates} />}
+      {google && <SyncCard connected={connected} lastSync={lastSync} sendUpdates={google.sendUpdates} clientInvitesPaused={google.clientInvitesPaused} />}
 
       {adding && <SessionForm ctx={ctx} onDone={() => setAdding(false)} />}
 
