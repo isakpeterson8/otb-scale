@@ -64,7 +64,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (!user && !pathname.startsWith('/auth')) {
+  // Cron routes authenticate with CRON_SECRET themselves (Vercel Cron has no session).
+  if (!user && !pathname.startsWith('/auth') && !pathname.startsWith('/api/cron/')) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     url.searchParams.set('redirectTo', pathname)

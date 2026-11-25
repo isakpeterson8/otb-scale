@@ -13,6 +13,15 @@ import {
   utcToChicagoInputs,
   type LssSessionSummary,
 } from '@/lib/live-support'
+import type { GoogleStatus } from '@/app/actions/lss-calendar'
+import { GoogleConnectionCard, ReviewEventsCard, SyncCard, type CoachOption } from './LssGoogleAdmin'
+
+interface FormCtx {
+  coaches: CoachOption[]
+  hostIdsBySession: Record<string, string[]>
+  linkedSessionIds: string[]
+  googleConnected: boolean
+}
 
 const inputClass =
   'w-full px-3 py-2 rounded-lg border border-[var(--ink)]/15 bg-[var(--canvas)] text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-text)]'
@@ -97,12 +106,16 @@ function ZoomLinkCard({ maskedZoomUrl }: { maskedZoomUrl: string | null }) {
 function SessionForm({
   session,
   onDone,
+  ctx,
 }: {
   session?: LssSessionSummary
   onDone: () => void
+  ctx: FormCtx
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
+  const currentHosts = session ? ctx.hostIdsBySession[session.id] ?? [] : []
+  const linked = session ? ctx.linkedSessionIds.includes(session.id) : false
   const [pending, startTransition] = useTransition()
   const start = session ? utcToChicagoInputs(session.starts_at) : { date: '', time: '' }
 
@@ -111,6 +124,7 @@ function SessionForm({
     startTransition(async () => {
       const res = session ? await updateLssSession(session.id, form) : await createLssSession(form)
       if (res.error) { setError(res.error); return }
+      if (res.warning) { setError(res.warning); router.refresh(); return }
       onDone()
       router.refresh()
     })
@@ -123,11 +137,17 @@ function SessionForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>Title *</label>
-          <input name="title" required defaultValue={session?.title ?? 'Live Support Session'} className={inputClass} />
+          <input name="title" required defaultValue={session?.title ?? 'OTB Live Support Session'} className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Coaches</label>
-          <input name="coach_names" defaultValue={session?.coach_names ?? ''} placeholder="e.g. Isak & Kelly" className={inputClass} />
+          <label className={labelClass}>Hosts</label>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-[var(--ink-2)] pt-1">
+            {ctx.coaches.map(c => (
+              <label key={c.id} className="inline-flex items-center gap-1">
+                <input type="checkbox" name="coach_ids" value={c.id} defaultChecked={currentHosts.includes(c.id)} /> {c.first_name}
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -162,6 +182,14 @@ function SessionForm({
         </div>
       </div>
 
+      {ctx.googleConnected && (linked
+        ? <p className="text-xs text-[var(--ink-3)]">Linked to Google Calendar: the event&apos;s title and guests follow the hosts. A time change here moves the event and emails its guests.</p>
+        : (
+          <label className="inline-flex items-center gap-2 text-xs text-[var(--ink-2)]">
+            <input type="checkbox" name="add_to_google" defaultChecked={!session} /> Add to Google Calendar (hosts get the invite; clients are added by the sync)
+          </label>
+        ))}
+
       <ErrorNote message={error} />
 
       <div className="flex items-center gap-3 pt-1">
@@ -178,14 +206,14 @@ function SessionForm({
 
 // ─── Session row ─────────────────────────────────────────────────────────────
 
-function SessionRow({ session }: { session: LssSessionSummary }) {
+function SessionRow({ session, ctx }: { session: LssSessionSummary; ctx: FormCtx }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  if (editing) return <SessionForm session={session} onDone={() => setEditing(false)} />
+  if (editing) return <SessionForm session={session} ctx={ctx} onDone={() => setEditing(false)} />
 
   const start = new Date(session.starts_at)
   const end = sessionEnd(session)
@@ -218,6 +246,7 @@ function SessionRow({ session }: { session: LssSessionSummary }) {
           <p className="text-xs text-[var(--ink-3)] mt-0.5">
             {fmtChicagoDate(start)} · {fmtChicagoTime(start)}–{fmtChicagoTime(end)} Central
             {session.coach_names ? ` · ${session.coach_names}` : ''}
+            {ctx.linkedSessionIds.includes(session.id) ? ' · in Google Calendar' : ''}
           </p>
           <div className="flex flex-wrap gap-3 mt-1.5 text-xs">
             {session.facebook_event_url
@@ -253,11 +282,25 @@ function SessionRow({ session }: { session: LssSessionSummary }) {
 export default function LssAdminClient({
   sessions,
   maskedZoomUrl,
+  coaches,
+  hostIdsBySession,
+  linkedSessionIds,
+  google,
+  googleFlash,
+  lastSync,
 }: {
   sessions: LssSessionSummary[]
   maskedZoomUrl: string | null
+  coaches: CoachOption[]
+  hostIdsBySession: Record<string, string[]>
+  linkedSessionIds: string[]
+  google: GoogleStatus | null
+  googleFlash: { error?: string; connected?: boolean }
+  lastSync: string | null
 }) {
   const [adding, setAdding] = useState(false)
+  const connected = !!google?.connected && !google.testError
+  const ctx: FormCtx = { coaches, hostIdsBySession, linkedSessionIds, googleConnected: connected }
   const [now] = useState(() => new Date())
   const upcoming = upcomingSessions(sessions, now)
   const past = pastSessions(sessions, now)
@@ -274,20 +317,24 @@ export default function LssAdminClient({
 
       <ZoomLinkCard maskedZoomUrl={maskedZoomUrl} />
 
-      {adding && <SessionForm onDone={() => setAdding(false)} />}
+      {google && <GoogleConnectionCard status={google} flash={googleFlash} />}
+      {google && <ReviewEventsCard coaches={coaches} connected={connected} />}
+      {google && <SyncCard connected={connected} lastSync={lastSync} sendUpdates={google.sendUpdates} />}
+
+      {adding && <SessionForm ctx={ctx} onDone={() => setAdding(false)} />}
 
       <section className="space-y-3">
         <h3 className="text-sm font-semibold uppercase tracking-widest text-[var(--ink-3)]">Upcoming ({upcoming.length})</h3>
         {upcoming.length === 0
           ? <p className="text-sm text-[var(--ink-3)]">No upcoming sessions.</p>
-          : upcoming.map(s => <SessionRow key={s.id} session={s} />)}
+          : upcoming.map(s => <SessionRow key={s.id} session={s} ctx={ctx} />)}
       </section>
 
       <section className="space-y-3">
         <h3 className="text-sm font-semibold uppercase tracking-widest text-[var(--ink-3)]">Past ({past.length})</h3>
         {past.length === 0
           ? <p className="text-sm text-[var(--ink-3)]">No past sessions.</p>
-          : past.map(s => <SessionRow key={s.id} session={s} />)}
+          : past.map(s => <SessionRow key={s.id} session={s} ctx={ctx} />)}
       </section>
     </div>
   )

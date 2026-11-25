@@ -3,8 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { getStaffContext } from '@/lib/staff'
 import { chicagoToUtcIso } from '@/lib/live-support'
+import { setSessionHosts } from '@/lib/lss-sync'
+import { pushSessionToGoogle } from '@/app/actions/lss-calendar'
 
-type Result = { error: string | null }
+type Result = { error: string | null; warning?: string | null }
 
 function revalidateLss() {
   revalidatePath('/admin/lss')
@@ -72,7 +74,6 @@ function parseSessionForm(form: FormData): { row?: Record<string, unknown>; erro
   return {
     row: {
       title,
-      coach_names: text(form.get('coach_names')),
       starts_at: startsAt,
       duration_minutes: duration,
       description: text(form.get('description')),
@@ -82,16 +83,35 @@ function parseSessionForm(form: FormData): { row?: Record<string, unknown>; erro
   }
 }
 
+function coachIds(form: FormData): string[] {
+  return form.getAll('coach_ids').map(String).filter(Boolean)
+}
+
+/**
+ * Hosts → coach_names (first names only), then the Google event. A Google
+ * failure does not undo the save; its message comes back as `warning`.
+ */
+async function afterSave(id: string, form: FormData): Promise<Result> {
+  try {
+    await setSessionHosts(id, coachIds(form))
+  } catch (e) {
+    return { error: null, warning: `Saved, but hosts were not updated: ${e instanceof Error ? e.message : e}` }
+  }
+  const g = await pushSessionToGoogle(id, form.get('add_to_google') === 'on')
+  return { error: null, warning: g.error }
+}
+
 export async function createLssSession(form: FormData): Promise<Result> {
   const staff = await getStaffContext()
   if (!staff) return { error: 'Unauthorized' }
   const { row, error: parseError } = parseSessionForm(form)
   if (!row) return { error: parseError ?? 'Invalid session.' }
 
-  const { error } = await staff.supabase.from('lss_sessions').insert(row)
-  if (error) return { error: error.message }
+  const { data, error } = await staff.supabase.from('lss_sessions').insert(row).select('id').single()
+  if (error || !data) return { error: error?.message ?? 'Could not create the session.' }
+  const res = await afterSave(data.id as string, form)
   revalidateLss()
-  return { error: null }
+  return res
 }
 
 export async function updateLssSession(id: string, form: FormData): Promise<Result> {
@@ -102,8 +122,9 @@ export async function updateLssSession(id: string, form: FormData): Promise<Resu
 
   const { error } = await staff.supabase.from('lss_sessions').update(row).eq('id', id)
   if (error) return { error: error.message }
+  const res = await afterSave(id, form)
   revalidateLss()
-  return { error: null }
+  return res
 }
 
 export async function deleteLssSession(id: string): Promise<Result> {
