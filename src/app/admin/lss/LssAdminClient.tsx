@@ -137,7 +137,7 @@ function SessionForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>Title *</label>
-          <input name="title" required defaultValue={session?.title ?? 'Live Support Session'} className={inputClass} />
+          <input name="title" required defaultValue={session?.title ?? 'OTB Live Support Session'} className={inputClass} />
         </div>
         <div>
           <label className={labelClass}>Hosts</label>

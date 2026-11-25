@@ -201,7 +201,8 @@ export async function importCalendarEvent(eventId: string, coachIds: string[]): 
   const { data: created, error: insErr } = await adminClient
     .from('lss_sessions')
     .insert({
-      title: format.summary,
+      // App title stays generic; the pages add "with {names}" from coach_names.
+      title: 'OTB Live Support Session',
       starts_at: startIso,
       duration_minutes: eventDurationMinutes(event),
       google_event_id: event.id,
@@ -318,7 +319,6 @@ export async function pushSessionToGoogle(sessionId: string, createInGoogle: boo
       }
       // Existing guests (hosts + clients) hear about a time change; a title-only edit is silent.
       await patchEvent(settings.calendarId, s.google_event_id as string, body, body.start ? 'all' : 'none')
-      await adminClient.from('lss_sessions').update({ title: format.summary }).eq('id', sessionId)
       await syncLssAttendees({ sessionIds: [sessionId] })
       return { error: null, data: { created: false } }
     }
@@ -330,7 +330,7 @@ export async function pushSessionToGoogle(sessionId: string, createInGoogle: boo
       end: { dateTime: endIso, timeZone: 'America/Chicago' },
       attendees: hosts.map(h => ({ email: h.email })),
     }, 'all') // only the hosts are guests at this point
-    await adminClient.from('lss_sessions').update({ google_event_id: ev.id, title: format.summary }).eq('id', sessionId)
+    await adminClient.from('lss_sessions').update({ google_event_id: ev.id }).eq('id', sessionId)
     await syncLssAttendees({ sessionIds: [sessionId] })
     revalidateLss()
     return { error: null, data: { created: true } }
