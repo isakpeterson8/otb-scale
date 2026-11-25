@@ -16,6 +16,7 @@ import {
   getEvent,
   insertEvent,
   listEventsFrom,
+  LSS_CALENDAR_OWNER,
   lssEventFormat,
   lssOAuthConfig,
   patchEvent,
@@ -49,6 +50,9 @@ export interface GoogleStatus {
   configured: boolean
   connected: boolean
   accountEmail: string | null
+  /** The account that must be connected (invites are sent From it). */
+  expectedAccount: string
+  wrongAccount: boolean
   calendarId: string | null
   calendarTitle: string | null
   testError: string | null
@@ -62,12 +66,14 @@ export async function getGoogleStatus(): Promise<Result<GoogleStatus>> {
     configured: !!lssOAuthConfig(),
     connected: !!token?.refresh_token,
     accountEmail: token?.account_email ?? null,
+    expectedAccount: LSS_CALENDAR_OWNER,
+    wrongAccount: !!token?.refresh_token && token.account_email?.toLowerCase() !== LSS_CALENDAR_OWNER,
     calendarId: settings.calendarId,
     calendarTitle: null,
     testError: null,
     sendUpdates: settings.sendUpdates,
   }
-  if (status.connected && status.configured && settings.calendarId) {
+  if (status.connected && !status.wrongAccount && status.configured && settings.calendarId) {
     try {
       status.calendarTitle = await getCalendarTitle(settings.calendarId)
     } catch (e) {

@@ -71,7 +71,7 @@ export function GoogleConnectionCard({ status, flash }: { status: GoogleStatus; 
       <div>
         <h3 className="text-sm font-medium text-[var(--ink)]">Google Calendar</h3>
         <p className="text-xs text-[var(--ink-3)] mt-0.5">
-          Invites go out from the shared calendar. Clients never see other guests, coach emails or the Zoom link.
+          Invites go out from the shared calendar, sent by {status.expectedAccount}. Clients never see other guests, coach emails or the Zoom link.
         </p>
       </div>
 
@@ -91,7 +91,14 @@ export function GoogleConnectionCard({ status, flash }: { status: GoogleStatus; 
         </div>
       )}
 
-      {status.connected && (
+      {status.wrongAccount && (
+        <Note tone="error">
+          Connected as {status.accountEmail ?? 'an unknown account'}, but invites must come from {status.expectedAccount}.
+          Nothing will be sent until you reconnect as {status.expectedAccount}.
+        </Note>
+      )}
+
+      {status.connected && !status.wrongAccount && (
         status.testError
           ? <Note tone="error">Calendar test failed: {status.testError}</Note>
           : status.calendarTitle

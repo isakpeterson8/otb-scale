@@ -13,8 +13,12 @@ export const LSS_GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
 ]
 
-/** The only Google account allowed to connect (owner of the LSS calendar). */
-export const LSS_CALENDAR_OWNER = 'isak@outsidethebachs.com'
+/**
+ * The only Google account allowed to connect. Google sends invite emails From
+ * and Reply-To the connected account, so this must be a non-coach mailbox:
+ * clients see this address on every invite.
+ */
+export const LSS_CALENDAR_OWNER = 'support@outsidethebachs.com'
 export const LSS_OAUTH_STATE_COOKIE = 'lss_google_oauth_state'
 
 export const LSS_LIVE_SUPPORT_URL = 'https://studio.outsidethebachs.com/live-support'
@@ -164,6 +168,10 @@ function emailFromIdToken(idToken: string | undefined): string | null {
 export async function getAccessToken(): Promise<string> {
   const row = await readTokenRow()
   if (!row?.refresh_token) throw new Error('Google Calendar is not connected')
+  if (row.account_email?.toLowerCase() !== LSS_CALENDAR_OWNER) {
+    // A token from an earlier allowed account (e.g. a coach) must never send invites.
+    throw new Error(`Google Calendar is connected as ${row.account_email ?? 'an unknown account'}; reconnect as ${LSS_CALENDAR_OWNER}`)
+  }
 
   const expiry = row.access_token_expires_at ? new Date(row.access_token_expires_at).getTime() : 0
   if (row.access_token && expiry - Date.now() > 60_000) return row.access_token
