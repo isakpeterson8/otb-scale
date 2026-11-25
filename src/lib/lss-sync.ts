@@ -20,6 +20,7 @@ import { adminClient } from '@/lib/supabase/admin'
 import {
   GoogleApiError,
   LSS_IMPORT_FROM_ISO,
+  containsZoomLink,
   getEvent,
   joinFirstNames,
   patchEvent,
@@ -291,6 +292,12 @@ async function syncOne(s: LinkedSession, ctx: SyncContext): Promise<SessionSyncR
     const start = event.start.dateTime ?? event.start.date ?? ''
     if (start && new Date(start).toISOString() < LSS_IMPORT_FROM_ISO) {
       return { ...base, skipped: 'Google event is before Dec 1, 2026' }
+    }
+
+    // Never invite clients to an event that still shows the real Zoom link
+    // (e.g. an event edited by hand in Google after import).
+    if (containsZoomLink(event)) {
+      throw new Error('The Google event still contains a zoom.us link; clients were not added. Fix the event (re-save it in /admin/lss) and sync again.')
     }
 
     const hostEmails = (ctx.hosts.get(s.id) ?? []).map(h => norm(h.email))
